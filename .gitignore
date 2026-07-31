@@ -36,6 +36,9 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
+# lockfile (regenerate with `npm install`)
+package-lock.json
+
 # generated native folders
 /ios
 /android
