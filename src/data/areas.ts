@@ -1,0 +1,16 @@
+export const GIBRALTAR_AREAS = [
+  'Ocean Village',
+  'Marina Bay',
+  'Reclamation Road',
+  'Europa Point',
+  'Catalan Bay',
+  'Upper Town',
+  'Sandpits',
+  'Glacis Estate',
+  'Varyl Begg Estate',
+  'Both Worlds',
+  'Westside',
+  'Laguna Estate',
+  'South District',
+  'Town Range',
+];
