@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -56,9 +57,10 @@ export default function CompanyListScreen({ route, navigation }: Props) {
         contentContainerStyle={styles.list}
         ListHeaderComponent={
           <View style={styles.header}>
-            <Text style={styles.title}>
-              {category?.icon} {category?.name}
-            </Text>
+            <View style={styles.titleRow}>
+              {category ? <Ionicons name={category.icon} size={20} color={colors.primary} /> : null}
+              <Text style={styles.title}>{category?.name}</Text>
+            </View>
             <Text style={styles.subtitle}>{allCompanies.length} companies in Gibraltar</Text>
 
             <TextInput
@@ -108,7 +110,7 @@ export default function CompanyListScreen({ route, navigation }: Props) {
         }
         ListEmptyComponent={
           <EmptyState
-            icon="🔍"
+            icon="search-outline"
             title="No matches"
             subtitle={hasActiveFilters ? 'Try clearing a filter or searching something else.' : 'No companies yet in this category.'}
           />
@@ -152,6 +154,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.surfaceAlt },
   list: { padding: spacing.lg, paddingBottom: spacing.xl * 2 },
   header: { marginBottom: spacing.md },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   title: { fontSize: 22, fontWeight: '800', color: colors.text },
   subtitle: { fontSize: 13, color: colors.textMuted, marginTop: 2 },
   search: {

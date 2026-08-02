@@ -1,6 +1,6 @@
+import { Ionicons } from '@expo/vector-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import React from 'react';
-import { Text } from 'react-native';
 import MyRequestsScreen from '../screens/customer/MyRequestsScreen';
 import ProfileScreen from '../screens/customer/ProfileScreen';
 import { colors } from '../theme';
@@ -9,10 +9,10 @@ import { CustomerTabParamList } from './types';
 
 const Tab = createBottomTabNavigator<CustomerTabParamList>();
 
-const ICONS: Record<keyof CustomerTabParamList, string> = {
-  Browse: '⚡',
-  MyRequests: '📋',
-  Profile: '👤',
+const ICONS: Record<keyof CustomerTabParamList, { active: keyof typeof Ionicons.glyphMap; inactive: keyof typeof Ionicons.glyphMap }> = {
+  Browse: { active: 'flash', inactive: 'flash-outline' },
+  MyRequests: { active: 'clipboard', inactive: 'clipboard-outline' },
+  Profile: { active: 'person', inactive: 'person-outline' },
 };
 
 export default function CustomerNavigator() {
@@ -24,7 +24,10 @@ export default function CustomerNavigator() {
         tabBarInactiveTintColor: colors.textFaint,
         tabBarStyle: { borderTopColor: colors.border, borderTopWidth: 1 },
         tabBarLabelStyle: { fontSize: 11.5, fontWeight: '600' },
-        tabBarIcon: () => <Text style={{ fontSize: 18 }}>{ICONS[route.name as keyof CustomerTabParamList]}</Text>,
+        tabBarIcon: ({ focused, color }) => {
+          const icons = ICONS[route.name as keyof CustomerTabParamList];
+          return <Ionicons name={focused ? icons.active : icons.inactive} size={22} color={color} />;
+        },
       })}
     >
       <Tab.Screen name="Browse" component={BrowseNavigator} options={{ title: 'Browse' }} />

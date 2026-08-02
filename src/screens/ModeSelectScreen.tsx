@@ -1,8 +1,9 @@
+import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import { Button } from '../components/ui';
 import { useApp } from '../context/AppContext';
-import { colors, radius, spacing } from '../theme';
+import { colors, radius, shadow, spacing } from '../theme';
 
 export default function ModeSelectScreen() {
   const { setMode } = useApp();
@@ -11,7 +12,7 @@ export default function ModeSelectScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.hero}>
         <View style={styles.boltBadge}>
-          <Text style={styles.bolt}>⚡</Text>
+          <Ionicons name="flash" size={34} color={colors.textInverse} />
         </View>
         <Text style={styles.title}>LightningService</Text>
         <Text style={styles.subtitle}>Find trusted local tradespeople in Gibraltar, fast.</Text>
@@ -36,16 +37,14 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, justifyContent: 'space-between', padding: spacing.lg },
   hero: { alignItems: 'center', marginTop: spacing.xl * 2 },
   boltBadge: {
-    width: 84,
-    height: 84,
-    borderRadius: radius.xl,
-    backgroundColor: 'rgba(79, 163, 247, 0.16)',
+    width: 76,
+    height: 76,
+    borderRadius: radius.lg,
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(79, 163, 247, 0.35)',
+    ...shadow.raised,
   },
-  bolt: { fontSize: 40 },
   title: { fontSize: 30, fontWeight: '800', color: colors.textInverse, marginTop: spacing.lg, letterSpacing: 0.2 },
   subtitle: {
     fontSize: 15,

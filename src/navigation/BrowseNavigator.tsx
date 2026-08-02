@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -16,7 +17,7 @@ function BrandTitle() {
   return (
     <View style={brandStyles.row}>
       <View style={brandStyles.badge}>
-        <Text style={brandStyles.bolt}>⚡</Text>
+        <Ionicons name="flash" size={13} color={colors.textInverse} />
       </View>
       <Text style={brandStyles.title}>LightningService</Text>
     </View>
@@ -33,7 +34,6 @@ const brandStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  bolt: { fontSize: 13 },
   title: { fontSize: 17, fontWeight: '700', color: colors.text },
 });
 

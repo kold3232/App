@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors, radius, shadow, spacing } from '../theme';
@@ -92,11 +93,19 @@ export function StatusBadge({ status }: { status: 'pending' | 'accepted' | 'decl
   );
 }
 
-export function EmptyState({ icon, title, subtitle }: { icon: string; title: string; subtitle?: string }) {
+export function EmptyState({
+  icon,
+  title,
+  subtitle,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  subtitle?: string;
+}) {
   return (
     <View style={styles.emptyState}>
       <View style={styles.emptyIconWrap}>
-        <Text style={styles.emptyIcon}>{icon}</Text>
+        <Ionicons name={icon} size={28} color={colors.textFaint} />
       </View>
       <Text style={styles.emptyTitle}>{title}</Text>
       {subtitle ? <Text style={styles.emptySubtitle}>{subtitle}</Text> : null}
@@ -161,7 +170,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: spacing.md,
   },
-  emptyIcon: { fontSize: 32 },
   emptyTitle: { fontSize: 16, fontWeight: '700', color: colors.text, textAlign: 'center' },
   emptySubtitle: { fontSize: 13, color: colors.textMuted, textAlign: 'center', marginTop: 4, lineHeight: 19 },
   sectionLabel: {

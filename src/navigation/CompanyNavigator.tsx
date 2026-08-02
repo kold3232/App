@@ -1,6 +1,6 @@
+import { Ionicons } from '@expo/vector-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import React from 'react';
-import { Text } from 'react-native';
 import DashboardScreen from '../screens/company/DashboardScreen';
 import MyListingScreen from '../screens/company/MyListingScreen';
 import SettingsScreen from '../screens/company/SettingsScreen';
@@ -9,10 +9,10 @@ import { CompanyTabParamList } from './types';
 
 const Tab = createBottomTabNavigator<CompanyTabParamList>();
 
-const ICONS: Record<keyof CompanyTabParamList, string> = {
-  Dashboard: '📥',
-  MyListing: '🏷️',
-  Settings: '⚙️',
+const ICONS: Record<keyof CompanyTabParamList, { active: keyof typeof Ionicons.glyphMap; inactive: keyof typeof Ionicons.glyphMap }> = {
+  Dashboard: { active: 'file-tray-full', inactive: 'file-tray-full-outline' },
+  MyListing: { active: 'pricetag', inactive: 'pricetag-outline' },
+  Settings: { active: 'settings', inactive: 'settings-outline' },
 };
 
 export default function CompanyNavigator() {
@@ -24,7 +24,10 @@ export default function CompanyNavigator() {
         tabBarInactiveTintColor: colors.textFaint,
         tabBarStyle: { borderTopColor: colors.border, borderTopWidth: 1 },
         tabBarLabelStyle: { fontSize: 11.5, fontWeight: '600' },
-        tabBarIcon: () => <Text style={{ fontSize: 18 }}>{ICONS[route.name as keyof CompanyTabParamList]}</Text>,
+        tabBarIcon: ({ focused, color }) => {
+          const icons = ICONS[route.name as keyof CompanyTabParamList];
+          return <Ionicons name={focused ? icons.active : icons.inactive} size={22} color={color} />;
+        },
       })}
     >
       <Tab.Screen name="Dashboard" component={DashboardScreen} options={{ title: 'Requests' }} />

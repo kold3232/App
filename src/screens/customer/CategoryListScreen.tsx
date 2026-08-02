@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -30,7 +31,7 @@ export default function CategoryListScreen({ navigation }: Props) {
               onPress={() => navigation.navigate('CompanyList', { categoryId: item.id })}
             >
               <View style={styles.tileIconWrap}>
-                <Text style={styles.tileIcon}>{item.icon}</Text>
+                <Ionicons name={item.icon} size={21} color={colors.primary} />
               </View>
               <Text style={styles.tileTitle}>{item.name}</Text>
               <Text style={styles.tileDescription}>{item.description}</Text>
@@ -56,20 +57,19 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     borderWidth: 1,
     borderColor: colors.border,
-    minHeight: 156,
+    minHeight: 152,
     ...shadow.card,
   },
   tilePressed: { opacity: 0.9 },
   tileIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: radius.md,
-    backgroundColor: colors.surfaceAlt,
+    width: 40,
+    height: 40,
+    borderRadius: radius.sm,
+    backgroundColor: 'rgba(36, 84, 232, 0.08)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  tileIcon: { fontSize: 22 },
-  tileTitle: { fontSize: 15, fontWeight: '700', color: colors.text, marginTop: spacing.sm },
-  tileDescription: { fontSize: 12, color: colors.textMuted, marginTop: 4, minHeight: 32, lineHeight: 16 },
+  tileTitle: { fontSize: 14.5, fontWeight: '700', color: colors.text, marginTop: spacing.sm, letterSpacing: 0.1 },
+  tileDescription: { fontSize: 11.5, color: colors.textMuted, marginTop: 4, minHeight: 30, lineHeight: 15.5 },
   tileCount: { fontSize: 11, color: colors.primary, fontWeight: '700', marginTop: spacing.sm },
 });

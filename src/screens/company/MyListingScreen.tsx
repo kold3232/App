@@ -87,7 +87,7 @@ export default function MyListingScreen() {
           {CATEGORIES.map((c) => (
             <Chip
               key={c.id}
-              label={`${c.icon} ${c.name}`}
+              label={c.name}
               selected={profile.categoryIds.includes(c.id)}
               onPress={() => toggleCategory(c.id)}
             />

@@ -42,7 +42,7 @@ export default function DashboardScreen() {
           </View>
         }
         ListEmptyComponent={
-          <EmptyState icon="📭" title="Nothing here yet" subtitle="New customer requests will show up in this list." />
+          <EmptyState icon="file-tray-outline" title="Nothing here yet" subtitle="New customer requests will show up in this list." />
         }
         ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
         renderItem={({ item }) => (

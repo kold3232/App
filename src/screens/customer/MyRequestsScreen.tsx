@@ -16,7 +16,7 @@ export default function MyRequestsScreen() {
         ListHeaderComponent={<Text style={styles.title}>My requests</Text>}
         ListEmptyComponent={
           <EmptyState
-            icon="📋"
+            icon="clipboard-outline"
             title="No requests yet"
             subtitle="Browse a category and request a quote to see it here."
           />

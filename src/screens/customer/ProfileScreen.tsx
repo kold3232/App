@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import { Button, Card, SectionLabel } from '../../components/ui';
@@ -25,7 +26,7 @@ export default function ProfileScreen() {
         <Card style={{ marginTop: spacing.lg }}>
           <View style={styles.row}>
             <View style={styles.iconWrap}>
-              <Text style={styles.icon}>👤</Text>
+              <Ionicons name="person-outline" size={18} color={colors.primary} />
             </View>
             <View style={{ flex: 1 }}>
               <SectionLabel>Account</SectionLabel>
@@ -37,7 +38,7 @@ export default function ProfileScreen() {
         <Card style={{ marginTop: spacing.md }}>
           <View style={styles.row}>
             <View style={styles.iconWrap}>
-              <Text style={styles.icon}>📍</Text>
+              <Ionicons name="location-outline" size={18} color={colors.primary} />
             </View>
             <View style={{ flex: 1 }}>
               <SectionLabel>Location</SectionLabel>
@@ -66,6 +67,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  icon: { fontSize: 18 },
   text: { fontSize: 14, color: colors.text, marginTop: 6, lineHeight: 20 },
 });
