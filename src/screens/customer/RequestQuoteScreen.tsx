@@ -7,7 +7,7 @@ import { GIBRALTAR_AREAS } from '../../data/areas';
 import { getCompanyById } from '../../data/companies';
 import { useApp } from '../../context/AppContext';
 import { BrowseStackParamList } from '../../navigation/types';
-import { colors, radius, spacing } from '../../theme';
+import { colors, radius, shadow, spacing } from '../../theme';
 import { notify } from '../../utils/alert';
 
 type Props = NativeStackScreenProps<BrowseStackParamList, 'RequestQuote'>;
@@ -63,7 +63,8 @@ export default function RequestQuoteScreen({ route, navigation }: Props) {
           value={customerName}
           onChangeText={setCustomerName}
           placeholder="e.g. Maria Chipolina"
-          placeholderTextColor={colors.textMuted}
+          placeholderTextColor={colors.textFaint}
+          selectionColor={colors.primary}
         />
 
         <SectionLabel>Phone number</SectionLabel>
@@ -72,7 +73,8 @@ export default function RequestQuoteScreen({ route, navigation }: Props) {
           value={phone}
           onChangeText={setPhone}
           placeholder="+350 5400 0000"
-          placeholderTextColor={colors.textMuted}
+          placeholderTextColor={colors.textFaint}
+          selectionColor={colors.primary}
           keyboardType="phone-pad"
         />
 
@@ -89,7 +91,8 @@ export default function RequestQuoteScreen({ route, navigation }: Props) {
           value={addressDetails}
           onChangeText={setAddressDetails}
           placeholder="Block, floor, flat number..."
-          placeholderTextColor={colors.textMuted}
+          placeholderTextColor={colors.textFaint}
+          selectionColor={colors.primary}
         />
 
         <SectionLabel>What do you need done?</SectionLabel>
@@ -98,7 +101,8 @@ export default function RequestQuoteScreen({ route, navigation }: Props) {
           value={jobDetails}
           onChangeText={setJobDetails}
           placeholder="Describe the job..."
-          placeholderTextColor={colors.textMuted}
+          placeholderTextColor={colors.textFaint}
+          selectionColor={colors.primary}
           multiline
           numberOfLines={4}
         />
@@ -109,7 +113,8 @@ export default function RequestQuoteScreen({ route, navigation }: Props) {
           value={preferredDate}
           onChangeText={setPreferredDate}
           placeholder="e.g. This week, or 12 August"
-          placeholderTextColor={colors.textMuted}
+          placeholderTextColor={colors.textFaint}
+          selectionColor={colors.primary}
         />
 
         <View style={{ height: spacing.md }} />
@@ -121,11 +126,11 @@ export default function RequestQuoteScreen({ route, navigation }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.surfaceAlt },
-  title: { fontSize: 22, fontWeight: '800', color: colors.text },
+  title: { fontSize: 22, fontWeight: '800', color: colors.text, letterSpacing: 0.1 },
   subtitle: { fontSize: 13, color: colors.textMuted, marginTop: 4, marginBottom: spacing.md },
   input: {
     backgroundColor: colors.surface,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: colors.border,
     borderRadius: radius.md,
     padding: spacing.md,
@@ -133,6 +138,7 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginTop: spacing.xs,
     marginBottom: spacing.md,
+    ...shadow.card,
   },
   multiline: { minHeight: 90, textAlignVertical: 'top' },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', marginTop: spacing.xs, marginBottom: spacing.sm },

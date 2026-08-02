@@ -4,7 +4,7 @@ import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { CATEGORIES } from '../../data/categories';
 import { getCompaniesByCategory } from '../../data/companies';
 import { BrowseStackParamList } from '../../navigation/types';
-import { colors, radius, spacing } from '../../theme';
+import { colors, radius, shadow, spacing } from '../../theme';
 
 type Props = NativeStackScreenProps<BrowseStackParamList, 'CategoryList'>;
 
@@ -26,10 +26,12 @@ export default function CategoryListScreen({ navigation }: Props) {
           const count = getCompaniesByCategory(item.id).length;
           return (
             <Pressable
-              style={styles.tile}
+              style={({ pressed }) => [styles.tile, pressed && styles.tilePressed]}
               onPress={() => navigation.navigate('CompanyList', { categoryId: item.id })}
             >
-              <Text style={styles.tileIcon}>{item.icon}</Text>
+              <View style={styles.tileIconWrap}>
+                <Text style={styles.tileIcon}>{item.icon}</Text>
+              </View>
               <Text style={styles.tileTitle}>{item.name}</Text>
               <Text style={styles.tileDescription}>{item.description}</Text>
               <Text style={styles.tileCount}>{count} companies</Text>
@@ -43,9 +45,9 @@ export default function CategoryListScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.surfaceAlt },
-  header: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.sm },
-  eyebrow: { color: colors.primary, fontWeight: '700', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 },
-  title: { fontSize: 24, fontWeight: '800', color: colors.text, marginTop: 4 },
+  header: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.md },
+  eyebrow: { color: colors.primary, fontWeight: '700', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.6 },
+  title: { fontSize: 25, fontWeight: '800', color: colors.text, marginTop: 4, letterSpacing: 0.1 },
   list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
   tile: {
     flex: 1,
@@ -54,10 +56,20 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     borderWidth: 1,
     borderColor: colors.border,
-    minHeight: 148,
+    minHeight: 156,
+    ...shadow.card,
   },
-  tileIcon: { fontSize: 28 },
+  tilePressed: { opacity: 0.9 },
+  tileIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceAlt,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tileIcon: { fontSize: 22 },
   tileTitle: { fontSize: 15, fontWeight: '700', color: colors.text, marginTop: spacing.sm },
-  tileDescription: { fontSize: 12, color: colors.textMuted, marginTop: 4, minHeight: 32 },
+  tileDescription: { fontSize: 12, color: colors.textMuted, marginTop: 4, minHeight: 32, lineHeight: 16 },
   tileCount: { fontSize: 11, color: colors.primary, fontWeight: '700', marginTop: spacing.sm },
 });

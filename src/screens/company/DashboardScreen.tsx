@@ -85,7 +85,7 @@ export default function DashboardScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.surfaceAlt },
   list: { padding: spacing.lg, paddingBottom: spacing.xl * 2, flexGrow: 1 },
-  title: { fontSize: 22, fontWeight: '800', color: colors.text },
+  title: { fontSize: 22, fontWeight: '800', color: colors.text, letterSpacing: 0.1 },
   subtitle: { fontSize: 12, color: colors.textMuted, marginTop: 4 },
   filterRow: { flexDirection: 'row', flexWrap: 'wrap', marginTop: spacing.md, marginBottom: spacing.xs },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },

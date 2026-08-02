@@ -21,7 +21,9 @@ export default function CompanyNavigator() {
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textMuted,
+        tabBarInactiveTintColor: colors.textFaint,
+        tabBarStyle: { borderTopColor: colors.border, borderTopWidth: 1 },
+        tabBarLabelStyle: { fontSize: 11.5, fontWeight: '600' },
         tabBarIcon: () => <Text style={{ fontSize: 18 }}>{ICONS[route.name as keyof CompanyTabParamList]}</Text>,
       })}
     >

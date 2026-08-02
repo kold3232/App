@@ -15,7 +15,7 @@ export const COMPANIES: Company[] = [
     phone: '+350 200 12345',
     yearsActive: 14,
     services: ['Emergency call-outs', 'Boiler installation', 'Bathroom refits', 'Leak detection'],
-    color: '#2A3AFF',
+    color: '#2454E8',
   },
   {
     id: 'gib-flow-plumbers',
@@ -31,7 +31,7 @@ export const COMPANIES: Company[] = [
     phone: '+350 200 22334',
     yearsActive: 6,
     services: ['Tap & pipe repairs', 'Drain unblocking', 'Water tank servicing'],
-    color: '#2A3AFF',
+    color: '#5B82F2',
   },
   {
     id: 'gibwatt-electrical',
@@ -47,7 +47,7 @@ export const COMPANIES: Company[] = [
     phone: '+350 200 33456',
     yearsActive: 19,
     services: ['EICR certificates', 'Fuse board upgrades', 'Rewiring', 'Lighting installation'],
-    color: '#FFC300',
+    color: '#173CB8',
   },
   {
     id: 'sparkline-electrical',
@@ -63,7 +63,7 @@ export const COMPANIES: Company[] = [
     phone: '+350 200 44567',
     yearsActive: 8,
     services: ['Fault finding', 'Socket & switch fitting', 'CCTV wiring'],
-    color: '#FFC300',
+    color: '#334155',
   },
   {
     id: 'two-sisters-cleaning',
@@ -79,7 +79,7 @@ export const COMPANIES: Company[] = [
     phone: '+350 200 55678',
     yearsActive: 5,
     services: ['Regular home cleaning', 'Deep cleaning', 'End of tenancy', 'Office cleaning'],
-    color: '#1E9E5A',
+    color: '#2454E8',
   },
   {
     id: 'rock-shine-cleaners',
@@ -95,7 +95,7 @@ export const COMPANIES: Company[] = [
     phone: '+350 200 66789',
     yearsActive: 3,
     services: ['Office cleaning', 'Window cleaning', 'Post-construction cleaning'],
-    color: '#1E9E5A',
+    color: '#64748B',
   },
   {
     id: 'upper-rock-gardening',
@@ -111,7 +111,7 @@ export const COMPANIES: Company[] = [
     phone: '+350 200 77890',
     yearsActive: 11,
     services: ['Lawn & hedge maintenance', 'Patio jet-washing', 'Planting & landscaping'],
-    color: '#1E9E5A',
+    color: '#173CB8',
   },
   {
     id: 'gib-locksmiths',
@@ -127,7 +127,7 @@ export const COMPANIES: Company[] = [
     phone: '+350 200 88901',
     yearsActive: 9,
     services: ['Emergency lockout', 'uPVC door repair', 'Lock upgrades', 'Safe opening'],
-    color: '#E1483C',
+    color: '#334155',
   },
   {
     id: 'mediterranean-painters',
@@ -143,7 +143,7 @@ export const COMPANIES: Company[] = [
     phone: '+350 200 99012',
     yearsActive: 12,
     services: ['Interior painting', 'Exterior & damp-proofing', 'Wallpaper hanging'],
-    color: '#FFC300',
+    color: '#5B82F2',
   },
   {
     id: 'rock-removals',
@@ -159,7 +159,7 @@ export const COMPANIES: Company[] = [
     phone: '+350 200 10123',
     yearsActive: 7,
     services: ['House removals', 'Man with a van', 'Furniture assembly', 'Cross-border moves'],
-    color: '#2A3AFF',
+    color: '#2454E8',
   },
   {
     id: 'southport-carpentry',
@@ -175,7 +175,7 @@ export const COMPANIES: Company[] = [
     phone: '+350 200 11234',
     yearsActive: 16,
     services: ['Fitted wardrobes', 'Doors & skirting', 'Decking'],
-    color: '#FFC300',
+    color: '#64748B',
   },
   {
     id: 'gibraltar-pest-solutions',
@@ -191,7 +191,7 @@ export const COMPANIES: Company[] = [
     phone: '+350 200 12456',
     yearsActive: 10,
     services: ['Ant & cockroach treatment', 'Rodent control', 'Preventative contracts'],
-    color: '#E1483C',
+    color: '#173CB8',
   },
   {
     id: 'bay-tech-support',
@@ -207,7 +207,7 @@ export const COMPANIES: Company[] = [
     phone: '+350 200 13567',
     yearsActive: 4,
     services: ['Wi-Fi troubleshooting', 'TV wall mounting', 'Satellite & TV setup'],
-    color: '#2A3AFF',
+    color: '#334155',
   },
   {
     id: 'ocean-village-handyman',
@@ -223,7 +223,7 @@ export const COMPANIES: Company[] = [
     phone: '+350 200 14678',
     yearsActive: 5,
     services: ['Flat-pack assembly', 'Shelving & mounting', 'General repairs'],
-    color: '#6B7280',
+    color: '#64748B',
   },
   {
     id: 'chillair-gibraltar',
@@ -239,7 +239,7 @@ export const COMPANIES: Company[] = [
     phone: '+350 200 15789',
     yearsActive: 13,
     services: ['AC installation', 'Annual servicing', 'Emergency repair', 'Gas re-gassing'],
-    color: '#2A3AFF',
+    color: '#2454E8',
   },
 ];
 

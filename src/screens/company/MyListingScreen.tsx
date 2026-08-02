@@ -5,7 +5,7 @@ import { CATEGORIES } from '../../data/categories';
 import { GIBRALTAR_AREAS } from '../../data/areas';
 import { useApp } from '../../context/AppContext';
 import { CompanyProfile } from '../../types';
-import { colors, radius, spacing } from '../../theme';
+import { colors, radius, shadow, spacing } from '../../theme';
 import { notify } from '../../utils/alert';
 
 const PRICE_OPTIONS: CompanyProfile['priceRange'][] = ['£', '££', '£££'];
@@ -59,7 +59,8 @@ export default function MyListingScreen() {
           style={styles.input}
           value={profile.name}
           onChangeText={(v) => setProfile((p) => ({ ...p, name: v }))}
-          placeholderTextColor={colors.textMuted}
+          placeholderTextColor={colors.textFaint}
+          selectionColor={colors.primary}
         />
 
         <SectionLabel>Tagline</SectionLabel>
@@ -67,7 +68,8 @@ export default function MyListingScreen() {
           style={styles.input}
           value={profile.tagline}
           onChangeText={(v) => setProfile((p) => ({ ...p, tagline: v }))}
-          placeholderTextColor={colors.textMuted}
+          placeholderTextColor={colors.textFaint}
+          selectionColor={colors.primary}
         />
 
         <SectionLabel>Description</SectionLabel>
@@ -76,7 +78,8 @@ export default function MyListingScreen() {
           value={profile.description}
           onChangeText={(v) => setProfile((p) => ({ ...p, description: v }))}
           multiline
-          placeholderTextColor={colors.textMuted}
+          placeholderTextColor={colors.textFaint}
+          selectionColor={colors.primary}
         />
 
         <SectionLabel>Categories</SectionLabel>
@@ -111,7 +114,8 @@ export default function MyListingScreen() {
           value={profile.phone}
           onChangeText={(v) => setProfile((p) => ({ ...p, phone: v }))}
           keyboardType="phone-pad"
-          placeholderTextColor={colors.textMuted}
+          placeholderTextColor={colors.textFaint}
+          selectionColor={colors.primary}
         />
 
         <SectionLabel>Services</SectionLabel>
@@ -129,7 +133,8 @@ export default function MyListingScreen() {
             value={newService}
             onChangeText={setNewService}
             placeholder="Add a service..."
-            placeholderTextColor={colors.textMuted}
+            placeholderTextColor={colors.textFaint}
+          selectionColor={colors.primary}
             onSubmitEditing={addService}
           />
           <Pressable style={styles.addButton} onPress={addService}>
@@ -146,11 +151,11 @@ export default function MyListingScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.surfaceAlt },
-  title: { fontSize: 22, fontWeight: '800', color: colors.text },
+  title: { fontSize: 22, fontWeight: '800', color: colors.text, letterSpacing: 0.1 },
   subtitle: { fontSize: 13, color: colors.textMuted, marginTop: 4, marginBottom: spacing.md },
   input: {
     backgroundColor: colors.surface,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: colors.border,
     borderRadius: radius.md,
     padding: spacing.md,
@@ -158,6 +163,7 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginTop: spacing.xs,
     marginBottom: spacing.md,
+    ...shadow.card,
   },
   multiline: { minHeight: 90, textAlignVertical: 'top' },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', marginTop: spacing.xs, marginBottom: spacing.sm },
@@ -172,6 +178,12 @@ const styles = StyleSheet.create({
   serviceText: { fontSize: 14, color: colors.text, flex: 1 },
   remove: { fontSize: 12, color: colors.danger, fontWeight: '700' },
   addServiceRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md, alignItems: 'center' },
-  addButton: { backgroundColor: colors.primary, paddingHorizontal: spacing.md, paddingVertical: 14, borderRadius: radius.md },
+  addButton: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 14,
+    borderRadius: radius.md,
+    ...shadow.card,
+  },
   addButtonText: { color: colors.textInverse, fontWeight: '700' },
 });

@@ -1,6 +1,6 @@
 import React from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors, radius, spacing } from '../theme';
+import { colors, radius, shadow, spacing } from '../theme';
 
 export function Button({
   title,
@@ -16,12 +16,13 @@ export function Button({
   loading?: boolean;
 }) {
   const styleForVariant = {
-    primary: { backgroundColor: colors.primary },
-    secondary: { backgroundColor: colors.accent },
-    danger: { backgroundColor: colors.danger },
+    primary: { backgroundColor: colors.primary, ...shadow.card },
+    secondary: { backgroundColor: colors.surfaceAlt, borderWidth: 1.5, borderColor: colors.borderStrong },
+    danger: { backgroundColor: colors.danger, ...shadow.card },
     outline: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: colors.primary },
   }[variant];
-  const textColor = variant === 'outline' ? colors.primary : variant === 'secondary' ? colors.text : colors.textInverse;
+  const textColor =
+    variant === 'outline' ? colors.primary : variant === 'secondary' ? colors.slate700 : colors.textInverse;
 
   return (
     <Pressable
@@ -79,10 +80,10 @@ export function RatingBadge({ rating, reviewCount }: { rating: number; reviewCou
 
 export function StatusBadge({ status }: { status: 'pending' | 'accepted' | 'declined' | 'completed' }) {
   const map = {
-    pending: { bg: '#FDF1D8', fg: colors.pending, label: 'Pending' },
-    accepted: { bg: '#DFF5E7', fg: colors.success, label: 'Accepted' },
-    declined: { bg: '#FBE2E0', fg: colors.danger, label: 'Declined' },
-    completed: { bg: '#E4E9FF', fg: colors.primary, label: 'Completed' },
+    pending: { bg: colors.pendingBg, fg: colors.pending, label: 'Pending' },
+    accepted: { bg: colors.infoBg, fg: colors.info, label: 'Accepted' },
+    declined: { bg: colors.dangerBg, fg: colors.danger, label: 'Declined' },
+    completed: { bg: colors.successBg, fg: colors.success, label: 'Completed' },
   }[status];
   return (
     <View style={[styles.statusBadge, { backgroundColor: map.bg }]}>
@@ -94,7 +95,9 @@ export function StatusBadge({ status }: { status: 'pending' | 'accepted' | 'decl
 export function EmptyState({ icon, title, subtitle }: { icon: string; title: string; subtitle?: string }) {
   return (
     <View style={styles.emptyState}>
-      <Text style={styles.emptyIcon}>{icon}</Text>
+      <View style={styles.emptyIconWrap}>
+        <Text style={styles.emptyIcon}>{icon}</Text>
+      </View>
       <Text style={styles.emptyTitle}>{title}</Text>
       {subtitle ? <Text style={styles.emptySubtitle}>{subtitle}</Text> : null}
     </View>
@@ -107,27 +110,27 @@ export function SectionLabel({ children }: { children: React.ReactNode }) {
 
 const styles = StyleSheet.create({
   button: {
-    paddingVertical: 14,
+    paddingVertical: 15,
     paddingHorizontal: spacing.lg,
     borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  buttonDisabled: { opacity: 0.5 },
+  buttonDisabled: { opacity: 0.45 },
   buttonPressed: { opacity: 0.85 },
-  buttonText: { fontSize: 16, fontWeight: '700' },
+  buttonText: { fontSize: 15.5, fontWeight: '700', letterSpacing: 0.2 },
   chip: {
-    paddingVertical: 8,
-    paddingHorizontal: 14,
+    paddingVertical: 9,
+    paddingHorizontal: 15,
     borderRadius: radius.pill,
-    backgroundColor: colors.surfaceAlt,
-    borderWidth: 1,
+    backgroundColor: colors.surface,
+    borderWidth: 1.5,
     borderColor: colors.border,
     marginRight: spacing.sm,
     marginBottom: spacing.sm,
   },
   chipSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
-  chipText: { color: colors.text, fontWeight: '600', fontSize: 13 },
+  chipText: { color: colors.slate700, fontWeight: '600', fontSize: 13 },
   chipTextSelected: { color: colors.textInverse },
   card: {
     backgroundColor: colors.surface,
@@ -135,21 +138,37 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     borderWidth: 1,
     borderColor: colors.border,
+    ...shadow.card,
   },
   ratingRow: { flexDirection: 'row', alignItems: 'center' },
   ratingStar: { color: colors.accent, fontSize: 14, marginRight: 3 },
   ratingText: { fontWeight: '700', color: colors.text, fontSize: 13, marginRight: 3 },
   ratingCount: { color: colors.textMuted, fontSize: 12 },
   statusBadge: {
-    paddingVertical: 4,
-    paddingHorizontal: 10,
+    paddingVertical: 5,
+    paddingHorizontal: 11,
     borderRadius: radius.pill,
     alignSelf: 'flex-start',
   },
-  statusBadgeText: { fontSize: 12, fontWeight: '700' },
+  statusBadgeText: { fontSize: 11.5, fontWeight: '700', letterSpacing: 0.2 },
   emptyState: { alignItems: 'center', justifyContent: 'center', paddingVertical: spacing.xl * 2, paddingHorizontal: spacing.lg },
-  emptyIcon: { fontSize: 40, marginBottom: spacing.sm },
+  emptyIconWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: radius.xl,
+    backgroundColor: colors.surfaceAlt,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+  },
+  emptyIcon: { fontSize: 32 },
   emptyTitle: { fontSize: 16, fontWeight: '700', color: colors.text, textAlign: 'center' },
-  emptySubtitle: { fontSize: 13, color: colors.textMuted, textAlign: 'center', marginTop: 4 },
-  sectionLabel: { fontSize: 13, fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
+  emptySubtitle: { fontSize: 13, color: colors.textMuted, textAlign: 'center', marginTop: 4, lineHeight: 19 },
+  sectionLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+  },
 });

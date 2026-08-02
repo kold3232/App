@@ -45,7 +45,7 @@ export default function MyRequestsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.surfaceAlt },
   list: { padding: spacing.lg, paddingBottom: spacing.xl * 2, flexGrow: 1 },
-  title: { fontSize: 22, fontWeight: '800', color: colors.text, marginBottom: spacing.md },
+  title: { fontSize: 22, fontWeight: '800', color: colors.text, marginBottom: spacing.md, letterSpacing: 0.1 },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   companyName: { fontSize: 16, fontWeight: '700', color: colors.text, flex: 1, marginRight: spacing.sm },
   category: { fontSize: 12, color: colors.primary, fontWeight: '700', marginTop: 2 },

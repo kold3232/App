@@ -5,7 +5,7 @@ import { Card, RatingBadge } from '../../components/ui';
 import { CATEGORIES } from '../../data/categories';
 import { getCompaniesByCategory } from '../../data/companies';
 import { BrowseStackParamList } from '../../navigation/types';
-import { colors, spacing } from '../../theme';
+import { colors, radius, spacing } from '../../theme';
 
 type Props = NativeStackScreenProps<BrowseStackParamList, 'CompanyList'>;
 
@@ -30,29 +30,31 @@ export default function CompanyListScreen({ route, navigation }: Props) {
         ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
         renderItem={({ item }) => (
           <Pressable onPress={() => navigation.navigate('CompanyDetail', { companyId: item.id })}>
-            <Card>
-              <View style={styles.row}>
-                <View style={[styles.avatar, { backgroundColor: item.color }]}>
-                  <Text style={styles.avatarText}>{item.name.charAt(0)}</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.companyName}>{item.name}</Text>
-                  <Text style={styles.tagline} numberOfLines={1}>
-                    {item.tagline}
-                  </Text>
-                  <View style={styles.metaRow}>
-                    <RatingBadge rating={item.rating} reviewCount={item.reviewCount} />
-                    <Text style={styles.dot}>·</Text>
-                    <Text style={styles.priceRange}>{item.priceRange}</Text>
-                    <Text style={styles.dot}>·</Text>
-                    <Text style={styles.years}>{item.yearsActive} yrs</Text>
+            {({ pressed }) => (
+              <Card style={pressed && styles.cardPressed}>
+                <View style={styles.row}>
+                  <View style={[styles.avatar, { backgroundColor: item.color }]}>
+                    <Text style={styles.avatarText}>{item.name.charAt(0)}</Text>
                   </View>
-                  <Text style={styles.areas} numberOfLines={1}>
-                    📍 {item.areas.join(', ')}
-                  </Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.companyName}>{item.name}</Text>
+                    <Text style={styles.tagline} numberOfLines={1}>
+                      {item.tagline}
+                    </Text>
+                    <View style={styles.metaRow}>
+                      <RatingBadge rating={item.rating} reviewCount={item.reviewCount} />
+                      <Text style={styles.dot}>·</Text>
+                      <Text style={styles.priceRange}>{item.priceRange}</Text>
+                      <Text style={styles.dot}>·</Text>
+                      <Text style={styles.years}>{item.yearsActive} yrs</Text>
+                    </View>
+                    <Text style={styles.areas} numberOfLines={1}>
+                      📍 {item.areas.join(', ')}
+                    </Text>
+                  </View>
                 </View>
-              </View>
-            </Card>
+              </Card>
+            )}
           </Pressable>
         )}
       />
@@ -67,13 +69,14 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: '800', color: colors.text },
   subtitle: { fontSize: 13, color: colors.textMuted, marginTop: 2 },
   row: { flexDirection: 'row', gap: spacing.md },
-  avatar: { width: 48, height: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  cardPressed: { opacity: 0.85 },
+  avatar: { width: 50, height: 50, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
   avatarText: { color: '#fff', fontWeight: '800', fontSize: 18 },
   companyName: { fontSize: 16, fontWeight: '700', color: colors.text },
   tagline: { fontSize: 13, color: colors.textMuted, marginTop: 2 },
-  metaRow: { flexDirection: 'row', alignItems: 'center', marginTop: 6, gap: 6 },
-  dot: { color: colors.textMuted },
+  metaRow: { flexDirection: 'row', alignItems: 'center', marginTop: 7, gap: 6 },
+  dot: { color: colors.textFaint },
   priceRange: { fontSize: 13, color: colors.textMuted, fontWeight: '700' },
   years: { fontSize: 12, color: colors.textMuted },
-  areas: { fontSize: 12, color: colors.textMuted, marginTop: 6 },
+  areas: { fontSize: 12, color: colors.textMuted, marginTop: 7 },
 });

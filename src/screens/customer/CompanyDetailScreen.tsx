@@ -4,7 +4,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Button, Card, RatingBadge, SectionLabel } from '../../components/ui';
 import { getCompanyById } from '../../data/companies';
 import { BrowseStackParamList } from '../../navigation/types';
-import { colors, spacing } from '../../theme';
+import { colors, radius, shadow, spacing } from '../../theme';
 
 type Props = NativeStackScreenProps<BrowseStackParamList, 'CompanyDetail'>;
 
@@ -18,7 +18,9 @@ export default function CompanyDetailScreen({ route, navigation }: Props) {
       contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xl * 2 }}
     >
       <View style={[styles.banner, { backgroundColor: company.color }]}>
-        <Text style={styles.bannerInitial}>{company.name.charAt(0)}</Text>
+        <View style={styles.bannerAvatar}>
+          <Text style={styles.bannerInitial}>{company.name.charAt(0)}</Text>
+        </View>
       </View>
 
       <Text style={styles.name}>{company.name}</Text>
@@ -40,9 +42,10 @@ export default function CompanyDetailScreen({ route, navigation }: Props) {
       <Card style={{ marginTop: spacing.md }}>
         <SectionLabel>Services</SectionLabel>
         {company.services.map((s) => (
-          <Text key={s} style={styles.listItem}>
-            •  {s}
-          </Text>
+          <View key={s} style={styles.listRow}>
+            <View style={styles.listDot} />
+            <Text style={styles.listItem}>{s}</Text>
+          </View>
         ))}
       </Card>
 
@@ -66,13 +69,31 @@ export default function CompanyDetailScreen({ route, navigation }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.surfaceAlt },
-  banner: { height: 88, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  bannerInitial: { color: '#fff', fontSize: 40, fontWeight: '800' },
-  name: { fontSize: 24, fontWeight: '800', color: colors.text, marginTop: spacing.md },
+  banner: {
+    height: 104,
+    borderRadius: radius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...shadow.raised,
+  },
+  bannerAvatar: {
+    width: 68,
+    height: 68,
+    borderRadius: radius.md,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.35)',
+  },
+  bannerInitial: { color: '#fff', fontSize: 30, fontWeight: '800' },
+  name: { fontSize: 23, fontWeight: '800', color: colors.text, marginTop: spacing.md, letterSpacing: 0.1 },
   tagline: { fontSize: 14, color: colors.textMuted, marginTop: 4 },
   metaRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm, gap: 6 },
-  dot: { color: colors.textMuted },
+  dot: { color: colors.textFaint },
   meta: { fontSize: 13, color: colors.textMuted, fontWeight: '600' },
   description: { fontSize: 14, color: colors.text, marginTop: spacing.sm, lineHeight: 20 },
-  listItem: { fontSize: 14, color: colors.text, marginTop: spacing.sm, lineHeight: 20 },
+  listRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm },
+  listDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primary, marginRight: 10 },
+  listItem: { fontSize: 14, color: colors.text, lineHeight: 20 },
 });
