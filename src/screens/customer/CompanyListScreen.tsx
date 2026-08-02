@@ -1,17 +1,52 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Card, RatingBadge } from '../../components/ui';
+import React, { useMemo, useState } from 'react';
+import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Card, Chip, EmptyState, RatingBadge, SectionLabel } from '../../components/ui';
 import { CATEGORIES } from '../../data/categories';
 import { getCompaniesByCategory } from '../../data/companies';
 import { BrowseStackParamList } from '../../navigation/types';
-import { colors, radius, spacing } from '../../theme';
+import { Company } from '../../types';
+import { colors, radius, shadow, spacing } from '../../theme';
 
 type Props = NativeStackScreenProps<BrowseStackParamList, 'CompanyList'>;
 
+type SortOption = 'rating' | 'reviews';
+type PriceFilter = 'any' | Company['priceRange'];
+
+const PRICE_FILTERS: PriceFilter[] = ['any', '£', '££', '£££'];
+
 export default function CompanyListScreen({ route, navigation }: Props) {
   const category = CATEGORIES.find((c) => c.id === route.params.categoryId);
-  const companies = getCompaniesByCategory(route.params.categoryId);
+  const allCompanies = getCompaniesByCategory(route.params.categoryId);
+
+  const [query, setQuery] = useState('');
+  const [priceFilter, setPriceFilter] = useState<PriceFilter>('any');
+  const [selectedArea, setSelectedArea] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<SortOption>('rating');
+
+  const availableAreas = useMemo(() => {
+    const set = new Set<string>();
+    allCompanies.forEach((c) => c.areas.forEach((a) => set.add(a)));
+    return Array.from(set).sort();
+  }, [allCompanies]);
+
+  const companies = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return allCompanies
+      .filter((c) => {
+        const matchesQuery =
+          q.length === 0 ||
+          c.name.toLowerCase().includes(q) ||
+          c.tagline.toLowerCase().includes(q) ||
+          c.services.some((s) => s.toLowerCase().includes(q));
+        const matchesPrice = priceFilter === 'any' || c.priceRange === priceFilter;
+        const matchesArea = !selectedArea || c.areas.includes(selectedArea);
+        return matchesQuery && matchesPrice && matchesArea;
+      })
+      .sort((a, b) => (sortBy === 'rating' ? b.rating - a.rating : b.reviewCount - a.reviewCount));
+  }, [allCompanies, query, priceFilter, selectedArea, sortBy]);
+
+  const hasActiveFilters = query.length > 0 || priceFilter !== 'any' || selectedArea !== null;
 
   return (
     <View style={styles.container}>
@@ -24,8 +59,59 @@ export default function CompanyListScreen({ route, navigation }: Props) {
             <Text style={styles.title}>
               {category?.icon} {category?.name}
             </Text>
-            <Text style={styles.subtitle}>{companies.length} companies in Gibraltar</Text>
+            <Text style={styles.subtitle}>{allCompanies.length} companies in Gibraltar</Text>
+
+            <TextInput
+              style={styles.search}
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Search by name or service..."
+              placeholderTextColor={colors.textFaint}
+              selectionColor={colors.primary}
+            />
+
+            <SectionLabel>Sort by</SectionLabel>
+            <View style={styles.chipWrap}>
+              <Chip label="Top rated" selected={sortBy === 'rating'} onPress={() => setSortBy('rating')} />
+              <Chip label="Most reviewed" selected={sortBy === 'reviews'} onPress={() => setSortBy('reviews')} />
+            </View>
+
+            <SectionLabel>Price</SectionLabel>
+            <View style={styles.chipWrap}>
+              {PRICE_FILTERS.map((p) => (
+                <Chip
+                  key={p}
+                  label={p === 'any' ? 'Any' : p}
+                  selected={priceFilter === p}
+                  onPress={() => setPriceFilter(p)}
+                />
+              ))}
+            </View>
+
+            <SectionLabel>Area</SectionLabel>
+            <View style={styles.chipWrap}>
+              <Chip label="Any" selected={selectedArea === null} onPress={() => setSelectedArea(null)} />
+              {availableAreas.map((a) => (
+                <Chip
+                  key={a}
+                  label={a}
+                  selected={selectedArea === a}
+                  onPress={() => setSelectedArea(selectedArea === a ? null : a)}
+                />
+              ))}
+            </View>
+
+            <Text style={styles.resultCount}>
+              {companies.length} {companies.length === 1 ? 'result' : 'results'}
+            </Text>
           </View>
+        }
+        ListEmptyComponent={
+          <EmptyState
+            icon="🔍"
+            title="No matches"
+            subtitle={hasActiveFilters ? 'Try clearing a filter or searching something else.' : 'No companies yet in this category.'}
+          />
         }
         ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
         renderItem={({ item }) => (
@@ -68,6 +154,20 @@ const styles = StyleSheet.create({
   header: { marginBottom: spacing.md },
   title: { fontSize: 22, fontWeight: '800', color: colors.text },
   subtitle: { fontSize: 13, color: colors.textMuted, marginTop: 2 },
+  search: {
+    backgroundColor: colors.surface,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    fontSize: 14,
+    color: colors.text,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+    ...shadow.card,
+  },
+  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', marginTop: spacing.xs, marginBottom: spacing.xs },
+  resultCount: { fontSize: 12, color: colors.textMuted, fontWeight: '600', marginTop: spacing.xs },
   row: { flexDirection: 'row', gap: spacing.md },
   cardPressed: { opacity: 0.85 },
   avatar: { width: 50, height: 50, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },

@@ -1,13 +1,13 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { Button, Chip, SectionLabel } from '../../components/ui';
+import { Button, Card, Chip, SectionLabel } from '../../components/ui';
 import { CATEGORIES } from '../../data/categories';
 import { GIBRALTAR_AREAS } from '../../data/areas';
 import { getCompanyById } from '../../data/companies';
 import { useApp } from '../../context/AppContext';
 import { BrowseStackParamList } from '../../navigation/types';
-import { colors, radius, shadow, spacing } from '../../theme';
+import { colors, spacing } from '../../theme';
 import { notify } from '../../utils/alert';
 
 type Props = NativeStackScreenProps<BrowseStackParamList, 'RequestQuote'>;
@@ -57,67 +57,79 @@ export default function RequestQuoteScreen({ route, navigation }: Props) {
         <Text style={styles.title}>Request a quote</Text>
         <Text style={styles.subtitle}>Sending to {company.name}</Text>
 
-        <SectionLabel>Your name</SectionLabel>
-        <TextInput
-          style={styles.input}
-          value={customerName}
-          onChangeText={setCustomerName}
-          placeholder="e.g. Maria Chipolina"
-          placeholderTextColor={colors.textFaint}
-          selectionColor={colors.primary}
-        />
+        <Card>
+          <View style={styles.field}>
+            <SectionLabel>Your name</SectionLabel>
+            <TextInput
+              style={styles.input}
+              value={customerName}
+              onChangeText={setCustomerName}
+              placeholder="e.g. Maria Chipolina"
+              placeholderTextColor={colors.textFaint}
+              selectionColor={colors.primary}
+            />
+          </View>
 
-        <SectionLabel>Phone number</SectionLabel>
-        <TextInput
-          style={styles.input}
-          value={phone}
-          onChangeText={setPhone}
-          placeholder="+350 5400 0000"
-          placeholderTextColor={colors.textFaint}
-          selectionColor={colors.primary}
-          keyboardType="phone-pad"
-        />
+          <View style={[styles.field, styles.fieldBorder]}>
+            <SectionLabel>Phone number</SectionLabel>
+            <TextInput
+              style={styles.input}
+              value={phone}
+              onChangeText={setPhone}
+              placeholder="+350 5400 0000"
+              placeholderTextColor={colors.textFaint}
+              selectionColor={colors.primary}
+              keyboardType="phone-pad"
+            />
+          </View>
 
-        <SectionLabel>Area</SectionLabel>
+          <View style={[styles.field, styles.fieldBorder]}>
+            <SectionLabel>Address details</SectionLabel>
+            <TextInput
+              style={styles.input}
+              value={addressDetails}
+              onChangeText={setAddressDetails}
+              placeholder="Block, floor, flat number..."
+              placeholderTextColor={colors.textFaint}
+              selectionColor={colors.primary}
+            />
+          </View>
+
+          <View style={[styles.field, styles.fieldBorder]}>
+            <SectionLabel>What do you need done?</SectionLabel>
+            <TextInput
+              style={[styles.input, styles.multiline]}
+              value={jobDetails}
+              onChangeText={setJobDetails}
+              placeholder="Describe the job..."
+              placeholderTextColor={colors.textFaint}
+              selectionColor={colors.primary}
+              multiline
+              numberOfLines={4}
+            />
+          </View>
+
+          <View style={[styles.field, styles.fieldBorder]}>
+            <SectionLabel>Preferred date (optional)</SectionLabel>
+            <TextInput
+              style={styles.input}
+              value={preferredDate}
+              onChangeText={setPreferredDate}
+              placeholder="e.g. This week, or 12 August"
+              placeholderTextColor={colors.textFaint}
+              selectionColor={colors.primary}
+            />
+          </View>
+        </Card>
+
+        <Text style={styles.fieldLabelSpaced}>Area</Text>
         <View style={styles.chipWrap}>
           {GIBRALTAR_AREAS.map((a) => (
             <Chip key={a} label={a} selected={a === area} onPress={() => setArea(a)} />
           ))}
         </View>
 
-        <SectionLabel>Address details</SectionLabel>
-        <TextInput
-          style={styles.input}
-          value={addressDetails}
-          onChangeText={setAddressDetails}
-          placeholder="Block, floor, flat number..."
-          placeholderTextColor={colors.textFaint}
-          selectionColor={colors.primary}
-        />
-
-        <SectionLabel>What do you need done?</SectionLabel>
-        <TextInput
-          style={[styles.input, styles.multiline]}
-          value={jobDetails}
-          onChangeText={setJobDetails}
-          placeholder="Describe the job..."
-          placeholderTextColor={colors.textFaint}
-          selectionColor={colors.primary}
-          multiline
-          numberOfLines={4}
-        />
-
-        <SectionLabel>Preferred date (optional)</SectionLabel>
-        <TextInput
-          style={styles.input}
-          value={preferredDate}
-          onChangeText={setPreferredDate}
-          placeholder="e.g. This week, or 12 August"
-          placeholderTextColor={colors.textFaint}
-          selectionColor={colors.primary}
-        />
-
-        <View style={{ height: spacing.md }} />
+        <View style={{ height: spacing.xs }} />
         <Button title="Send request" onPress={handleSubmit} disabled={!canSubmit} />
       </ScrollView>
     </KeyboardAvoidingView>
@@ -128,18 +140,23 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.surfaceAlt },
   title: { fontSize: 22, fontWeight: '800', color: colors.text, letterSpacing: 0.1 },
   subtitle: { fontSize: 13, color: colors.textMuted, marginTop: 4, marginBottom: spacing.md },
+  field: { paddingVertical: spacing.sm },
+  fieldBorder: { borderTopWidth: 1, borderTopColor: colors.border, marginTop: 2 },
   input: {
-    backgroundColor: colors.surface,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    fontSize: 14,
+    fontSize: 15,
     color: colors.text,
-    marginTop: spacing.xs,
-    marginBottom: spacing.md,
-    ...shadow.card,
+    marginTop: 6,
+    padding: 0,
   },
-  multiline: { minHeight: 90, textAlignVertical: 'top' },
-  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', marginTop: spacing.xs, marginBottom: spacing.sm },
+  multiline: { minHeight: 70, textAlignVertical: 'top' },
+  fieldLabelSpaced: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginTop: spacing.lg,
+    marginBottom: 4,
+  },
+  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', marginTop: spacing.xs, marginBottom: spacing.md },
 });
