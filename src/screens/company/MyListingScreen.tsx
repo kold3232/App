@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Button, Chip, SectionLabel } from '../../components/ui';
 import { CATEGORIES } from '../../data/categories';
-import { GIBRALTAR_AREAS } from '../../data/areas';
 import { useApp } from '../../context/AppContext';
 import { CompanyProfile } from '../../types';
 import { colors, radius, shadow, spacing } from '../../theme';
@@ -19,13 +18,6 @@ export default function MyListingScreen() {
     setProfile((p) => ({
       ...p,
       categoryIds: p.categoryIds.includes(id) ? p.categoryIds.filter((c) => c !== id) : [...p.categoryIds, id],
-    }));
-  }
-
-  function toggleArea(area: string) {
-    setProfile((p) => ({
-      ...p,
-      areas: p.areas.includes(area) ? p.areas.filter((a) => a !== area) : [...p.areas, area],
     }));
   }
 
@@ -91,13 +83,6 @@ export default function MyListingScreen() {
               selected={profile.categoryIds.includes(c.id)}
               onPress={() => toggleCategory(c.id)}
             />
-          ))}
-        </View>
-
-        <SectionLabel>Areas covered</SectionLabel>
-        <View style={styles.chipWrap}>
-          {GIBRALTAR_AREAS.map((a) => (
-            <Chip key={a} label={a} selected={profile.areas.includes(a)} onPress={() => toggleArea(a)} />
           ))}
         </View>
 

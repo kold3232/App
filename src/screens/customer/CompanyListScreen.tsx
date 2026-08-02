@@ -22,14 +22,7 @@ export default function CompanyListScreen({ route, navigation }: Props) {
 
   const [query, setQuery] = useState('');
   const [priceFilter, setPriceFilter] = useState<PriceFilter>('any');
-  const [selectedArea, setSelectedArea] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortOption>('rating');
-
-  const availableAreas = useMemo(() => {
-    const set = new Set<string>();
-    allCompanies.forEach((c) => c.areas.forEach((a) => set.add(a)));
-    return Array.from(set).sort();
-  }, [allCompanies]);
 
   const companies = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -41,13 +34,12 @@ export default function CompanyListScreen({ route, navigation }: Props) {
           c.tagline.toLowerCase().includes(q) ||
           c.services.some((s) => s.toLowerCase().includes(q));
         const matchesPrice = priceFilter === 'any' || c.priceRange === priceFilter;
-        const matchesArea = !selectedArea || c.areas.includes(selectedArea);
-        return matchesQuery && matchesPrice && matchesArea;
+        return matchesQuery && matchesPrice;
       })
       .sort((a, b) => (sortBy === 'rating' ? b.rating - a.rating : b.reviewCount - a.reviewCount));
-  }, [allCompanies, query, priceFilter, selectedArea, sortBy]);
+  }, [allCompanies, query, priceFilter, sortBy]);
 
-  const hasActiveFilters = query.length > 0 || priceFilter !== 'any' || selectedArea !== null;
+  const hasActiveFilters = query.length > 0 || priceFilter !== 'any';
 
   return (
     <View style={styles.container}>
@@ -90,19 +82,6 @@ export default function CompanyListScreen({ route, navigation }: Props) {
               ))}
             </View>
 
-            <SectionLabel>Area</SectionLabel>
-            <View style={styles.chipWrap}>
-              <Chip label="Any" selected={selectedArea === null} onPress={() => setSelectedArea(null)} />
-              {availableAreas.map((a) => (
-                <Chip
-                  key={a}
-                  label={a}
-                  selected={selectedArea === a}
-                  onPress={() => setSelectedArea(selectedArea === a ? null : a)}
-                />
-              ))}
-            </View>
-
             <Text style={styles.resultCount}>
               {companies.length} {companies.length === 1 ? 'result' : 'results'}
             </Text>
@@ -136,9 +115,6 @@ export default function CompanyListScreen({ route, navigation }: Props) {
                       <Text style={styles.dot}>·</Text>
                       <Text style={styles.years}>{item.yearsActive} yrs</Text>
                     </View>
-                    <Text style={styles.areas} numberOfLines={1}>
-                      📍 {item.areas.join(', ')}
-                    </Text>
                   </View>
                 </View>
               </Card>
@@ -181,5 +157,4 @@ const styles = StyleSheet.create({
   dot: { color: colors.textFaint },
   priceRange: { fontSize: 13, color: colors.textMuted, fontWeight: '700' },
   years: { fontSize: 12, color: colors.textMuted },
-  areas: { fontSize: 12, color: colors.textMuted, marginTop: 7 },
 });

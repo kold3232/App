@@ -1,9 +1,8 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { Button, Card, Chip, SectionLabel } from '../../components/ui';
+import { Button, Card, SectionLabel } from '../../components/ui';
 import { CATEGORIES } from '../../data/categories';
-import { GIBRALTAR_AREAS } from '../../data/areas';
 import { getCompanyById } from '../../data/companies';
 import { useApp } from '../../context/AppContext';
 import { BrowseStackParamList } from '../../navigation/types';
@@ -18,15 +17,18 @@ export default function RequestQuoteScreen({ route, navigation }: Props) {
 
   const [customerName, setCustomerName] = useState('');
   const [phone, setPhone] = useState('');
-  const [area, setArea] = useState(company?.areas[0] ?? GIBRALTAR_AREAS[0]);
-  const [addressDetails, setAddressDetails] = useState('');
+  const [address, setAddress] = useState('');
   const [jobDetails, setJobDetails] = useState('');
   const [preferredDate, setPreferredDate] = useState('');
 
   if (!company) return null;
 
   const categoryName = CATEGORIES.find((c) => c.id === company.categoryIds[0])?.name ?? '';
-  const canSubmit = customerName.trim().length > 0 && phone.trim().length > 0 && jobDetails.trim().length > 0;
+  const canSubmit =
+    customerName.trim().length > 0 &&
+    phone.trim().length > 0 &&
+    address.trim().length > 0 &&
+    jobDetails.trim().length > 0;
 
   function handleSubmit() {
     addRequest({
@@ -35,8 +37,7 @@ export default function RequestQuoteScreen({ route, navigation }: Props) {
       categoryName,
       customerName: customerName.trim(),
       phone: phone.trim(),
-      area,
-      addressDetails: addressDetails.trim(),
+      address: address.trim(),
       jobDetails: jobDetails.trim(),
       preferredDate: preferredDate.trim(),
     });
@@ -84,12 +85,12 @@ export default function RequestQuoteScreen({ route, navigation }: Props) {
           </View>
 
           <View style={[styles.field, styles.fieldBorder]}>
-            <SectionLabel>Address details</SectionLabel>
+            <SectionLabel>Your address</SectionLabel>
             <TextInput
               style={styles.input}
-              value={addressDetails}
-              onChangeText={setAddressDetails}
-              placeholder="Block, floor, flat number..."
+              value={address}
+              onChangeText={setAddress}
+              placeholder="Street, block, floor, flat number..."
               placeholderTextColor={colors.textFaint}
               selectionColor={colors.primary}
             />
@@ -122,14 +123,7 @@ export default function RequestQuoteScreen({ route, navigation }: Props) {
           </View>
         </Card>
 
-        <Text style={styles.fieldLabelSpaced}>Area</Text>
-        <View style={styles.chipWrap}>
-          {GIBRALTAR_AREAS.map((a) => (
-            <Chip key={a} label={a} selected={a === area} onPress={() => setArea(a)} />
-          ))}
-        </View>
-
-        <View style={{ height: spacing.xs }} />
+        <View style={{ height: spacing.lg }} />
         <Button title="Send request" onPress={handleSubmit} disabled={!canSubmit} />
       </ScrollView>
     </KeyboardAvoidingView>
@@ -149,14 +143,4 @@ const styles = StyleSheet.create({
     padding: 0,
   },
   multiline: { minHeight: 70, textAlignVertical: 'top' },
-  fieldLabelSpaced: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    marginTop: spacing.lg,
-    marginBottom: 4,
-  },
-  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', marginTop: spacing.xs, marginBottom: spacing.md },
 });

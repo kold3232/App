@@ -53,8 +53,8 @@ export default function DashboardScreen() {
             </View>
             <Text style={styles.category}>{item.categoryName}</Text>
             <Text style={styles.detail}>{item.jobDetails}</Text>
-            <Text style={styles.meta}>
-              📍 {item.area}
+            <Text style={styles.meta} numberOfLines={1}>
+              📍 {item.address}
               {item.preferredDate ? `  ·  🗓️ ${item.preferredDate}` : ''}
             </Text>
             <Text style={styles.meta}>📞 {item.phone}</Text>

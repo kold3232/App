@@ -14,7 +14,6 @@ export type Company = {
   categoryIds: string[];
   tagline: string;
   description: string;
-  areas: string[];
   rating: number;
   reviewCount: number;
   priceRange: '£' | '££' | '£££';
@@ -33,8 +32,7 @@ export type ServiceRequest = {
   categoryName: string;
   customerName: string;
   phone: string;
-  area: string;
-  addressDetails: string;
+  address: string;
   jobDetails: string;
   preferredDate: string;
   status: RequestStatus;
@@ -46,7 +44,6 @@ export type CompanyProfile = {
   categoryIds: string[];
   tagline: string;
   description: string;
-  areas: string[];
   phone: string;
   priceRange: '£' | '££' | '£££';
   services: string[];

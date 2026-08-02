@@ -8,7 +8,6 @@ export const COMPANIES: Company[] = [
     tagline: 'Gibraltar-wide plumbing, 24/7 emergency call-outs',
     description:
       'Family-run plumbing business covering the whole Rock. We handle everything from a dripping tap to full bathroom refits, and offer a 24/7 emergency call-out for burst pipes and boiler breakdowns.',
-    areas: ['Ocean Village', 'Reclamation Road', 'South District', 'Westside'],
     rating: 4.8,
     reviewCount: 132,
     priceRange: '££',
@@ -24,7 +23,6 @@ export const COMPANIES: Company[] = [
     tagline: 'Fast response across Gibraltar',
     description:
       'GibFlow specialises in fast-turnaround residential plumbing, from Upper Town townhouses to Marina Bay apartments. Fixed-price quotes with no hidden call-out fees.',
-    areas: ['Upper Town', 'Marina Bay', 'Catalan Bay'],
     rating: 4.6,
     reviewCount: 87,
     priceRange: '£',
@@ -40,7 +38,6 @@ export const COMPANIES: Company[] = [
     tagline: 'NICEIC-style certified electricians',
     description:
       'Fully certified electrical contractors serving homes and businesses across Gibraltar. We carry out EICRs, fuse board upgrades and full rewires with all work certified.',
-    areas: ['Ocean Village', 'Glacis Estate', 'Both Worlds'],
     rating: 4.9,
     reviewCount: 156,
     priceRange: '££',
@@ -56,7 +53,6 @@ export const COMPANIES: Company[] = [
     tagline: 'Same-day electrical call-outs',
     description:
       'Sparkline covers everything from a tripping fuse box to full commercial fit-outs, with same-day response for urgent faults anywhere on the Rock.',
-    areas: ['Sandpits', 'Varyl Begg Estate', 'South District'],
     rating: 4.5,
     reviewCount: 64,
     priceRange: '£',
@@ -72,7 +68,6 @@ export const COMPANIES: Company[] = [
     tagline: 'Trusted home & office cleaning',
     description:
       'A dependable local cleaning team offering regular home cleans, deep cleans and end-of-tenancy cleans for landlords and letting agents across Gibraltar.',
-    areas: ['Ocean Village', 'Marina Bay', 'Westside', 'Laguna Estate'],
     rating: 4.7,
     reviewCount: 98,
     priceRange: '£',
@@ -88,7 +83,6 @@ export const COMPANIES: Company[] = [
     tagline: 'Commercial & residential cleaning',
     description:
       'Rock Shine provides insured cleaning teams for offices, shops and homes, with flexible scheduling including evenings and weekends.',
-    areas: ['Town Range', 'Upper Town', 'Reclamation Road'],
     rating: 4.4,
     reviewCount: 41,
     priceRange: '£',
@@ -104,7 +98,6 @@ export const COMPANIES: Company[] = [
     tagline: 'Terrace, patio & garden maintenance',
     description:
       'We look after gardens, terraces and communal grounds across Gibraltar, from a one-off tidy-up to ongoing monthly maintenance contracts.',
-    areas: ['Catalan Bay', 'Both Worlds', 'Laguna Estate'],
     rating: 4.6,
     reviewCount: 52,
     priceRange: '££',
@@ -120,7 +113,6 @@ export const COMPANIES: Company[] = [
     tagline: 'Emergency lockouts, any time of day',
     description:
       'Round-the-clock locksmith service covering house and car lockouts, uPVC door mechanism repairs and lock upgrades across the whole of Gibraltar.',
-    areas: ['Ocean Village', 'South District', 'Sandpits', 'Westside'],
     rating: 4.8,
     reviewCount: 110,
     priceRange: '££',
@@ -136,7 +128,6 @@ export const COMPANIES: Company[] = [
     tagline: 'Interior & exterior painting specialists',
     description:
       'Experienced decorators used to Gibraltar’s climate, tackling everything from damp-proofing exterior walls to interior repaints for homes and offices.',
-    areas: ['Glacis Estate', 'Varyl Begg Estate', 'Upper Town'],
     rating: 4.5,
     reviewCount: 73,
     priceRange: '££',
@@ -152,7 +143,6 @@ export const COMPANIES: Company[] = [
     tagline: 'House moves across Gibraltar and the border',
     description:
       'Reliable man-with-van and full house removal service, including cross-border moves to La Linea and the wider Costa del Sol.',
-    areas: ['Ocean Village', 'Marina Bay', 'South District'],
     rating: 4.7,
     reviewCount: 88,
     priceRange: '££',
@@ -168,7 +158,6 @@ export const COMPANIES: Company[] = [
     tagline: 'Fitted wardrobes, doors & decking',
     description:
       'Bespoke carpentry for Gibraltar homes — fitted wardrobes, internal doors, skirting and outdoor decking built to withstand the local climate.',
-    areas: ['Town Range', 'Catalan Bay', 'Both Worlds'],
     rating: 4.6,
     reviewCount: 39,
     priceRange: '£££',
@@ -184,7 +173,6 @@ export const COMPANIES: Company[] = [
     tagline: 'Licensed pest control for homes & business',
     description:
       'Fully licensed pest control covering ants, cockroaches, rodents and the Barbary macaques-adjacent issues unique to Gibraltar properties.',
-    areas: ['Upper Town', 'Sandpits', 'South District'],
     rating: 4.7,
     reviewCount: 61,
     priceRange: '££',
@@ -200,7 +188,6 @@ export const COMPANIES: Company[] = [
     tagline: 'Home Wi-Fi, TV mounting & tech help',
     description:
       'Local tech support for home Wi-Fi troubleshooting, smart TV and satellite installation, and general computer/phone help for individuals and small offices.',
-    areas: ['Ocean Village', 'Marina Bay', 'Westside'],
     rating: 4.5,
     reviewCount: 47,
     priceRange: '£',
@@ -216,7 +203,6 @@ export const COMPANIES: Company[] = [
     tagline: 'No job too small',
     description:
       'General handyman covering flat-pack assembly, shelving, minor repairs and odd jobs around the home, with same-week availability.',
-    areas: ['Ocean Village', 'Marina Bay', 'Laguna Estate'],
     rating: 4.4,
     reviewCount: 55,
     priceRange: '£',
@@ -232,7 +218,6 @@ export const COMPANIES: Company[] = [
     tagline: 'AC installation, service & repair',
     description:
       'Specialists in split and central air conditioning for Gibraltar homes and offices — installation, annual servicing and emergency repairs during the summer heat.',
-    areas: ['Glacis Estate', 'Varyl Begg Estate', 'South District', 'Both Worlds'],
     rating: 4.8,
     reviewCount: 102,
     priceRange: '££',

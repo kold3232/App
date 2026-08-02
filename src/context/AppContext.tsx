@@ -13,7 +13,6 @@ const DEFAULT_COMPANY_PROFILE: CompanyProfile = {
   categoryIds: ['plumbing'],
   tagline: 'Tell customers what you do best',
   description: 'Add a description of your business so customers know what to expect.',
-  areas: ['Ocean Village'],
   phone: '+350 200 00000',
   priceRange: '££',
   services: ['Add your first service'],

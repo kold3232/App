@@ -49,11 +49,6 @@ export default function CompanyDetailScreen({ route, navigation }: Props) {
         ))}
       </Card>
 
-      <Card style={{ marginTop: spacing.md }}>
-        <SectionLabel>Areas covered</SectionLabel>
-        <Text style={styles.description}>{company.areas.join(', ')}</Text>
-      </Card>
-
       <Card style={{ marginTop: spacing.md, marginBottom: spacing.lg }}>
         <SectionLabel>Contact</SectionLabel>
         <Text style={styles.description}>{company.phone}</Text>
