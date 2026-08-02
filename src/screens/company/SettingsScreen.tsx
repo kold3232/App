@@ -1,13 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import React from 'react';
 import { SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import { Button, Card, SectionLabel } from '../../components/ui';
+import { getTierInfo } from '../../data/tiers';
 import { useApp } from '../../context/AppContext';
 import { colors, radius, spacing } from '../../theme';
 import { confirmAction } from '../../utils/alert';
 
 export default function SettingsScreen() {
-  const { setMode } = useApp();
+  const { setMode, businessApplication } = useApp();
+  const navigation = useNavigation<any>();
+  const tierInfo = businessApplication.tier ? getTierInfo(businessApplication.tier) : null;
 
   function handleSwitchToCustomer() {
     confirmAction(
@@ -23,7 +27,30 @@ export default function SettingsScreen() {
       <View style={{ padding: spacing.lg }}>
         <Text style={styles.title}>Settings</Text>
 
-        <Card style={{ marginTop: spacing.lg }}>
+        {tierInfo && (
+          <Card style={{ marginTop: spacing.lg }}>
+            <View style={styles.row}>
+              <View style={styles.iconWrap}>
+                <Ionicons name="ribbon-outline" size={18} color={colors.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <SectionLabel>Subscription</SectionLabel>
+                <Text style={styles.text}>
+                  {tierInfo.name} plan · {tierInfo.price} {tierInfo.priceNote}
+                </Text>
+                <View style={{ marginTop: spacing.sm }}>
+                  <Button
+                    title="Change plan"
+                    variant="outline"
+                    onPress={() => navigation.navigate('TierSelection', { mode: 'change' })}
+                  />
+                </View>
+              </View>
+            </View>
+          </Card>
+        )}
+
+        <Card style={{ marginTop: spacing.md }}>
           <View style={styles.row}>
             <View style={styles.iconWrap}>
               <Ionicons name="business-outline" size={18} color={colors.primary} />

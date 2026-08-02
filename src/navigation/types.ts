@@ -18,3 +18,14 @@ export type CompanyTabParamList = {
   MyListing: undefined;
   Settings: undefined;
 };
+
+export type TierSelectionMode = 'signup' | 'change';
+
+export type CompanyStackParamList = {
+  BusinessSignup: undefined;
+  DocumentUpload: undefined;
+  TierSelection: { mode: TierSelectionMode };
+  Payment: { mode: TierSelectionMode; tier: import('../types').SubscriptionTier };
+  ApplicationStatus: undefined;
+  CompanyTabs: undefined;
+};

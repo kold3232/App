@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { Button, Chip, SectionLabel } from '../../components/ui';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Button, Card, Chip, SectionLabel } from '../../components/ui';
 import { CATEGORIES } from '../../data/categories';
+import { getTierInfo } from '../../data/tiers';
 import { useApp } from '../../context/AppContext';
 import { CompanyProfile } from '../../types';
 import { colors, radius, shadow, spacing } from '../../theme';
@@ -10,9 +11,11 @@ import { notify } from '../../utils/alert';
 const PRICE_OPTIONS: CompanyProfile['priceRange'][] = ['£', '££', '£££'];
 
 export default function MyListingScreen() {
-  const { companyProfile, updateCompanyProfile } = useApp();
+  const { companyProfile, updateCompanyProfile, businessApplication } = useApp();
   const [profile, setProfile] = useState<CompanyProfile>(companyProfile);
   const [newService, setNewService] = useState('');
+  const tier = businessApplication.tier;
+  const canShowAvailability = tier === 'premium' || tier === 'pro';
 
   function toggleCategory(id: string) {
     setProfile((p) => ({
@@ -45,6 +48,11 @@ export default function MyListingScreen() {
       >
         <Text style={styles.title}>My listing</Text>
         <Text style={styles.subtitle}>This is what customers see when they view your business.</Text>
+        {tier && (
+          <View style={styles.tierBadge}>
+            <Text style={styles.tierBadgeText}>{getTierInfo(tier).name} plan</Text>
+          </View>
+        )}
 
         <SectionLabel>Business name</SectionLabel>
         <TextInput
@@ -93,6 +101,26 @@ export default function MyListingScreen() {
           ))}
         </View>
 
+        <SectionLabel>Availability indicator</SectionLabel>
+        {canShowAvailability ? (
+          <Card style={styles.availabilityCard}>
+            <View style={styles.availabilityRow}>
+              <Text style={styles.availabilityLabel}>Show "Available now" to customers</Text>
+              <Switch
+                value={!!profile.availableNow}
+                onValueChange={(v) => setProfile((p) => ({ ...p, availableNow: v }))}
+                trackColor={{ false: colors.border, true: colors.primary }}
+              />
+            </View>
+          </Card>
+        ) : (
+          <Card style={styles.availabilityCard}>
+            <Text style={styles.upsellText}>
+              Available on Premium and Pro plans. Upgrade in Settings to show real-time availability to customers.
+            </Text>
+          </Card>
+        )}
+
         <SectionLabel>Phone</SectionLabel>
         <TextInput
           style={styles.input}
@@ -138,6 +166,19 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.surfaceAlt },
   title: { fontSize: 22, fontWeight: '800', color: colors.text, letterSpacing: 0.1 },
   subtitle: { fontSize: 13, color: colors.textMuted, marginTop: 4, marginBottom: spacing.md },
+  tierBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: colors.infoBg,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+    marginBottom: spacing.md,
+  },
+  tierBadgeText: { fontSize: 11.5, fontWeight: '700', color: colors.info },
+  availabilityCard: { marginTop: spacing.xs, marginBottom: spacing.md },
+  availabilityRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  availabilityLabel: { fontSize: 14, color: colors.text, flex: 1, marginRight: spacing.sm },
+  upsellText: { fontSize: 12.5, color: colors.textMuted, lineHeight: 18 },
   input: {
     backgroundColor: colors.surface,
     borderWidth: 1.5,

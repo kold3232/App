@@ -1,12 +1,20 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { CompanyProfile, NotifySignup, ServiceRequest, UserMode } from '../types';
+import {
+  BusinessApplication,
+  CompanyProfile,
+  NotifySignup,
+  ServiceRequest,
+  SubscriptionTier,
+  UserMode,
+} from '../types';
 
 const STORAGE_KEYS = {
   mode: '@sortedforyou/mode',
   requests: '@sortedforyou/requests',
   companyProfile: '@sortedforyou/companyProfile',
   notifySignups: '@sortedforyou/notifySignups',
+  businessApplication: '@sortedforyou/businessApplication',
 };
 
 const DEFAULT_COMPANY_PROFILE: CompanyProfile = {
@@ -17,6 +25,24 @@ const DEFAULT_COMPANY_PROFILE: CompanyProfile = {
   phone: '+350 200 00000',
   priceRange: '££',
   services: ['Add your first service'],
+};
+
+const DEFAULT_BUSINESS_APPLICATION: BusinessApplication = {
+  status: 'not_started',
+  businessName: '',
+  contactEmail: '',
+  contactPhone: '',
+  categoryIds: [],
+  documents: [
+    { id: 'id-proof', label: 'ID / proof of address', uploaded: false },
+    { id: 'trade-licence', label: 'Trade Licence', uploaded: false },
+    { id: 'insurance', label: 'Public liability insurance', uploaded: false, expiryDate: '' },
+    { id: 'business-registration', label: 'Business registration proof', uploaded: false },
+  ],
+  tier: null,
+  promoCode: '',
+  submittedAt: '',
+  rejectionReason: '',
 };
 
 type AppContextValue = {
@@ -30,6 +56,11 @@ type AppContextValue = {
   updateCompanyProfile: (profile: CompanyProfile) => void;
   notifySignups: NotifySignup[];
   addNotifySignup: (categoryId: string, contact: string) => void;
+  businessApplication: BusinessApplication;
+  updateApplicationDraft: (patch: Partial<BusinessApplication>) => void;
+  submitApplication: () => void;
+  approveApplication: () => void;
+  changeTier: (tier: SubscriptionTier) => void;
 };
 
 const AppContext = createContext<AppContextValue | undefined>(undefined);
@@ -40,20 +71,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
   const [companyProfile, setCompanyProfile] = useState<CompanyProfile>(DEFAULT_COMPANY_PROFILE);
   const [notifySignups, setNotifySignups] = useState<NotifySignup[]>([]);
+  const [businessApplication, setBusinessApplication] = useState<BusinessApplication>(DEFAULT_BUSINESS_APPLICATION);
 
   useEffect(() => {
     (async () => {
       try {
-        const [storedMode, storedRequests, storedProfile, storedSignups] = await Promise.all([
+        const [storedMode, storedRequests, storedProfile, storedSignups, storedApplication] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.mode),
           AsyncStorage.getItem(STORAGE_KEYS.requests),
           AsyncStorage.getItem(STORAGE_KEYS.companyProfile),
           AsyncStorage.getItem(STORAGE_KEYS.notifySignups),
+          AsyncStorage.getItem(STORAGE_KEYS.businessApplication),
         ]);
         if (storedMode) setModeState(JSON.parse(storedMode));
         if (storedRequests) setRequests(JSON.parse(storedRequests));
         if (storedProfile) setCompanyProfile(JSON.parse(storedProfile));
         if (storedSignups) setNotifySignups(JSON.parse(storedSignups));
+        if (storedApplication) setBusinessApplication(JSON.parse(storedApplication));
       } finally {
         setIsReady(true);
       }
@@ -101,6 +135,51 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const updateApplicationDraft = useCallback(
+    (patch: Partial<BusinessApplication>) => {
+      setBusinessApplication((prev) => {
+        const next = { ...prev, ...patch };
+        AsyncStorage.setItem(STORAGE_KEYS.businessApplication, JSON.stringify(next));
+        return next;
+      });
+    },
+    []
+  );
+
+  const submitApplication = useCallback(() => {
+    setBusinessApplication((prev) => {
+      const next: BusinessApplication = { ...prev, status: 'pending', submittedAt: new Date().toISOString() };
+      AsyncStorage.setItem(STORAGE_KEYS.businessApplication, JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  const approveApplication = useCallback(() => {
+    setBusinessApplication((prev) => {
+      const next: BusinessApplication = { ...prev, status: 'approved' };
+      AsyncStorage.setItem(STORAGE_KEYS.businessApplication, JSON.stringify(next));
+      return next;
+    });
+    setCompanyProfile((prev) => {
+      const next: CompanyProfile = {
+        ...prev,
+        name: businessApplication.businessName || prev.name,
+        categoryIds: businessApplication.categoryIds.length > 0 ? businessApplication.categoryIds : prev.categoryIds,
+        phone: businessApplication.contactPhone || prev.phone,
+      };
+      AsyncStorage.setItem(STORAGE_KEYS.companyProfile, JSON.stringify(next));
+      return next;
+    });
+  }, [businessApplication.businessName, businessApplication.categoryIds, businessApplication.contactPhone]);
+
+  const changeTier = useCallback((tier: SubscriptionTier) => {
+    setBusinessApplication((prev) => {
+      const next: BusinessApplication = { ...prev, tier };
+      AsyncStorage.setItem(STORAGE_KEYS.businessApplication, JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
   const value = useMemo(
     () => ({
       isReady,
@@ -113,6 +192,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       updateCompanyProfile,
       notifySignups,
       addNotifySignup,
+      businessApplication,
+      updateApplicationDraft,
+      submitApplication,
+      approveApplication,
+      changeTier,
     }),
     [
       isReady,
@@ -125,6 +209,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       updateCompanyProfile,
       notifySignups,
       addNotifySignup,
+      businessApplication,
+      updateApplicationDraft,
+      submitApplication,
+      approveApplication,
+      changeTier,
     ]
   );
 
