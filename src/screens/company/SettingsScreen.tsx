@@ -30,7 +30,7 @@ export default function SettingsScreen() {
             </View>
             <View style={{ flex: 1 }}>
               <SectionLabel>Account type</SectionLabel>
-              <Text style={styles.text}>You're using LightningService as a business.</Text>
+              <Text style={styles.text}>You're using Sortedforyou as a business.</Text>
             </View>
           </View>
         </Card>

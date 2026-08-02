@@ -51,11 +51,14 @@ export default function DashboardScreen() {
               <Text style={styles.customerName}>{item.customerName}</Text>
               <StatusBadge status={item.status} />
             </View>
-            <Text style={styles.category}>{item.categoryName}</Text>
-            <Text style={styles.detail}>{item.jobDetails}</Text>
+            <Text style={styles.category}>
+              {item.categoryName} · {item.type === 'instant' ? 'Instant booking' : 'Quote request'}
+            </Text>
+            {item.jobDetails ? <Text style={styles.detail}>{item.jobDetails}</Text> : null}
             <Text style={styles.meta} numberOfLines={1}>
               📍 {item.address}
-              {item.preferredDate ? `  ·  🗓️ ${item.preferredDate}` : ''}
+              {item.type === 'instant' && item.scheduledSlot ? `  ·  🗓️ ${item.scheduledSlot}` : ''}
+              {item.type === 'quote' && item.preferredDate ? `  ·  🗓️ ${item.preferredDate}` : ''}
             </Text>
             <Text style={styles.meta}>📞 {item.phone}</Text>
             <Text style={styles.date}>{new Date(item.createdAt).toLocaleString()}</Text>

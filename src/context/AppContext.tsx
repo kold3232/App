@@ -1,16 +1,17 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { CompanyProfile, ServiceRequest, UserMode } from '../types';
+import { CompanyProfile, NotifySignup, ServiceRequest, UserMode } from '../types';
 
 const STORAGE_KEYS = {
-  mode: '@lightningservice/mode',
-  requests: '@lightningservice/requests',
-  companyProfile: '@lightningservice/companyProfile',
+  mode: '@sortedforyou/mode',
+  requests: '@sortedforyou/requests',
+  companyProfile: '@sortedforyou/companyProfile',
+  notifySignups: '@sortedforyou/notifySignups',
 };
 
 const DEFAULT_COMPANY_PROFILE: CompanyProfile = {
   name: 'My Business',
-  categoryIds: ['plumbing'],
+  categoryIds: ['plumbers'],
   tagline: 'Tell customers what you do best',
   description: 'Add a description of your business so customers know what to expect.',
   phone: '+350 200 00000',
@@ -23,10 +24,12 @@ type AppContextValue = {
   mode: UserMode | null;
   setMode: (mode: UserMode | null) => void;
   requests: ServiceRequest[];
-  addRequest: (input: Omit<ServiceRequest, 'id' | 'status' | 'createdAt'>) => void;
+  addRequest: (input: Omit<ServiceRequest, 'id' | 'createdAt'>) => void;
   updateRequestStatus: (id: string, status: ServiceRequest['status']) => void;
   companyProfile: CompanyProfile;
   updateCompanyProfile: (profile: CompanyProfile) => void;
+  notifySignups: NotifySignup[];
+  addNotifySignup: (categoryId: string, contact: string) => void;
 };
 
 const AppContext = createContext<AppContextValue | undefined>(undefined);
@@ -36,18 +39,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [mode, setModeState] = useState<UserMode | null>(null);
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
   const [companyProfile, setCompanyProfile] = useState<CompanyProfile>(DEFAULT_COMPANY_PROFILE);
+  const [notifySignups, setNotifySignups] = useState<NotifySignup[]>([]);
 
   useEffect(() => {
     (async () => {
       try {
-        const [storedMode, storedRequests, storedProfile] = await Promise.all([
+        const [storedMode, storedRequests, storedProfile, storedSignups] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.mode),
           AsyncStorage.getItem(STORAGE_KEYS.requests),
           AsyncStorage.getItem(STORAGE_KEYS.companyProfile),
+          AsyncStorage.getItem(STORAGE_KEYS.notifySignups),
         ]);
         if (storedMode) setModeState(JSON.parse(storedMode));
         if (storedRequests) setRequests(JSON.parse(storedRequests));
         if (storedProfile) setCompanyProfile(JSON.parse(storedProfile));
+        if (storedSignups) setNotifySignups(JSON.parse(storedSignups));
       } finally {
         setIsReady(true);
       }
@@ -59,13 +65,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     AsyncStorage.setItem(STORAGE_KEYS.mode, JSON.stringify(next));
   }, []);
 
-  const addRequest = useCallback((input: Omit<ServiceRequest, 'id' | 'status' | 'createdAt'>) => {
+  const addRequest = useCallback((input: Omit<ServiceRequest, 'id' | 'createdAt'>) => {
     setRequests((prev) => {
       const next: ServiceRequest[] = [
         {
           ...input,
           id: `req-${Date.now()}-${Math.round(Math.random() * 10000)}`,
-          status: 'pending',
           createdAt: new Date().toISOString(),
         },
         ...prev,
@@ -88,6 +93,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     AsyncStorage.setItem(STORAGE_KEYS.companyProfile, JSON.stringify(profile));
   }, []);
 
+  const addNotifySignup = useCallback((categoryId: string, contact: string) => {
+    setNotifySignups((prev) => {
+      const next: NotifySignup[] = [...prev, { categoryId, contact, createdAt: new Date().toISOString() }];
+      AsyncStorage.setItem(STORAGE_KEYS.notifySignups, JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
   const value = useMemo(
     () => ({
       isReady,
@@ -98,8 +111,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       updateRequestStatus,
       companyProfile,
       updateCompanyProfile,
+      notifySignups,
+      addNotifySignup,
     }),
-    [isReady, mode, setMode, requests, addRequest, updateRequestStatus, companyProfile, updateCompanyProfile]
+    [
+      isReady,
+      mode,
+      setMode,
+      requests,
+      addRequest,
+      updateRequestStatus,
+      companyProfile,
+      updateCompanyProfile,
+      notifySignups,
+      addNotifySignup,
+    ]
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

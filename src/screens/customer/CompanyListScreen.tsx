@@ -115,6 +115,11 @@ export default function CompanyListScreen({ route, navigation }: Props) {
                       <Text style={styles.dot}>·</Text>
                       <Text style={styles.years}>{item.yearsActive} yrs</Text>
                     </View>
+                    {item.tier === 'pro' && (
+                      <View style={styles.instantPill}>
+                        <Text style={styles.instantPillText}>⚡ Instant booking</Text>
+                      </View>
+                    )}
                   </View>
                 </View>
               </Card>
@@ -157,4 +162,13 @@ const styles = StyleSheet.create({
   dot: { color: colors.textFaint },
   priceRange: { fontSize: 13, color: colors.textMuted, fontWeight: '700' },
   years: { fontSize: 12, color: colors.textMuted },
+  instantPill: {
+    alignSelf: 'flex-start',
+    backgroundColor: colors.infoBg,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+    marginTop: 7,
+  },
+  instantPillText: { fontSize: 10.5, fontWeight: '700', color: colors.info },
 });

@@ -1,12 +1,17 @@
 import type { ComponentProps } from 'react';
 import type { Ionicons } from '@expo/vector-icons';
 
+export type CategoryStatus = 'live' | 'coming-soon';
+
 export type Category = {
   id: string;
   name: string;
   icon: ComponentProps<typeof Ionicons>['name'];
   description: string;
+  status: CategoryStatus;
 };
+
+export type SubscriptionTier = 'standard' | 'premium' | 'pro';
 
 export type Company = {
   id: string;
@@ -21,20 +26,25 @@ export type Company = {
   yearsActive: number;
   services: string[];
   color: string;
+  tier: SubscriptionTier;
+  availableNow?: boolean;
 };
 
 export type RequestStatus = 'pending' | 'accepted' | 'declined' | 'completed';
+export type BookingType = 'quote' | 'instant';
 
 export type ServiceRequest = {
   id: string;
   companyId: string;
   companyName: string;
   categoryName: string;
+  type: BookingType;
   customerName: string;
   phone: string;
   address: string;
   jobDetails: string;
   preferredDate: string;
+  scheduledSlot: string;
   status: RequestStatus;
   createdAt: string;
 };
@@ -50,3 +60,9 @@ export type CompanyProfile = {
 };
 
 export type UserMode = 'customer' | 'company';
+
+export type NotifySignup = {
+  categoryId: string;
+  contact: string;
+  createdAt: string;
+};

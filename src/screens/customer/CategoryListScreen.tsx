@@ -24,18 +24,28 @@ export default function CategoryListScreen({ navigation }: Props) {
         columnWrapperStyle={{ gap: spacing.md }}
         ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
         renderItem={({ item }) => {
-          const count = getCompaniesByCategory(item.id).length;
+          const isComingSoon = item.status === 'coming-soon';
+          const count = isComingSoon ? 0 : getCompaniesByCategory(item.id).length;
           return (
             <Pressable
-              style={({ pressed }) => [styles.tile, pressed && styles.tilePressed]}
-              onPress={() => navigation.navigate('CompanyList', { categoryId: item.id })}
+              style={({ pressed }) => [styles.tile, isComingSoon && styles.tileComingSoon, pressed && styles.tilePressed]}
+              onPress={() =>
+                isComingSoon
+                  ? navigation.navigate('ComingSoon', { categoryId: item.id })
+                  : navigation.navigate('CompanyList', { categoryId: item.id })
+              }
             >
-              <View style={styles.tileIconWrap}>
-                <Ionicons name={item.icon} size={21} color={colors.primary} />
+              {isComingSoon && (
+                <View style={styles.comingSoonBadge}>
+                  <Text style={styles.comingSoonBadgeText}>Coming soon</Text>
+                </View>
+              )}
+              <View style={[styles.tileIconWrap, isComingSoon && styles.tileIconWrapMuted]}>
+                <Ionicons name={item.icon} size={21} color={isComingSoon ? colors.textFaint : colors.primary} />
               </View>
-              <Text style={styles.tileTitle}>{item.name}</Text>
+              <Text style={[styles.tileTitle, isComingSoon && styles.tileTitleMuted]}>{item.name}</Text>
               <Text style={styles.tileDescription}>{item.description}</Text>
-              <Text style={styles.tileCount}>{count} companies</Text>
+              {!isComingSoon && <Text style={styles.tileCount}>{count} companies</Text>}
             </Pressable>
           );
         }}
@@ -60,7 +70,18 @@ const styles = StyleSheet.create({
     minHeight: 152,
     ...shadow.card,
   },
+  tileComingSoon: { backgroundColor: colors.surfaceAlt, opacity: 0.75 },
   tilePressed: { opacity: 0.9 },
+  comingSoonBadge: {
+    position: 'absolute',
+    top: spacing.md,
+    right: spacing.md,
+    backgroundColor: colors.pendingBg,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+  },
+  comingSoonBadgeText: { fontSize: 9.5, fontWeight: '700', color: colors.pending },
   tileIconWrap: {
     width: 40,
     height: 40,
@@ -69,7 +90,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  tileIconWrapMuted: { backgroundColor: colors.border },
   tileTitle: { fontSize: 14.5, fontWeight: '700', color: colors.text, marginTop: spacing.sm, letterSpacing: 0.1 },
+  tileTitleMuted: { color: colors.textMuted },
   tileDescription: { fontSize: 11.5, color: colors.textMuted, marginTop: 4, minHeight: 30, lineHeight: 15.5 },
   tileCount: { fontSize: 11, color: colors.primary, fontWeight: '700', marginTop: spacing.sm },
 });

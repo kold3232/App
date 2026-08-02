@@ -14,7 +14,7 @@ export default function ModeSelectScreen() {
         <View style={styles.boltBadge}>
           <Ionicons name="flash" size={34} color={colors.textInverse} />
         </View>
-        <Text style={styles.title}>LightningService</Text>
+        <Text style={styles.title}>Sortedforyou</Text>
         <Text style={styles.subtitle}>Find trusted local tradespeople in Gibraltar, fast.</Text>
       </View>
 

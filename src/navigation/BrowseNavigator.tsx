@@ -5,8 +5,10 @@ import { StyleSheet, Text, View } from 'react-native';
 import { CATEGORIES } from '../data/categories';
 import { getCompanyById } from '../data/companies';
 import CategoryListScreen from '../screens/customer/CategoryListScreen';
+import ComingSoonScreen from '../screens/customer/ComingSoonScreen';
 import CompanyDetailScreen from '../screens/customer/CompanyDetailScreen';
 import CompanyListScreen from '../screens/customer/CompanyListScreen';
+import InstantBookScreen from '../screens/customer/InstantBookScreen';
 import RequestQuoteScreen from '../screens/customer/RequestQuoteScreen';
 import { colors, radius } from '../theme';
 import { BrowseStackParamList } from './types';
@@ -19,7 +21,7 @@ function BrandTitle() {
       <View style={brandStyles.badge}>
         <Ionicons name="flash" size={13} color={colors.textInverse} />
       </View>
-      <Text style={brandStyles.title}>LightningService</Text>
+      <Text style={brandStyles.title}>Sortedforyou</Text>
     </View>
   );
 }
@@ -64,6 +66,14 @@ export default function BrowseNavigator() {
         options={({ route }) => ({ title: getCompanyById(route.params.companyId)?.name ?? 'Company' })}
       />
       <Stack.Screen name="RequestQuote" component={RequestQuoteScreen} options={{ title: 'Request a quote' }} />
+      <Stack.Screen name="InstantBook" component={InstantBookScreen} options={{ title: 'Book a time' }} />
+      <Stack.Screen
+        name="ComingSoon"
+        component={ComingSoonScreen}
+        options={({ route }) => ({
+          title: CATEGORIES.find((c) => c.id === route.params.categoryId)?.name ?? 'Coming soon',
+        })}
+      />
     </Stack.Navigator>
   );
 }

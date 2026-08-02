@@ -3,6 +3,8 @@ export type BrowseStackParamList = {
   CompanyList: { categoryId: string };
   CompanyDetail: { companyId: string };
   RequestQuote: { companyId: string };
+  InstantBook: { companyId: string };
+  ComingSoon: { categoryId: string };
 };
 
 export type CustomerTabParamList = {
