@@ -2,14 +2,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
-import { CATEGORIES } from '../../data/categories';
 import { getCompaniesByCategory } from '../../data/companies';
+import { useApp } from '../../context/AppContext';
 import { BrowseStackParamList } from '../../navigation/types';
 import { colors, radius, shadow, spacing } from '../../theme';
 
 type Props = NativeStackScreenProps<BrowseStackParamList, 'CategoryList'>;
 
 export default function CategoryListScreen({ navigation }: Props) {
+  const { categories } = useApp();
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -17,7 +18,7 @@ export default function CategoryListScreen({ navigation }: Props) {
         <Text style={styles.title}>What do you need help with?</Text>
       </View>
       <FlatList
-        data={CATEGORIES}
+        data={categories}
         keyExtractor={(item) => item.id}
         numColumns={2}
         contentContainerStyle={styles.list}

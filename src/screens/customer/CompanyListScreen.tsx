@@ -3,8 +3,8 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Card, Chip, EmptyState, RatingBadge, SectionLabel } from '../../components/ui';
-import { CATEGORIES } from '../../data/categories';
 import { getCompaniesByCategory } from '../../data/companies';
+import { useApp } from '../../context/AppContext';
 import { BrowseStackParamList } from '../../navigation/types';
 import { Company } from '../../types';
 import { colors, radius, shadow, spacing } from '../../theme';
@@ -17,7 +17,8 @@ type PriceFilter = 'any' | Company['priceRange'];
 const PRICE_FILTERS: PriceFilter[] = ['any', '£', '££', '£££'];
 
 export default function CompanyListScreen({ route, navigation }: Props) {
-  const category = CATEGORIES.find((c) => c.id === route.params.categoryId);
+  const { categories } = useApp();
+  const category = categories.find((c) => c.id === route.params.categoryId);
   const allCompanies = getCompaniesByCategory(route.params.categoryId);
 
   const [query, setQuery] = useState('');

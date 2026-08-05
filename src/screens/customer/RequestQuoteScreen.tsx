@@ -2,7 +2,6 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Button, Card, SectionLabel } from '../../components/ui';
-import { CATEGORIES } from '../../data/categories';
 import { getCompanyById } from '../../data/companies';
 import { useApp } from '../../context/AppContext';
 import { BrowseStackParamList } from '../../navigation/types';
@@ -13,7 +12,7 @@ type Props = NativeStackScreenProps<BrowseStackParamList, 'RequestQuote'>;
 
 export default function RequestQuoteScreen({ route, navigation }: Props) {
   const company = getCompanyById(route.params.companyId);
-  const { addRequest } = useApp();
+  const { addRequest, categories } = useApp();
 
   const [customerName, setCustomerName] = useState('');
   const [phone, setPhone] = useState('');
@@ -23,7 +22,7 @@ export default function RequestQuoteScreen({ route, navigation }: Props) {
 
   if (!company) return null;
 
-  const categoryName = CATEGORIES.find((c) => c.id === company.categoryIds[0])?.name ?? '';
+  const categoryName = categories.find((c) => c.id === company.categoryIds[0])?.name ?? '';
   const canSubmit =
     customerName.trim().length > 0 &&
     phone.trim().length > 0 &&

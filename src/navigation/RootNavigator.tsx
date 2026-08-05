@@ -3,6 +3,7 @@ import React from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { useApp } from '../context/AppContext';
 import { colors } from '../theme';
+import AdminNavigator from './AdminNavigator';
 import CompanyRootNavigator from './CompanyRootNavigator';
 import CustomerNavigator from './CustomerNavigator';
 import ModeSelectScreen from '../screens/ModeSelectScreen';
@@ -20,7 +21,15 @@ export default function RootNavigator() {
 
   return (
     <NavigationContainer>
-      {mode === 'customer' ? <CustomerNavigator /> : mode === 'company' ? <CompanyRootNavigator /> : <ModeSelectScreen />}
+      {mode === 'customer' ? (
+        <CustomerNavigator />
+      ) : mode === 'company' ? (
+        <CompanyRootNavigator />
+      ) : mode === 'admin' ? (
+        <AdminNavigator />
+      ) : (
+        <ModeSelectScreen />
+      )}
     </NavigationContainer>
   );
 }

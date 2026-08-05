@@ -2,8 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { CATEGORIES } from '../data/categories';
 import { getCompanyById } from '../data/companies';
+import { useApp } from '../context/AppContext';
 import CategoryListScreen from '../screens/customer/CategoryListScreen';
 import ComingSoonScreen from '../screens/customer/ComingSoonScreen';
 import CompanyDetailScreen from '../screens/customer/CompanyDetailScreen';
@@ -40,6 +40,8 @@ const brandStyles = StyleSheet.create({
 });
 
 export default function BrowseNavigator() {
+  const { categories } = useApp();
+
   return (
     <Stack.Navigator
       screenOptions={{
@@ -57,7 +59,7 @@ export default function BrowseNavigator() {
         name="CompanyList"
         component={CompanyListScreen}
         options={({ route }) => ({
-          title: CATEGORIES.find((c) => c.id === route.params.categoryId)?.name ?? 'Companies',
+          title: categories.find((c) => c.id === route.params.categoryId)?.name ?? 'Companies',
         })}
       />
       <Stack.Screen
@@ -71,7 +73,7 @@ export default function BrowseNavigator() {
         name="ComingSoon"
         component={ComingSoonScreen}
         options={({ route }) => ({
-          title: CATEGORIES.find((c) => c.id === route.params.categoryId)?.name ?? 'Coming soon',
+          title: categories.find((c) => c.id === route.params.categoryId)?.name ?? 'Coming soon',
         })}
       />
     </Stack.Navigator>

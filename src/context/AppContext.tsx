@@ -1,7 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { ADMIN_BUSINESSES } from '../data/adminBusinesses';
+import { DEFAULT_CATEGORIES } from '../data/categories';
 import {
+  AdminBusiness,
   BusinessApplication,
+  Category,
   CompanyProfile,
   NotifySignup,
   ServiceRequest,
@@ -15,6 +19,8 @@ const STORAGE_KEYS = {
   companyProfile: '@sortedforyou/companyProfile',
   notifySignups: '@sortedforyou/notifySignups',
   businessApplication: '@sortedforyou/businessApplication',
+  categories: '@sortedforyou/categories',
+  adminBusinesses: '@sortedforyou/adminBusinesses',
 };
 
 const DEFAULT_COMPANY_PROFILE: CompanyProfile = {
@@ -61,6 +67,17 @@ type AppContextValue = {
   submitApplication: () => void;
   approveApplication: () => void;
   changeTier: (tier: SubscriptionTier) => void;
+  categories: Category[];
+  toggleCategoryStatus: (id: string) => void;
+  addCategory: (category: Category) => void;
+  adminBusinesses: AdminBusiness[];
+  approveAdminApplication: (id: string) => void;
+  rejectAdminApplication: (id: string, reason: string) => void;
+  suspendBusiness: (id: string) => void;
+  reinstateBusiness: (id: string) => void;
+  addComplaintFlag: (id: string, note: string) => void;
+  markCommissionPaid: (id: string) => void;
+  runExpiryCheck: () => number;
 };
 
 const AppContext = createContext<AppContextValue | undefined>(undefined);
@@ -72,22 +89,36 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [companyProfile, setCompanyProfile] = useState<CompanyProfile>(DEFAULT_COMPANY_PROFILE);
   const [notifySignups, setNotifySignups] = useState<NotifySignup[]>([]);
   const [businessApplication, setBusinessApplication] = useState<BusinessApplication>(DEFAULT_BUSINESS_APPLICATION);
+  const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
+  const [adminBusinesses, setAdminBusinesses] = useState<AdminBusiness[]>(ADMIN_BUSINESSES);
 
   useEffect(() => {
     (async () => {
       try {
-        const [storedMode, storedRequests, storedProfile, storedSignups, storedApplication] = await Promise.all([
+        const [
+          storedMode,
+          storedRequests,
+          storedProfile,
+          storedSignups,
+          storedApplication,
+          storedCategories,
+          storedAdminBusinesses,
+        ] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.mode),
           AsyncStorage.getItem(STORAGE_KEYS.requests),
           AsyncStorage.getItem(STORAGE_KEYS.companyProfile),
           AsyncStorage.getItem(STORAGE_KEYS.notifySignups),
           AsyncStorage.getItem(STORAGE_KEYS.businessApplication),
+          AsyncStorage.getItem(STORAGE_KEYS.categories),
+          AsyncStorage.getItem(STORAGE_KEYS.adminBusinesses),
         ]);
         if (storedMode) setModeState(JSON.parse(storedMode));
         if (storedRequests) setRequests(JSON.parse(storedRequests));
         if (storedProfile) setCompanyProfile(JSON.parse(storedProfile));
         if (storedSignups) setNotifySignups(JSON.parse(storedSignups));
         if (storedApplication) setBusinessApplication(JSON.parse(storedApplication));
+        if (storedCategories) setCategories(JSON.parse(storedCategories));
+        if (storedAdminBusinesses) setAdminBusinesses(JSON.parse(storedAdminBusinesses));
       } finally {
         setIsReady(true);
       }
@@ -180,6 +211,110 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const toggleCategoryStatus = useCallback((id: string) => {
+    setCategories((prev) => {
+      const next = prev.map((c) =>
+        c.id === id ? { ...c, status: (c.status === 'live' ? 'coming-soon' : 'live') as Category['status'] } : c
+      );
+      AsyncStorage.setItem(STORAGE_KEYS.categories, JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  const addCategory = useCallback((category: Category) => {
+    setCategories((prev) => {
+      const next = [...prev, category];
+      AsyncStorage.setItem(STORAGE_KEYS.categories, JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  const persistAdminBusinesses = useCallback((next: AdminBusiness[]) => {
+    setAdminBusinesses(next);
+    AsyncStorage.setItem(STORAGE_KEYS.adminBusinesses, JSON.stringify(next));
+  }, []);
+
+  const approveAdminApplication = useCallback(
+    (id: string) => {
+      persistAdminBusinesses(
+        adminBusinesses.map((b) => (b.id === id ? { ...b, applicationStatus: 'approved', businessStatus: 'active' } : b))
+      );
+    },
+    [adminBusinesses, persistAdminBusinesses]
+  );
+
+  const rejectAdminApplication = useCallback(
+    (id: string, reason: string) => {
+      persistAdminBusinesses(
+        adminBusinesses.map((b) => (b.id === id ? { ...b, applicationStatus: 'rejected', rejectionReason: reason } : b))
+      );
+    },
+    [adminBusinesses, persistAdminBusinesses]
+  );
+
+  const suspendBusiness = useCallback(
+    (id: string) => {
+      persistAdminBusinesses(adminBusinesses.map((b) => (b.id === id ? { ...b, businessStatus: 'suspended' } : b)));
+    },
+    [adminBusinesses, persistAdminBusinesses]
+  );
+
+  const reinstateBusiness = useCallback(
+    (id: string) => {
+      persistAdminBusinesses(adminBusinesses.map((b) => (b.id === id ? { ...b, businessStatus: 'active' } : b)));
+    },
+    [adminBusinesses, persistAdminBusinesses]
+  );
+
+  const addComplaintFlag = useCallback(
+    (id: string, note: string) => {
+      persistAdminBusinesses(
+        adminBusinesses.map((b) =>
+          b.id === id
+            ? { ...b, flags: [...b.flags, { id: `flag-${Date.now()}`, note, createdAt: new Date().toISOString() }] }
+            : b
+        )
+      );
+    },
+    [adminBusinesses, persistAdminBusinesses]
+  );
+
+  const markCommissionPaid = useCallback(
+    (id: string) => {
+      persistAdminBusinesses(
+        adminBusinesses.map((b) =>
+          b.id === id ? { ...b, commissionPaid: b.commissionPaid + b.commissionOwed, commissionOwed: 0 } : b
+        )
+      );
+    },
+    [adminBusinesses, persistAdminBusinesses]
+  );
+
+  const runExpiryCheck = useCallback(() => {
+    const today = new Date();
+    let suspendedCount = 0;
+    const next = adminBusinesses.map((b) => {
+      const insurance = b.documents.find((d) => d.id === 'insurance');
+      if (!insurance?.expiryDate) return b;
+      const [day, month, year] = insurance.expiryDate.split('/').map(Number);
+      const expiry = new Date(year, (month || 1) - 1, day || 1);
+      if (expiry < today && b.businessStatus === 'active') {
+        suspendedCount += 1;
+        return {
+          ...b,
+          businessStatus: 'suspended' as const,
+          flags: [
+            ...b.flags,
+            { id: `flag-${Date.now()}-${b.id}`, note: 'Auto-suspended — public liability insurance expired.', createdAt: new Date().toISOString() },
+          ],
+        };
+      }
+      return b;
+    });
+    persistAdminBusinesses(next);
+    return suspendedCount;
+  }, [adminBusinesses, persistAdminBusinesses]);
+
   const value = useMemo(
     () => ({
       isReady,
@@ -197,6 +332,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       submitApplication,
       approveApplication,
       changeTier,
+      categories,
+      toggleCategoryStatus,
+      addCategory,
+      adminBusinesses,
+      approveAdminApplication,
+      rejectAdminApplication,
+      suspendBusiness,
+      reinstateBusiness,
+      addComplaintFlag,
+      markCommissionPaid,
+      runExpiryCheck,
     }),
     [
       isReady,
@@ -214,6 +360,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       submitApplication,
       approveApplication,
       changeTier,
+      categories,
+      toggleCategoryStatus,
+      addCategory,
+      adminBusinesses,
+      approveAdminApplication,
+      rejectAdminApplication,
+      suspendBusiness,
+      reinstateBusiness,
+      addComplaintFlag,
+      markCommissionPaid,
+      runExpiryCheck,
     ]
   );
 

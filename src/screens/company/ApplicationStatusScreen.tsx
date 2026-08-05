@@ -3,7 +3,6 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Button, Card, SectionLabel } from '../../components/ui';
-import { CATEGORIES } from '../../data/categories';
 import { getTierInfo } from '../../data/tiers';
 import { useApp } from '../../context/AppContext';
 import { CompanyStackParamList } from '../../navigation/types';
@@ -13,9 +12,9 @@ import { notify } from '../../utils/alert';
 type Props = NativeStackScreenProps<CompanyStackParamList, 'ApplicationStatus'>;
 
 export default function ApplicationStatusScreen({ navigation }: Props) {
-  const { businessApplication, approveApplication } = useApp();
+  const { businessApplication, approveApplication, categories } = useApp();
   const categoryNames = businessApplication.categoryIds
-    .map((id) => CATEGORIES.find((c) => c.id === id)?.name)
+    .map((id) => categories.find((c) => c.id === id)?.name)
     .filter(Boolean)
     .join(', ');
 

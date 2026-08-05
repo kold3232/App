@@ -3,7 +3,6 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Button, Card, SectionLabel } from '../../components/ui';
-import { CATEGORIES } from '../../data/categories';
 import { useApp } from '../../context/AppContext';
 import { BrowseStackParamList } from '../../navigation/types';
 import { colors, radius, shadow, spacing } from '../../theme';
@@ -12,8 +11,8 @@ import { notify } from '../../utils/alert';
 type Props = NativeStackScreenProps<BrowseStackParamList, 'ComingSoon'>;
 
 export default function ComingSoonScreen({ route, navigation }: Props) {
-  const category = CATEGORIES.find((c) => c.id === route.params.categoryId);
-  const { notifySignups, addNotifySignup } = useApp();
+  const { notifySignups, addNotifySignup, categories } = useApp();
+  const category = categories.find((c) => c.id === route.params.categoryId);
   const [contact, setContact] = useState('');
 
   if (!category) return null;

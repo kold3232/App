@@ -60,7 +60,7 @@ export type CompanyProfile = {
   availableNow?: boolean;
 };
 
-export type UserMode = 'customer' | 'company';
+export type UserMode = 'customer' | 'company' | 'admin';
 
 export type NotifySignup = {
   categoryId: string;
@@ -89,4 +89,30 @@ export type BusinessApplication = {
   promoCode: string;
   submittedAt: string;
   rejectionReason: string;
+};
+
+export type AdminBusinessStatus = 'active' | 'suspended';
+
+export type ComplaintFlag = {
+  id: string;
+  note: string;
+  createdAt: string;
+};
+
+export type AdminBusiness = {
+  id: string;
+  businessName: string;
+  contactEmail: string;
+  contactPhone: string;
+  categoryIds: string[];
+  tier: SubscriptionTier;
+  applicationStatus: ApplicationStatus;
+  businessStatus: AdminBusinessStatus;
+  documents: BusinessDocument[];
+  submittedAt: string;
+  rejectionReason: string;
+  jobsCompleted: number;
+  commissionOwed: number;
+  commissionPaid: number;
+  flags: ComplaintFlag[];
 };

@@ -1,6 +1,6 @@
 import { Category } from '../types';
 
-export const CATEGORIES: Category[] = [
+export const DEFAULT_CATEGORIES: Category[] = [
   // Launch categories — live and bookable from day one
   { id: 'builders', name: 'Builders & Construction', icon: 'construct-outline', description: 'Renovations, extensions, general building work', status: 'live' },
   { id: 'electricians', name: 'Electricians', icon: 'flash-outline', description: 'Wiring, fuse boards, EICRs', status: 'live' },

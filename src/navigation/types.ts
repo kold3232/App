@@ -29,3 +29,15 @@ export type CompanyStackParamList = {
   ApplicationStatus: undefined;
   CompanyTabs: undefined;
 };
+
+export type AdminTabParamList = {
+  Queue: undefined;
+  Businesses: undefined;
+  Categories: undefined;
+  Insights: undefined;
+};
+
+export type AdminBusinessesStackParamList = {
+  BusinessesList: undefined;
+  BusinessDetail: { businessId: string };
+};

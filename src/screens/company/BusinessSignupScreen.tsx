@@ -2,17 +2,15 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Button, Card, Chip, SectionLabel } from '../../components/ui';
-import { CATEGORIES } from '../../data/categories';
 import { useApp } from '../../context/AppContext';
 import { CompanyStackParamList } from '../../navigation/types';
 import { colors, spacing } from '../../theme';
 
 type Props = NativeStackScreenProps<CompanyStackParamList, 'BusinessSignup'>;
 
-const LIVE_CATEGORIES = CATEGORIES.filter((c) => c.status === 'live');
-
 export default function BusinessSignupScreen({ navigation }: Props) {
-  const { businessApplication, updateApplicationDraft } = useApp();
+  const { businessApplication, updateApplicationDraft, categories } = useApp();
+  const liveCategories = categories.filter((c) => c.status === 'live');
   const [businessName, setBusinessName] = useState(businessApplication.businessName);
   const [contactEmail, setContactEmail] = useState(businessApplication.contactEmail);
   const [contactPhone, setContactPhone] = useState(businessApplication.contactPhone);
@@ -89,7 +87,7 @@ export default function BusinessSignupScreen({ navigation }: Props) {
         <Text style={styles.sectionTitle}>Categories</Text>
         <Text style={styles.sectionHint}>Select every category your business operates in.</Text>
         <View style={styles.chipWrap}>
-          {LIVE_CATEGORIES.map((c) => (
+          {liveCategories.map((c) => (
             <Chip key={c.id} label={c.name} selected={categoryIds.includes(c.id)} onPress={() => toggleCategory(c.id)} />
           ))}
         </View>

@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { Button, Card, Chip, SectionLabel } from '../../components/ui';
-import { CATEGORIES } from '../../data/categories';
 import { getTierInfo } from '../../data/tiers';
 import { useApp } from '../../context/AppContext';
 import { CompanyProfile } from '../../types';
@@ -11,7 +10,7 @@ import { notify } from '../../utils/alert';
 const PRICE_OPTIONS: CompanyProfile['priceRange'][] = ['£', '££', '£££'];
 
 export default function MyListingScreen() {
-  const { companyProfile, updateCompanyProfile, businessApplication } = useApp();
+  const { companyProfile, updateCompanyProfile, businessApplication, categories } = useApp();
   const [profile, setProfile] = useState<CompanyProfile>(companyProfile);
   const [newService, setNewService] = useState('');
   const tier = businessApplication.tier;
@@ -84,7 +83,7 @@ export default function MyListingScreen() {
 
         <SectionLabel>Categories</SectionLabel>
         <View style={styles.chipWrap}>
-          {CATEGORIES.map((c) => (
+          {categories.map((c) => (
             <Chip
               key={c.id}
               label={c.name}

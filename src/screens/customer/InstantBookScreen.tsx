@@ -2,7 +2,6 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Button, Card, Chip, SectionLabel } from '../../components/ui';
-import { CATEGORIES } from '../../data/categories';
 import { getCompanyById } from '../../data/companies';
 import { useApp } from '../../context/AppContext';
 import { BrowseStackParamList } from '../../navigation/types';
@@ -14,7 +13,7 @@ type Props = NativeStackScreenProps<BrowseStackParamList, 'InstantBook'>;
 
 export default function InstantBookScreen({ route, navigation }: Props) {
   const company = getCompanyById(route.params.companyId);
-  const { addRequest } = useApp();
+  const { addRequest, categories } = useApp();
   const slots = useMemo(() => generateSlots(), []);
 
   const days = useMemo(() => {
@@ -36,7 +35,7 @@ export default function InstantBookScreen({ route, navigation }: Props) {
 
   if (!company) return null;
 
-  const categoryName = CATEGORIES.find((c) => c.id === company.categoryIds[0])?.name ?? '';
+  const categoryName = categories.find((c) => c.id === company.categoryIds[0])?.name ?? '';
   const selectedSlot = slots.find((s) => s.id === selectedSlotId);
   const canSubmit = !!selectedSlot && customerName.trim().length > 0 && phone.trim().length > 0 && address.trim().length > 0;
 

@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
-import { SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import { Button } from '../components/ui';
 import { useApp } from '../context/AppContext';
 import { colors, radius, shadow, spacing } from '../theme';
@@ -29,6 +29,9 @@ export default function ModeSelectScreen() {
         <View style={styles.footerDot} />
         <Text style={styles.footer}>Currently serving Gibraltar only</Text>
       </View>
+      <Pressable onPress={() => setMode('admin')} hitSlop={12}>
+        <Text style={styles.adminLink}>Sortedforyou team? Admin sign-in</Text>
+      </Pressable>
     </SafeAreaView>
   );
 }
@@ -59,4 +62,5 @@ const styles = StyleSheet.create({
   footerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: spacing.sm, gap: 6 },
   footerDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.accent },
   footer: { textAlign: 'center', color: '#64749B', fontSize: 12, fontWeight: '600' },
+  adminLink: { textAlign: 'center', color: '#4A5A85', fontSize: 11.5, marginTop: spacing.md, textDecorationLine: 'underline' },
 });
