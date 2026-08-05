@@ -42,7 +42,7 @@ export default function CategoryListScreen({ navigation }: Props) {
                 </View>
               )}
               <View style={[styles.tileIconWrap, isComingSoon && styles.tileIconWrapMuted]}>
-                <Ionicons name={item.icon} size={21} color={isComingSoon ? colors.textFaint : colors.primary} />
+                <Ionicons name={item.icon} size={21} color={isComingSoon ? colors.textFaint : colors.textInverse} />
               </View>
               <Text style={[styles.tileTitle, isComingSoon && styles.tileTitleMuted]}>{item.name}</Text>
               <Text style={styles.tileDescription}>{item.description}</Text>
@@ -87,11 +87,11 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: radius.sm,
-    backgroundColor: 'rgba(36, 84, 232, 0.08)',
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  tileIconWrapMuted: { backgroundColor: colors.border },
+  tileIconWrapMuted: { backgroundColor: colors.surfaceAlt },
   tileTitle: { fontSize: 14.5, fontWeight: '700', color: colors.text, marginTop: spacing.sm, letterSpacing: 0.1 },
   tileTitleMuted: { color: colors.textMuted },
   tileDescription: { fontSize: 11.5, color: colors.textMuted, marginTop: 4, minHeight: 30, lineHeight: 15.5 },

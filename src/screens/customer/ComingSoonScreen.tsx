@@ -34,7 +34,7 @@ export default function ComingSoonScreen({ route, navigation }: Props) {
         contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xl * 2 }}
       >
         <View style={styles.iconWrap}>
-          <Ionicons name={category.icon} size={30} color={colors.primary} />
+          <Ionicons name={category.icon} size={30} color={colors.textInverse} />
         </View>
         <View style={styles.badge}>
           <Text style={styles.badgeText}>Coming soon</Text>
@@ -86,7 +86,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: radius.lg,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
