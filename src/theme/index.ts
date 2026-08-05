@@ -22,6 +22,8 @@ export const colors = {
   pendingBg: '#E2E8F0',
   info: '#1D4ED8',
   infoBg: '#DBEAFE',
+  buttonGradientStart: '#4B5563',
+  buttonGradientEnd: '#9CA3AF',
 };
 
 export const spacing = {

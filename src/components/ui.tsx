@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors, radius, shadow, spacing } from '../theme';
@@ -17,13 +18,19 @@ export function Button({
   loading?: boolean;
 }) {
   const styleForVariant = {
-    primary: { backgroundColor: colors.primary, ...shadow.card },
+    primary: shadow.card,
     secondary: { backgroundColor: colors.surfaceAlt, borderWidth: 1.5, borderColor: colors.borderStrong },
     danger: { backgroundColor: colors.danger, ...shadow.card },
     outline: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: colors.primary },
   }[variant];
   const textColor =
     variant === 'outline' ? colors.primary : variant === 'secondary' ? colors.slate700 : colors.textInverse;
+
+  const content = loading ? (
+    <ActivityIndicator color={textColor} />
+  ) : (
+    <Text style={[styles.buttonText, { color: textColor }]}>{title}</Text>
+  );
 
   return (
     <Pressable
@@ -36,11 +43,15 @@ export function Button({
         pressed && !disabled && styles.buttonPressed,
       ]}
     >
-      {loading ? (
-        <ActivityIndicator color={textColor} />
-      ) : (
-        <Text style={[styles.buttonText, { color: textColor }]}>{title}</Text>
+      {variant === 'primary' && (
+        <LinearGradient
+          colors={[colors.buttonGradientStart, colors.buttonGradientEnd]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.gradientFill}
+        />
       )}
+      {content}
     </Pressable>
   );
 }
@@ -128,6 +139,7 @@ const styles = StyleSheet.create({
   buttonDisabled: { opacity: 0.45 },
   buttonPressed: { opacity: 0.85 },
   buttonText: { fontSize: 15.5, fontWeight: '700', letterSpacing: 0.2 },
+  gradientFill: { ...StyleSheet.absoluteFillObject, borderRadius: radius.md },
   chip: {
     paddingVertical: 9,
     paddingHorizontal: 15,
