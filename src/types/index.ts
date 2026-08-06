@@ -99,6 +99,15 @@ export type ComplaintFlag = {
   createdAt: string;
 };
 
+export type Review = {
+  id: string;
+  requestId: string;
+  companyId: string;
+  rating: number;
+  comment: string;
+  createdAt: string;
+};
+
 export type AdminBusiness = {
   id: string;
   businessName: string;

@@ -9,6 +9,7 @@ import {
   Category,
   CompanyProfile,
   NotifySignup,
+  Review,
   ServiceRequest,
   SubscriptionTier,
   UserMode,
@@ -24,6 +25,7 @@ const STORAGE_KEYS = {
   adminBusinesses: '@sortedforyou/adminBusinesses',
   hasAcceptedLegal: '@sortedforyou/hasAcceptedLegal',
   isAdminAuthenticated: '@sortedforyou/isAdminAuthenticated',
+  reviews: '@sortedforyou/reviews',
 };
 
 const DEFAULT_COMPANY_PROFILE: CompanyProfile = {
@@ -63,6 +65,8 @@ type AppContextValue = {
   isAdminAuthenticated: boolean;
   authenticateAdmin: (passcode: string) => boolean;
   logoutAdmin: () => void;
+  reviews: Review[];
+  addReview: (requestId: string, companyId: string, rating: number, comment: string) => void;
   requests: ServiceRequest[];
   addRequest: (input: Omit<ServiceRequest, 'id' | 'createdAt'>) => void;
   updateRequestStatus: (id: string, status: ServiceRequest['status']) => void;
@@ -94,6 +98,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [isReady, setIsReady] = useState(false);
   const [hasAcceptedLegal, setHasAcceptedLegal] = useState(false);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
+  const [reviews, setReviews] = useState<Review[]>([]);
   const [mode, setModeState] = useState<UserMode | null>(null);
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
   const [companyProfile, setCompanyProfile] = useState<CompanyProfile>(DEFAULT_COMPANY_PROFILE);
@@ -115,6 +120,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           storedAdminBusinesses,
           storedHasAcceptedLegal,
           storedIsAdminAuthenticated,
+          storedReviews,
         ] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.mode),
           AsyncStorage.getItem(STORAGE_KEYS.requests),
@@ -125,6 +131,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           AsyncStorage.getItem(STORAGE_KEYS.adminBusinesses),
           AsyncStorage.getItem(STORAGE_KEYS.hasAcceptedLegal),
           AsyncStorage.getItem(STORAGE_KEYS.isAdminAuthenticated),
+          AsyncStorage.getItem(STORAGE_KEYS.reviews),
         ]);
         if (storedMode) setModeState(JSON.parse(storedMode));
         if (storedRequests) setRequests(JSON.parse(storedRequests));
@@ -135,6 +142,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (storedAdminBusinesses) setAdminBusinesses(JSON.parse(storedAdminBusinesses));
         if (storedHasAcceptedLegal) setHasAcceptedLegal(JSON.parse(storedHasAcceptedLegal));
         if (storedIsAdminAuthenticated) setIsAdminAuthenticated(JSON.parse(storedIsAdminAuthenticated));
+        if (storedReviews) setReviews(JSON.parse(storedReviews));
       } finally {
         setIsReady(true);
       }
@@ -186,6 +194,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setRequests((prev) => {
       const next = prev.map((r) => (r.id === id ? { ...r, status } : r));
       AsyncStorage.setItem(STORAGE_KEYS.requests, JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  const addReview = useCallback((requestId: string, companyId: string, rating: number, comment: string) => {
+    setReviews((prev) => {
+      const next: Review[] = [
+        ...prev,
+        { id: `review-${Date.now()}`, requestId, companyId, rating, comment, createdAt: new Date().toISOString() },
+      ];
+      AsyncStorage.setItem(STORAGE_KEYS.reviews, JSON.stringify(next));
       return next;
     });
   }, []);
@@ -362,6 +381,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       isAdminAuthenticated,
       authenticateAdmin,
       logoutAdmin,
+      reviews,
+      addReview,
       requests,
       addRequest,
       updateRequestStatus,
@@ -395,6 +416,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       isAdminAuthenticated,
       authenticateAdmin,
       logoutAdmin,
+      reviews,
+      addReview,
       requests,
       addRequest,
       updateRequestStatus,
