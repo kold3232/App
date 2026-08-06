@@ -18,7 +18,7 @@ export default function AdminQueueScreen() {
 
   function handleApprove(id: string, name: string) {
     approveAdminApplication(id);
-    notify('Approved', `${name} is now live on Sortedforyou.`);
+    notify('Approved', `${name} is now live on TradeLink.`);
   }
 
   function handleRejectConfirm(id: string, name: string) {

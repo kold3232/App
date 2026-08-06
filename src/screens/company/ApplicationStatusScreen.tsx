@@ -22,7 +22,7 @@ export default function ApplicationStatusScreen({ navigation }: Props) {
 
   function handleDemoApprove() {
     approveApplication();
-    notify('Application approved', 'Your business is now live on Sortedforyou.');
+    notify('Application approved', 'Your business is now live on TradeLink.');
     navigation.navigate('CompanyTabs');
   }
 

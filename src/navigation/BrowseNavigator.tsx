@@ -21,7 +21,7 @@ function BrandTitle() {
       <View style={brandStyles.badge}>
         <Ionicons name="flash" size={13} color={colors.textInverse} />
       </View>
-      <Text style={brandStyles.title}>Sortedforyou</Text>
+      <Text style={brandStyles.title}>TradeLink</Text>
     </View>
   );
 }

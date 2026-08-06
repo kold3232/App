@@ -34,7 +34,7 @@ export default function ProfileScreen() {
             </View>
             <View style={{ flex: 1 }}>
               <SectionLabel>Account</SectionLabel>
-              <Text style={styles.text}>You're browsing Sortedforyou as a customer.</Text>
+              <Text style={styles.text}>You're browsing TradeLink as a customer.</Text>
             </View>
           </View>
         </Card>
