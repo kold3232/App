@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { ADMIN_BUSINESSES } from '../data/adminBusinesses';
+import { ADMIN_PASSCODE } from '../data/adminAuth';
 import { DEFAULT_CATEGORIES } from '../data/categories';
 import {
   AdminBusiness,
@@ -22,6 +23,7 @@ const STORAGE_KEYS = {
   categories: '@sortedforyou/categories',
   adminBusinesses: '@sortedforyou/adminBusinesses',
   hasAcceptedLegal: '@sortedforyou/hasAcceptedLegal',
+  isAdminAuthenticated: '@sortedforyou/isAdminAuthenticated',
 };
 
 const DEFAULT_COMPANY_PROFILE: CompanyProfile = {
@@ -58,6 +60,9 @@ type AppContextValue = {
   acceptLegal: () => void;
   mode: UserMode | null;
   setMode: (mode: UserMode | null) => void;
+  isAdminAuthenticated: boolean;
+  authenticateAdmin: (passcode: string) => boolean;
+  logoutAdmin: () => void;
   requests: ServiceRequest[];
   addRequest: (input: Omit<ServiceRequest, 'id' | 'createdAt'>) => void;
   updateRequestStatus: (id: string, status: ServiceRequest['status']) => void;
@@ -88,6 +93,7 @@ const AppContext = createContext<AppContextValue | undefined>(undefined);
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [isReady, setIsReady] = useState(false);
   const [hasAcceptedLegal, setHasAcceptedLegal] = useState(false);
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [mode, setModeState] = useState<UserMode | null>(null);
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
   const [companyProfile, setCompanyProfile] = useState<CompanyProfile>(DEFAULT_COMPANY_PROFILE);
@@ -108,6 +114,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           storedCategories,
           storedAdminBusinesses,
           storedHasAcceptedLegal,
+          storedIsAdminAuthenticated,
         ] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.mode),
           AsyncStorage.getItem(STORAGE_KEYS.requests),
@@ -117,6 +124,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           AsyncStorage.getItem(STORAGE_KEYS.categories),
           AsyncStorage.getItem(STORAGE_KEYS.adminBusinesses),
           AsyncStorage.getItem(STORAGE_KEYS.hasAcceptedLegal),
+          AsyncStorage.getItem(STORAGE_KEYS.isAdminAuthenticated),
         ]);
         if (storedMode) setModeState(JSON.parse(storedMode));
         if (storedRequests) setRequests(JSON.parse(storedRequests));
@@ -126,6 +134,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (storedCategories) setCategories(JSON.parse(storedCategories));
         if (storedAdminBusinesses) setAdminBusinesses(JSON.parse(storedAdminBusinesses));
         if (storedHasAcceptedLegal) setHasAcceptedLegal(JSON.parse(storedHasAcceptedLegal));
+        if (storedIsAdminAuthenticated) setIsAdminAuthenticated(JSON.parse(storedIsAdminAuthenticated));
       } finally {
         setIsReady(true);
       }
@@ -140,6 +149,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const setMode = useCallback((next: UserMode | null) => {
     setModeState(next);
     AsyncStorage.setItem(STORAGE_KEYS.mode, JSON.stringify(next));
+  }, []);
+
+  const authenticateAdmin = useCallback((passcode: string) => {
+    const success = passcode.trim() === ADMIN_PASSCODE;
+    if (success) {
+      setIsAdminAuthenticated(true);
+      AsyncStorage.setItem(STORAGE_KEYS.isAdminAuthenticated, JSON.stringify(true));
+    }
+    return success;
+  }, []);
+
+  const logoutAdmin = useCallback(() => {
+    setIsAdminAuthenticated(false);
+    AsyncStorage.setItem(STORAGE_KEYS.isAdminAuthenticated, JSON.stringify(false));
+    setModeState(null);
+    AsyncStorage.setItem(STORAGE_KEYS.mode, JSON.stringify(null));
   }, []);
 
   const addRequest = useCallback((input: Omit<ServiceRequest, 'id' | 'createdAt'>) => {
@@ -334,6 +359,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       acceptLegal,
       mode,
       setMode,
+      isAdminAuthenticated,
+      authenticateAdmin,
+      logoutAdmin,
       requests,
       addRequest,
       updateRequestStatus,
@@ -364,6 +392,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       acceptLegal,
       mode,
       setMode,
+      isAdminAuthenticated,
+      authenticateAdmin,
+      logoutAdmin,
       requests,
       addRequest,
       updateRequestStatus,

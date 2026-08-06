@@ -6,10 +6,10 @@ import { colors, spacing } from '../../theme';
 import { confirmAction, notify } from '../../utils/alert';
 
 export default function AdminInsightsScreen() {
-  const { adminBusinesses, categories, notifySignups, setMode } = useApp();
+  const { adminBusinesses, categories, notifySignups, logoutAdmin } = useApp();
 
   function handleExit() {
-    confirmAction('Exit admin', 'Return to the mode selection screen.', 'Exit', () => setMode(null));
+    confirmAction('Log out of admin', 'You will need the passcode again to return to the admin dashboard.', 'Log out', logoutAdmin);
   }
 
   const stats = useMemo(() => {
@@ -127,7 +127,7 @@ export default function AdminInsightsScreen() {
       )}
 
       <View style={{ marginTop: spacing.lg }}>
-        <Button title="Exit admin" variant="outline" onPress={handleExit} />
+        <Button title="Log out of admin" variant="outline" onPress={handleExit} />
       </View>
     </ScrollView>
   );
