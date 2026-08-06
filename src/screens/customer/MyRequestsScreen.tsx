@@ -6,7 +6,7 @@ import { useApp } from '../../context/AppContext';
 import { colors, radius, spacing } from '../../theme';
 
 export default function MyRequestsScreen() {
-  const { requests, reviews, addReview } = useApp();
+  const { requests, reviews, addReview, confirmCompletion } = useApp();
   const [activeReviewId, setActiveReviewId] = useState<string | null>(null);
   const [draftRating, setDraftRating] = useState(0);
   const [draftComment, setDraftComment] = useState('');
@@ -58,7 +58,18 @@ export default function MyRequestsScreen() {
               </Text>
               <Text style={styles.date}>{new Date(item.createdAt).toLocaleString()}</Text>
 
-              {item.status === 'completed' && (
+              {item.status === 'completed' && !item.customerConfirmed && (
+                <View style={styles.reviewSection}>
+                  <Text style={styles.reviewLabel}>Was the work completed?</Text>
+                  <Text style={styles.confirmText}>
+                    {item.companyName} has marked this job as done. Confirm it was completed to your satisfaction.
+                  </Text>
+                  <View style={{ height: spacing.sm }} />
+                  <Button title="Confirm work was completed" onPress={() => confirmCompletion(item.id)} />
+                </View>
+              )}
+
+              {item.status === 'completed' && item.customerConfirmed && (
                 <View style={styles.reviewSection}>
                   {review ? (
                     <View>
@@ -117,6 +128,7 @@ const styles = StyleSheet.create({
   date: { fontSize: 11, color: colors.textMuted, marginTop: 6 },
   reviewSection: { marginTop: spacing.md, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.border },
   reviewLabel: { fontSize: 12, fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 6 },
+  confirmText: { fontSize: 13, color: colors.text, lineHeight: 19 },
   reviewComment: { fontSize: 13, color: colors.text, marginTop: 6, lineHeight: 19 },
   commentInput: {
     backgroundColor: colors.surface,

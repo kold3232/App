@@ -49,6 +49,7 @@ export type ServiceRequest = {
   createdAt: string;
   jobValue?: number;
   commission?: number;
+  customerConfirmed?: boolean;
 };
 
 export type CompanyProfile = {

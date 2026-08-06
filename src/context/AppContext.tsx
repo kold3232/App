@@ -72,6 +72,8 @@ type AppContextValue = {
   addRequest: (input: Omit<ServiceRequest, 'id' | 'createdAt'>) => void;
   updateRequestStatus: (id: string, status: ServiceRequest['status']) => void;
   completeRequest: (id: string, jobValue: number) => void;
+  confirmCompletion: (id: string) => void;
+  rescheduleRequest: (id: string, newSlot: string) => void;
   companyProfile: CompanyProfile;
   updateCompanyProfile: (profile: CompanyProfile) => void;
   notifySignups: NotifySignup[];
@@ -205,13 +207,31 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const rate = getTierInfo(businessApplication.tier ?? 'standard').commissionRate;
       const commission = Math.round(jobValue * rate * 100) / 100;
       setRequests((prev) => {
-        const next = prev.map((r) => (r.id === id ? { ...r, status: 'completed' as const, jobValue, commission } : r));
+        const next = prev.map((r) =>
+          r.id === id ? { ...r, status: 'completed' as const, jobValue, commission, customerConfirmed: false } : r
+        );
         AsyncStorage.setItem(STORAGE_KEYS.requests, JSON.stringify(next));
         return next;
       });
     },
     [businessApplication.tier]
   );
+
+  const confirmCompletion = useCallback((id: string) => {
+    setRequests((prev) => {
+      const next = prev.map((r) => (r.id === id ? { ...r, customerConfirmed: true } : r));
+      AsyncStorage.setItem(STORAGE_KEYS.requests, JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  const rescheduleRequest = useCallback((id: string, newSlot: string) => {
+    setRequests((prev) => {
+      const next = prev.map((r) => (r.id === id ? { ...r, scheduledSlot: newSlot } : r));
+      AsyncStorage.setItem(STORAGE_KEYS.requests, JSON.stringify(next));
+      return next;
+    });
+  }, []);
 
   const addReview = useCallback((requestId: string, companyId: string, rating: number, comment: string) => {
     setReviews((prev) => {
@@ -402,6 +422,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       addRequest,
       updateRequestStatus,
       completeRequest,
+      confirmCompletion,
+      rescheduleRequest,
       companyProfile,
       updateCompanyProfile,
       notifySignups,
@@ -438,6 +460,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       addRequest,
       updateRequestStatus,
       completeRequest,
+      confirmCompletion,
+      rescheduleRequest,
       companyProfile,
       updateCompanyProfile,
       notifySignups,

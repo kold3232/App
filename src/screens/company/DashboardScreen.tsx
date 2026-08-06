@@ -5,6 +5,7 @@ import { useApp } from '../../context/AppContext';
 import { RequestStatus } from '../../types';
 import { colors, radius, spacing } from '../../theme';
 import { notify } from '../../utils/alert';
+import { generateSlots } from '../../utils/booking';
 
 const FILTERS: { id: RequestStatus | 'all'; label: string }[] = [
   { id: 'all', label: 'All' },
@@ -15,10 +16,13 @@ const FILTERS: { id: RequestStatus | 'all'; label: string }[] = [
 ];
 
 export default function DashboardScreen() {
-  const { requests, updateRequestStatus, completeRequest, companyProfile } = useApp();
+  const { requests, updateRequestStatus, completeRequest, rescheduleRequest, companyProfile, businessApplication } = useApp();
   const [filter, setFilter] = useState<RequestStatus | 'all'>('all');
   const [completingId, setCompletingId] = useState<string | null>(null);
   const [jobValueInput, setJobValueInput] = useState('');
+  const [reschedulingId, setReschedulingId] = useState<string | null>(null);
+  const slots = useMemo(() => generateSlots(), []);
+  const canReschedule = businessApplication.tier === 'pro';
 
   function startCompleting(id: string) {
     setCompletingId(id);
@@ -33,6 +37,14 @@ export default function DashboardScreen() {
     }
     completeRequest(id, value);
     setCompletingId(null);
+  }
+
+  function confirmReschedule(id: string, slotId: string) {
+    const slot = slots.find((s) => s.id === slotId);
+    if (!slot) return;
+    rescheduleRequest(id, `${slot.dayLabel} · ${slot.time}`);
+    notify('Booking rescheduled', `Updated to ${slot.dayLabel} at ${slot.time}.`);
+    setReschedulingId(null);
   }
 
   const filtered = useMemo(
@@ -118,11 +130,38 @@ export default function DashboardScreen() {
                   <Button title="Mark as completed" onPress={() => startCompleting(item.id)} variant="secondary" />
                 </View>
               ))}
+            {item.status === 'accepted' && item.type === 'instant' && canReschedule && completingId !== item.id && (
+              reschedulingId === item.id ? (
+                <View style={styles.completeForm}>
+                  <Text style={styles.completeLabel}>Pick a new slot</Text>
+                  <View style={styles.chipWrap}>
+                    {slots.map((s) => (
+                      <Chip
+                        key={s.id}
+                        label={`${s.dayLabel} · ${s.time}`}
+                        onPress={() => confirmReschedule(item.id, s.id)}
+                      />
+                    ))}
+                  </View>
+                  <View style={{ height: spacing.sm }} />
+                  <Button title="Cancel" variant="outline" onPress={() => setReschedulingId(null)} />
+                </View>
+              ) : (
+                <View style={styles.actions}>
+                  <Button title="Reschedule" variant="outline" onPress={() => setReschedulingId(item.id)} />
+                </View>
+              )
+            )}
             {item.status === 'completed' && item.jobValue != null && (
               <View style={styles.completedSummary}>
                 <Text style={styles.completedText}>Job value £{item.jobValue.toFixed(2)}</Text>
                 <Text style={styles.completedText}>Commission £{(item.commission ?? 0).toFixed(2)}</Text>
               </View>
+            )}
+            {item.status === 'completed' && (
+              <Text style={styles.confirmStatus}>
+                {item.customerConfirmed ? '✓ Confirmed by customer' : 'Awaiting customer confirmation'}
+              </Text>
             )}
           </Card>
         )}
@@ -137,6 +176,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: '800', color: colors.text, letterSpacing: 0.1 },
   subtitle: { fontSize: 12, color: colors.textMuted, marginTop: 4 },
   filterRow: { flexDirection: 'row', flexWrap: 'wrap', marginTop: spacing.md, marginBottom: spacing.xs },
+  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', marginTop: spacing.xs },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   customerName: { fontSize: 16, fontWeight: '700', color: colors.text, flex: 1, marginRight: spacing.sm },
   category: { fontSize: 12, color: colors.primary, fontWeight: '700', marginTop: 2 },
@@ -164,4 +204,5 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
   },
   completedText: { fontSize: 12.5, fontWeight: '700', color: colors.primary },
+  confirmStatus: { fontSize: 11.5, color: colors.textMuted, marginTop: 6 },
 });
