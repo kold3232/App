@@ -47,6 +47,8 @@ export type ServiceRequest = {
   scheduledSlot: string;
   status: RequestStatus;
   createdAt: string;
+  jobValue?: number;
+  commission?: number;
 };
 
 export type CompanyProfile = {

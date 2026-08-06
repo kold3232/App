@@ -6,6 +6,7 @@ export type TierInfo = {
   price: string;
   priceNote: string;
   features: string[];
+  commissionRate: number;
 };
 
 export const TIERS: TierInfo[] = [
@@ -15,6 +16,7 @@ export const TIERS: TierInfo[] = [
     price: '£40–60',
     priceNote: 'per month',
     features: ['Business listing', 'Photo gallery', 'Category tags', 'Contact button', 'Customer reviews'],
+    commissionRate: 0.1,
   },
   {
     id: 'premium',
@@ -22,6 +24,7 @@ export const TIERS: TierInfo[] = [
     price: '£70',
     priceNote: 'per month',
     features: ['Everything in Standard', 'Visible "available now" indicator'],
+    commissionRate: 0.08,
   },
   {
     id: 'pro',
@@ -29,6 +32,7 @@ export const TIERS: TierInfo[] = [
     price: '£150',
     priceNote: 'per month',
     features: ['Everything in Premium', 'Live shared calendar', 'Instant in-app booking', 'Rescheduling'],
+    commissionRate: 0.05,
   },
 ];
 

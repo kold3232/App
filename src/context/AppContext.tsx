@@ -3,6 +3,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import { ADMIN_BUSINESSES } from '../data/adminBusinesses';
 import { ADMIN_PASSCODE } from '../data/adminAuth';
 import { DEFAULT_CATEGORIES } from '../data/categories';
+import { getTierInfo } from '../data/tiers';
 import {
   AdminBusiness,
   BusinessApplication,
@@ -70,6 +71,7 @@ type AppContextValue = {
   requests: ServiceRequest[];
   addRequest: (input: Omit<ServiceRequest, 'id' | 'createdAt'>) => void;
   updateRequestStatus: (id: string, status: ServiceRequest['status']) => void;
+  completeRequest: (id: string, jobValue: number) => void;
   companyProfile: CompanyProfile;
   updateCompanyProfile: (profile: CompanyProfile) => void;
   notifySignups: NotifySignup[];
@@ -197,6 +199,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return next;
     });
   }, []);
+
+  const completeRequest = useCallback(
+    (id: string, jobValue: number) => {
+      const rate = getTierInfo(businessApplication.tier ?? 'standard').commissionRate;
+      const commission = Math.round(jobValue * rate * 100) / 100;
+      setRequests((prev) => {
+        const next = prev.map((r) => (r.id === id ? { ...r, status: 'completed' as const, jobValue, commission } : r));
+        AsyncStorage.setItem(STORAGE_KEYS.requests, JSON.stringify(next));
+        return next;
+      });
+    },
+    [businessApplication.tier]
+  );
 
   const addReview = useCallback((requestId: string, companyId: string, rating: number, comment: string) => {
     setReviews((prev) => {
@@ -386,6 +401,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       requests,
       addRequest,
       updateRequestStatus,
+      completeRequest,
       companyProfile,
       updateCompanyProfile,
       notifySignups,
@@ -421,6 +437,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       requests,
       addRequest,
       updateRequestStatus,
+      completeRequest,
       companyProfile,
       updateCompanyProfile,
       notifySignups,
