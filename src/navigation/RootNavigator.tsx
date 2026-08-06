@@ -7,9 +7,10 @@ import AdminNavigator from './AdminNavigator';
 import CompanyRootNavigator from './CompanyRootNavigator';
 import CustomerNavigator from './CustomerNavigator';
 import ModeSelectScreen from '../screens/ModeSelectScreen';
+import LegalConsentScreen from '../screens/legal/LegalConsentScreen';
 
 export default function RootNavigator() {
-  const { isReady, mode } = useApp();
+  const { isReady, hasAcceptedLegal, mode } = useApp();
 
   if (!isReady) {
     return (
@@ -21,7 +22,9 @@ export default function RootNavigator() {
 
   return (
     <NavigationContainer>
-      {mode === 'customer' ? (
+      {!hasAcceptedLegal ? (
+        <LegalConsentScreen />
+      ) : mode === 'customer' ? (
         <CustomerNavigator />
       ) : mode === 'company' ? (
         <CompanyRootNavigator />

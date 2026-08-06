@@ -21,6 +21,7 @@ const STORAGE_KEYS = {
   businessApplication: '@sortedforyou/businessApplication',
   categories: '@sortedforyou/categories',
   adminBusinesses: '@sortedforyou/adminBusinesses',
+  hasAcceptedLegal: '@sortedforyou/hasAcceptedLegal',
 };
 
 const DEFAULT_COMPANY_PROFILE: CompanyProfile = {
@@ -53,6 +54,8 @@ const DEFAULT_BUSINESS_APPLICATION: BusinessApplication = {
 
 type AppContextValue = {
   isReady: boolean;
+  hasAcceptedLegal: boolean;
+  acceptLegal: () => void;
   mode: UserMode | null;
   setMode: (mode: UserMode | null) => void;
   requests: ServiceRequest[];
@@ -84,6 +87,7 @@ const AppContext = createContext<AppContextValue | undefined>(undefined);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [isReady, setIsReady] = useState(false);
+  const [hasAcceptedLegal, setHasAcceptedLegal] = useState(false);
   const [mode, setModeState] = useState<UserMode | null>(null);
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
   const [companyProfile, setCompanyProfile] = useState<CompanyProfile>(DEFAULT_COMPANY_PROFILE);
@@ -103,6 +107,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           storedApplication,
           storedCategories,
           storedAdminBusinesses,
+          storedHasAcceptedLegal,
         ] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.mode),
           AsyncStorage.getItem(STORAGE_KEYS.requests),
@@ -111,6 +116,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           AsyncStorage.getItem(STORAGE_KEYS.businessApplication),
           AsyncStorage.getItem(STORAGE_KEYS.categories),
           AsyncStorage.getItem(STORAGE_KEYS.adminBusinesses),
+          AsyncStorage.getItem(STORAGE_KEYS.hasAcceptedLegal),
         ]);
         if (storedMode) setModeState(JSON.parse(storedMode));
         if (storedRequests) setRequests(JSON.parse(storedRequests));
@@ -119,10 +125,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (storedApplication) setBusinessApplication(JSON.parse(storedApplication));
         if (storedCategories) setCategories(JSON.parse(storedCategories));
         if (storedAdminBusinesses) setAdminBusinesses(JSON.parse(storedAdminBusinesses));
+        if (storedHasAcceptedLegal) setHasAcceptedLegal(JSON.parse(storedHasAcceptedLegal));
       } finally {
         setIsReady(true);
       }
     })();
+  }, []);
+
+  const acceptLegal = useCallback(() => {
+    setHasAcceptedLegal(true);
+    AsyncStorage.setItem(STORAGE_KEYS.hasAcceptedLegal, JSON.stringify(true));
   }, []);
 
   const setMode = useCallback((next: UserMode | null) => {
@@ -318,6 +330,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo(
     () => ({
       isReady,
+      hasAcceptedLegal,
+      acceptLegal,
       mode,
       setMode,
       requests,
@@ -346,6 +360,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }),
     [
       isReady,
+      hasAcceptedLegal,
+      acceptLegal,
       mode,
       setMode,
       requests,

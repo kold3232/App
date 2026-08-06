@@ -1,9 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import React from 'react';
-import { SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { LegalTextModal } from '../../components/LegalTextModal';
 import { Button, Card, SectionLabel } from '../../components/ui';
 import { getTierInfo } from '../../data/tiers';
+import { LEGAL_LAST_UPDATED, PRIVACY_SECTIONS, TERMS_SECTIONS } from '../../data/legalContent';
 import { useApp } from '../../context/AppContext';
 import { colors, radius, spacing } from '../../theme';
 import { confirmAction } from '../../utils/alert';
@@ -12,6 +14,8 @@ export default function SettingsScreen() {
   const { setMode, businessApplication } = useApp();
   const navigation = useNavigation<any>();
   const tierInfo = businessApplication.tier ? getTierInfo(businessApplication.tier) : null;
+  const [showTerms, setShowTerms] = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
 
   function handleSwitchToCustomer() {
     confirmAction(
@@ -74,10 +78,37 @@ export default function SettingsScreen() {
           </View>
         </Card>
 
+        <Card style={{ marginTop: spacing.md }}>
+          <Pressable style={styles.legalRow} onPress={() => setShowTerms(true)}>
+            <Text style={styles.legalText}>Terms of Service</Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.textFaint} />
+          </Pressable>
+          <View style={styles.legalDivider} />
+          <Pressable style={styles.legalRow} onPress={() => setShowPrivacy(true)}>
+            <Text style={styles.legalText}>Privacy Policy</Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.textFaint} />
+          </Pressable>
+        </Card>
+
         <View style={{ marginTop: spacing.lg }}>
           <Button title="Switch to customer mode" onPress={handleSwitchToCustomer} variant="outline" />
         </View>
       </View>
+
+      <LegalTextModal
+        visible={showTerms}
+        onClose={() => setShowTerms(false)}
+        title="Terms of Service"
+        lastUpdated={LEGAL_LAST_UPDATED}
+        sections={TERMS_SECTIONS}
+      />
+      <LegalTextModal
+        visible={showPrivacy}
+        onClose={() => setShowPrivacy(false)}
+        title="Privacy Policy"
+        lastUpdated={LEGAL_LAST_UPDATED}
+        sections={PRIVACY_SECTIONS}
+      />
     </SafeAreaView>
   );
 }
@@ -95,4 +126,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   text: { fontSize: 14, color: colors.text, marginTop: 6, lineHeight: 20 },
+  legalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6 },
+  legalText: { fontSize: 14, fontWeight: '600', color: colors.text },
+  legalDivider: { height: 1, backgroundColor: colors.border, marginVertical: 4 },
 });
