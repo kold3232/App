@@ -24,6 +24,8 @@ export const colors = {
   infoBg: '#DBEAFE',
   buttonGradientStart: '#4B5563',
   buttonGradientEnd: '#9CA3AF',
+  accentGradientStart: '#1D4ED8',
+  accentGradientEnd: '#4FA3F7',
 };
 
 export const spacing = {

@@ -13,7 +13,7 @@ export function Button({
 }: {
   title: string;
   onPress: () => void;
-  variant?: 'primary' | 'secondary' | 'danger' | 'outline';
+  variant?: 'primary' | 'secondary' | 'danger' | 'outline' | 'accent';
   disabled?: boolean;
   loading?: boolean;
 }) {
@@ -22,6 +22,7 @@ export function Button({
     secondary: { backgroundColor: colors.surfaceAlt, borderWidth: 1.5, borderColor: colors.borderStrong },
     danger: { backgroundColor: colors.danger, ...shadow.card },
     outline: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: colors.primary },
+    accent: shadow.card,
   }[variant];
   const textColor =
     variant === 'outline' ? colors.primary : variant === 'secondary' ? colors.slate700 : colors.textInverse;
@@ -46,6 +47,14 @@ export function Button({
       {variant === 'primary' && (
         <LinearGradient
           colors={[colors.buttonGradientStart, colors.buttonGradientEnd]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.gradientFill}
+        />
+      )}
+      {variant === 'accent' && (
+        <LinearGradient
+          colors={[colors.accentGradientStart, colors.accentGradientEnd]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={styles.gradientFill}
