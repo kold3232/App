@@ -3,12 +3,22 @@ import type { Ionicons } from '@expo/vector-icons';
 
 export type CategoryStatus = 'live' | 'coming-soon';
 
+export type CategoryGroupId = 'home' | 'vehicle' | 'other' | 'events';
+
+export type CategoryGroup = {
+  id: CategoryGroupId;
+  name: string;
+  icon: ComponentProps<typeof Ionicons>['name'];
+  description: string;
+};
+
 export type Category = {
   id: string;
   name: string;
   icon: ComponentProps<typeof Ionicons>['name'];
   description: string;
   status: CategoryStatus;
+  groupId: CategoryGroupId;
 };
 
 export type SubscriptionTier = 'standard' | 'premium' | 'pro';

@@ -1,5 +1,6 @@
 export type BrowseStackParamList = {
   CategoryList: undefined;
+  CategoryGroup: { groupId: import('../types').CategoryGroupId };
   CompanyList: { categoryId: string };
   CompanyDetail: { companyId: string };
   RequestQuote: { companyId: string };

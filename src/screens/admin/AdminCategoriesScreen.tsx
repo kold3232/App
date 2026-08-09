@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
-import { Button, Card, SectionLabel } from '../../components/ui';
+import { Button, Card, Chip, SectionLabel } from '../../components/ui';
+import { CATEGORY_GROUPS } from '../../data/categoryGroups';
 import { useApp } from '../../context/AppContext';
-import { Category } from '../../types';
+import { Category, CategoryGroupId } from '../../types';
 import { colors, radius, shadow, spacing } from '../../theme';
 import { notify } from '../../utils/alert';
 
@@ -30,6 +31,7 @@ export default function AdminCategoriesScreen() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [icon, setIcon] = useState<Category['icon']>(ICON_OPTIONS[0]);
+  const [groupId, setGroupId] = useState<CategoryGroupId>('home');
 
   const liveCategories = categories.filter((c) => c.status === 'live');
   const comingSoonCategories = categories.filter((c) => c.status === 'coming-soon');
@@ -41,7 +43,7 @@ export default function AdminCategoriesScreen() {
       notify('Category exists', 'A category with that name already exists.');
       return;
     }
-    addCategory({ id, name: name.trim(), description: description.trim(), icon, status: 'coming-soon' });
+    addCategory({ id, name: name.trim(), description: description.trim(), icon, status: 'coming-soon', groupId });
     notify('Category added', `${name.trim()} was added as coming soon. Toggle it live when ready.`);
     setName('');
     setDescription('');
@@ -105,6 +107,14 @@ export default function AdminCategoriesScreen() {
           />
         </View>
         <View style={[styles.field, styles.fieldBorder]}>
+          <SectionLabel>Group</SectionLabel>
+          <View style={styles.groupWrap}>
+            {CATEGORY_GROUPS.map((g) => (
+              <Chip key={g.id} label={g.name} selected={groupId === g.id} onPress={() => setGroupId(g.id)} />
+            ))}
+          </View>
+        </View>
+        <View style={[styles.field, styles.fieldBorder]}>
           <SectionLabel>Icon</SectionLabel>
           <View style={styles.iconGrid}>
             {ICON_OPTIONS.map((opt) => (
@@ -132,6 +142,7 @@ const styles = StyleSheet.create({
   field: { paddingVertical: spacing.sm },
   fieldBorder: { borderTopWidth: 1, borderTopColor: colors.border, marginTop: 2 },
   input: { fontSize: 14, color: colors.text, marginTop: 6, padding: 0 },
+  groupWrap: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 8 },
   iconGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
   iconOption: {
     width: 36,

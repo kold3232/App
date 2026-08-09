@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
-import { getCompaniesByCategory } from '../../data/companies';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { CATEGORY_GROUPS } from '../../data/categoryGroups';
 import { useApp } from '../../context/AppContext';
 import { BrowseStackParamList } from '../../navigation/types';
 import { colors, radius, shadow, spacing } from '../../theme';
@@ -11,46 +11,47 @@ type Props = NativeStackScreenProps<BrowseStackParamList, 'CategoryList'>;
 
 export default function CategoryListScreen({ navigation }: Props) {
   const { categories } = useApp();
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.eyebrow}>Gibraltar</Text>
         <Text style={styles.title}>What do you need help with?</Text>
       </View>
-      <FlatList
-        data={categories}
-        keyExtractor={(item) => item.id}
-        numColumns={2}
-        contentContainerStyle={styles.list}
-        columnWrapperStyle={{ gap: spacing.md }}
-        ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
-        renderItem={({ item }) => {
-          const isComingSoon = item.status === 'coming-soon';
-          const count = isComingSoon ? 0 : getCompaniesByCategory(item.id).length;
+      <View style={styles.list}>
+        {CATEGORY_GROUPS.map((item, index) => {
+          const groupCategories = categories.filter((c) => c.groupId === item.id);
+          const isComingSoon = groupCategories.length > 0 && groupCategories.every((c) => c.status === 'coming-soon');
           return (
             <Pressable
-              style={({ pressed }) => [styles.tile, isComingSoon && styles.tileComingSoon, pressed && styles.tilePressed]}
-              onPress={() =>
-                isComingSoon
-                  ? navigation.navigate('ComingSoon', { categoryId: item.id })
-                  : navigation.navigate('CompanyList', { categoryId: item.id })
-              }
+              key={item.id}
+              style={({ pressed }) => [
+                styles.row,
+                isComingSoon && styles.rowComingSoon,
+                pressed && styles.rowPressed,
+                index < CATEGORY_GROUPS.length - 1 && styles.rowSpacing,
+              ]}
+              onPress={() => navigation.navigate('CategoryGroup', { groupId: item.id })}
             >
-              {isComingSoon && (
-                <View style={styles.comingSoonBadge}>
-                  <Text style={styles.comingSoonBadgeText}>Coming soon</Text>
-                </View>
-              )}
-              <View style={[styles.tileIconWrap, isComingSoon && styles.tileIconWrapMuted]}>
-                <Ionicons name={item.icon} size={21} color={isComingSoon ? colors.textFaint : colors.textInverse} />
+              <View style={[styles.iconWrap, isComingSoon && styles.iconWrapMuted]}>
+                <Ionicons name={item.icon} size={26} color={isComingSoon ? colors.textFaint : colors.textInverse} />
               </View>
-              <Text style={[styles.tileTitle, isComingSoon && styles.tileTitleMuted]}>{item.name}</Text>
-              <Text style={styles.tileDescription}>{item.description}</Text>
-              {!isComingSoon && <Text style={styles.tileCount}>{count} companies</Text>}
+              <View style={styles.rowText}>
+                <View style={styles.rowTitleLine}>
+                  <Text style={[styles.rowTitle, isComingSoon && styles.rowTitleMuted]}>{item.name}</Text>
+                  {isComingSoon && (
+                    <View style={styles.comingSoonBadge}>
+                      <Text style={styles.comingSoonBadgeText}>Coming soon</Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={styles.rowDescription}>{item.description}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.textFaint} />
             </Pressable>
           );
-        }}
-      />
+        })}
+      </View>
     </View>
   );
 }
@@ -60,40 +61,41 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.md },
   eyebrow: { color: colors.primary, fontWeight: '700', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.6 },
   title: { fontSize: 25, fontWeight: '800', color: colors.text, marginTop: 4, letterSpacing: 0.1 },
-  list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
-  tile: {
+  list: { flex: 1, flexDirection: 'column', paddingHorizontal: spacing.lg, paddingBottom: spacing.lg },
+  row: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
-    padding: spacing.md,
+    padding: spacing.lg,
     borderWidth: 1,
     borderColor: colors.border,
-    minHeight: 152,
+    gap: spacing.md,
     ...shadow.card,
   },
-  tileComingSoon: { backgroundColor: colors.surfaceAlt, opacity: 0.75 },
-  tilePressed: { opacity: 0.9 },
+  rowSpacing: { marginBottom: spacing.md },
+  rowComingSoon: { backgroundColor: colors.surfaceAlt, opacity: 0.85 },
+  rowPressed: { opacity: 0.9 },
+  iconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: radius.md,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconWrapMuted: { backgroundColor: colors.surfaceAlt },
+  rowText: { flex: 1 },
+  rowTitleLine: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  rowTitle: { fontSize: 18, fontWeight: '800', color: colors.text, letterSpacing: 0.1 },
+  rowTitleMuted: { color: colors.textMuted },
+  rowDescription: { fontSize: 12.5, color: colors.textMuted, marginTop: 3, lineHeight: 17 },
   comingSoonBadge: {
-    position: 'absolute',
-    top: spacing.md,
-    right: spacing.md,
     backgroundColor: colors.pendingBg,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: radius.pill,
   },
   comingSoonBadgeText: { fontSize: 9.5, fontWeight: '700', color: colors.pending },
-  tileIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.sm,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tileIconWrapMuted: { backgroundColor: colors.surfaceAlt },
-  tileTitle: { fontSize: 14.5, fontWeight: '700', color: colors.text, marginTop: spacing.sm, letterSpacing: 0.1 },
-  tileTitleMuted: { color: colors.textMuted },
-  tileDescription: { fontSize: 11.5, color: colors.textMuted, marginTop: 4, minHeight: 30, lineHeight: 15.5 },
-  tileCount: { fontSize: 11, color: colors.primary, fontWeight: '700', marginTop: spacing.sm },
 });

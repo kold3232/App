@@ -3,7 +3,9 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { getCompanyById } from '../data/companies';
+import { CATEGORY_GROUPS } from '../data/categoryGroups';
 import { useApp } from '../context/AppContext';
+import CategoryGroupScreen from '../screens/customer/CategoryGroupScreen';
 import CategoryListScreen from '../screens/customer/CategoryListScreen';
 import ComingSoonScreen from '../screens/customer/ComingSoonScreen';
 import CompanyDetailScreen from '../screens/customer/CompanyDetailScreen';
@@ -54,6 +56,13 @@ export default function BrowseNavigator() {
         name="CategoryList"
         component={CategoryListScreen}
         options={{ headerTitle: () => <BrandTitle /> }}
+      />
+      <Stack.Screen
+        name="CategoryGroup"
+        component={CategoryGroupScreen}
+        options={({ route }) => ({
+          title: CATEGORY_GROUPS.find((g) => g.id === route.params.groupId)?.name ?? 'Category',
+        })}
       />
       <Stack.Screen
         name="CompanyList"
