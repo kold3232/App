@@ -12,9 +12,9 @@ import AdminLoginScreen from '../screens/admin/AdminLoginScreen';
 import CustomerSignUpScreen from '../screens/customer/CustomerSignUpScreen';
 
 export default function RootNavigator() {
-  const { isReady, hasAcceptedLegal, mode, isAdminAuthenticated, customerProfile } = useApp();
+  const { isReady, hasAcceptedLegal, mode, isAdminAuthenticated, customerProfile, customerAuthLoading } = useApp();
 
-  if (!isReady) {
+  if (!isReady || (mode === 'customer' && customerAuthLoading)) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background }}>
         <ActivityIndicator color={colors.accent} size="large" />

@@ -4,6 +4,7 @@ import { ADMIN_BUSINESSES } from '../data/adminBusinesses';
 import { ADMIN_PASSCODE } from '../data/adminAuth';
 import { DEFAULT_CATEGORIES } from '../data/categories';
 import { getTierInfo } from '../data/tiers';
+import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import {
   AdminBusiness,
   BusinessApplication,
@@ -31,7 +32,6 @@ const STORAGE_KEYS = {
   isAdminAuthenticated: '@sortedforyou/isAdminAuthenticated',
   reviews: '@sortedforyou/reviews',
   messages: '@sortedforyou/messages',
-  customerProfile: '@sortedforyou/customerProfile',
 };
 
 const DEFAULT_COMPANY_PROFILE: CompanyProfile = {
@@ -88,7 +88,15 @@ type AppContextValue = {
   companyProfile: CompanyProfile;
   updateCompanyProfile: (profile: CompanyProfile) => void;
   customerProfile: CustomerProfile | null;
-  saveCustomerProfile: (profile: CustomerProfile) => void;
+  customerAuthLoading: boolean;
+  signUpCustomer: (
+    email: string,
+    password: string,
+    profile: Omit<CustomerProfile, 'email'>
+  ) => Promise<{ error?: string; needsEmailConfirmation?: boolean }>;
+  signInCustomer: (email: string, password: string) => Promise<{ error?: string }>;
+  signOutCustomer: () => Promise<void>;
+  saveCustomerProfile: (profile: CustomerProfile) => Promise<{ error?: string }>;
   notifySignups: NotifySignup[];
   addNotifySignup: (categoryId: string, contact: string) => void;
   businessApplication: BusinessApplication;
@@ -118,6 +126,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [customerProfile, setCustomerProfile] = useState<CustomerProfile | null>(null);
+  const [customerAuthLoading, setCustomerAuthLoading] = useState(isSupabaseConfigured);
   const [mode, setModeState] = useState<UserMode | null>(null);
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
   const [companyProfile, setCompanyProfile] = useState<CompanyProfile>(DEFAULT_COMPANY_PROFILE);
@@ -141,7 +150,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           storedIsAdminAuthenticated,
           storedReviews,
           storedMessages,
-          storedCustomerProfile,
         ] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.mode),
           AsyncStorage.getItem(STORAGE_KEYS.requests),
@@ -154,7 +162,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           AsyncStorage.getItem(STORAGE_KEYS.isAdminAuthenticated),
           AsyncStorage.getItem(STORAGE_KEYS.reviews),
           AsyncStorage.getItem(STORAGE_KEYS.messages),
-          AsyncStorage.getItem(STORAGE_KEYS.customerProfile),
         ]);
         if (storedMode) setModeState(JSON.parse(storedMode));
         if (storedRequests) setRequests(JSON.parse(storedRequests));
@@ -167,12 +174,43 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (storedIsAdminAuthenticated) setIsAdminAuthenticated(JSON.parse(storedIsAdminAuthenticated));
         if (storedReviews) setReviews(JSON.parse(storedReviews));
         if (storedMessages) setMessages(JSON.parse(storedMessages));
-        if (storedCustomerProfile) setCustomerProfile(JSON.parse(storedCustomerProfile));
       } finally {
         setIsReady(true);
       }
     })();
   }, []);
+
+  const fetchCustomerProfile = useCallback(async (userId: string) => {
+    const { data, error } = await supabase
+      .from('customers')
+      .select('name, email, phone, address')
+      .eq('id', userId)
+      .maybeSingle();
+    if (!error && data) setCustomerProfile(data);
+  }, []);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) {
+      setCustomerAuthLoading(false);
+      return;
+    }
+    let isMounted = true;
+    supabase.auth.getSession().then(async ({ data }) => {
+      if (data.session) await fetchCustomerProfile(data.session.user.id);
+      if (isMounted) setCustomerAuthLoading(false);
+    });
+    const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        fetchCustomerProfile(session.user.id);
+      } else {
+        setCustomerProfile(null);
+      }
+    });
+    return () => {
+      isMounted = false;
+      subscription.subscription.unsubscribe();
+    };
+  }, [fetchCustomerProfile]);
 
   const acceptLegal = useCallback(() => {
     setHasAcceptedLegal(true);
@@ -326,9 +364,43 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     AsyncStorage.setItem(STORAGE_KEYS.companyProfile, JSON.stringify(profile));
   }, []);
 
-  const saveCustomerProfile = useCallback((profile: CustomerProfile) => {
+  const signUpCustomer = useCallback(
+    async (email: string, password: string, profile: Omit<CustomerProfile, 'email'>) => {
+      const { data, error } = await supabase.auth.signUp({ email, password });
+      if (error) return { error: error.message };
+      if (!data.session) {
+        return { needsEmailConfirmation: true };
+      }
+      const { error: insertError } = await supabase
+        .from('customers')
+        .insert({ id: data.session.user.id, email, ...profile });
+      if (insertError) return { error: insertError.message };
+      setCustomerProfile({ email, ...profile });
+      return {};
+    },
+    []
+  );
+
+  const signInCustomer = useCallback(async (email: string, password: string) => {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) return { error: error.message };
+    if (data.session) await fetchCustomerProfile(data.session.user.id);
+    return {};
+  }, [fetchCustomerProfile]);
+
+  const signOutCustomer = useCallback(async () => {
+    await supabase.auth.signOut();
+    setCustomerProfile(null);
+  }, []);
+
+  const saveCustomerProfile = useCallback(async (profile: CustomerProfile) => {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData.session?.user.id;
+    if (!userId) return { error: 'Not signed in.' };
+    const { error } = await supabase.from('customers').update(profile).eq('id', userId);
+    if (error) return { error: error.message };
     setCustomerProfile(profile);
-    AsyncStorage.setItem(STORAGE_KEYS.customerProfile, JSON.stringify(profile));
+    return {};
   }, []);
 
   const addNotifySignup = useCallback((categoryId: string, contact: string) => {
@@ -514,6 +586,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       companyProfile,
       updateCompanyProfile,
       customerProfile,
+      customerAuthLoading,
+      signUpCustomer,
+      signInCustomer,
+      signOutCustomer,
       saveCustomerProfile,
       notifySignups,
       addNotifySignup,
@@ -559,6 +635,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       companyProfile,
       updateCompanyProfile,
       customerProfile,
+      customerAuthLoading,
+      signUpCustomer,
+      signInCustomer,
+      signOutCustomer,
       saveCustomerProfile,
       notifySignups,
       addNotifySignup,

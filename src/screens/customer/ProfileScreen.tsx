@@ -10,7 +10,7 @@ import { colors, radius, spacing } from '../../theme';
 import { confirmAction } from '../../utils/alert';
 
 export default function ProfileScreen() {
-  const { setMode, customerProfile } = useApp();
+  const { setMode, customerProfile, signOutCustomer } = useApp();
   const [showTerms, setShowTerms] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showSignUp, setShowSignUp] = useState(false);
@@ -22,6 +22,10 @@ export default function ProfileScreen() {
       'Switch',
       () => setMode('company')
     );
+  }
+
+  function handleLogOut() {
+    confirmAction('Log out', 'You will need to log in again to request services.', 'Log out', signOutCustomer);
   }
 
   return (
@@ -42,8 +46,13 @@ export default function ProfileScreen() {
                   <Text style={styles.accountDetail}>{customerProfile.email}</Text>
                   <Text style={styles.accountDetail}>{customerProfile.phone}</Text>
                   <Text style={styles.accountDetail}>{customerProfile.address}</Text>
-                  <View style={{ marginTop: spacing.sm }}>
-                    <Button title="Edit account" variant="outline" onPress={() => setShowSignUp(true)} />
+                  <View style={styles.accountActions}>
+                    <View style={{ flex: 1 }}>
+                      <Button title="Edit account" variant="outline" onPress={() => setShowSignUp(true)} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Button title="Log out" variant="secondary" onPress={handleLogOut} />
+                    </View>
                   </View>
                 </>
               ) : (
@@ -123,6 +132,7 @@ const styles = StyleSheet.create({
   },
   text: { fontSize: 14, color: colors.text, marginTop: 6, lineHeight: 20 },
   accountDetail: { fontSize: 13, color: colors.textMuted, marginTop: 2 },
+  accountActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
   legalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6 },
   legalText: { fontSize: 14, fontWeight: '600', color: colors.text },
   legalDivider: { height: 1, backgroundColor: colors.border, marginVertical: 4 },

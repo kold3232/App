@@ -14,25 +14,32 @@ import {
 } from 'react-native';
 import { useApp } from '../context/AppContext';
 import { colors, radius, spacing } from '../theme';
+import { notify } from '../utils/alert';
 import { Button, SectionLabel } from './ui';
 
 export function CustomerSignUpModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const { customerProfile, saveCustomerProfile } = useApp();
   const [name, setName] = useState(customerProfile?.name ?? '');
-  const [email, setEmail] = useState(customerProfile?.email ?? '');
   const [phone, setPhone] = useState(customerProfile?.phone ?? '');
   const [address, setAddress] = useState(customerProfile?.address ?? '');
+  const [loading, setLoading] = useState(false);
 
-  const canSave = name.trim().length > 0 && email.trim().length > 0 && phone.trim().length > 0 && address.trim().length > 0;
-  const isEditing = !!customerProfile;
+  const canSave = name.trim().length > 0 && phone.trim().length > 0 && address.trim().length > 0;
 
-  function handleSave() {
-    saveCustomerProfile({
+  async function handleSave() {
+    if (!customerProfile) return;
+    setLoading(true);
+    const { error } = await saveCustomerProfile({
+      email: customerProfile.email,
       name: name.trim(),
-      email: email.trim(),
       phone: phone.trim(),
       address: address.trim(),
     });
+    setLoading(false);
+    if (error) {
+      notify('Could not save changes', error);
+      return;
+    }
     onClose();
   }
 
@@ -40,7 +47,7 @@ export function CustomerSignUpModal({ visible, onClose }: { visible: boolean; on
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.title}>{isEditing ? 'Edit your account' : 'Create your account'}</Text>
+          <Text style={styles.title}>Edit your account</Text>
           <Pressable onPress={onClose} hitSlop={12} style={styles.closeButton}>
             <Ionicons name="close" size={22} color={colors.text} />
           </Pressable>
@@ -49,7 +56,7 @@ export function CustomerSignUpModal({ visible, onClose }: { visible: boolean; on
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xl * 2 }}>
             <Text style={styles.subtitle}>
-              Save your details once so requesting a service is quicker next time.
+              Update your details. Your email is tied to your login and can't be changed here.
             </Text>
 
             <View style={styles.card}>
@@ -66,16 +73,7 @@ export function CustomerSignUpModal({ visible, onClose }: { visible: boolean; on
               </View>
               <View style={[styles.field, styles.fieldBorder]}>
                 <SectionLabel>Email</SectionLabel>
-                <TextInput
-                  style={styles.input}
-                  value={email}
-                  onChangeText={setEmail}
-                  placeholder="you@example.com"
-                  placeholderTextColor={colors.textFaint}
-                  selectionColor={colors.primary}
-                  autoCapitalize="none"
-                  keyboardType="email-address"
-                />
+                <Text style={styles.readOnlyText}>{customerProfile?.email}</Text>
               </View>
               <View style={[styles.field, styles.fieldBorder]}>
                 <SectionLabel>Phone number</SectionLabel>
@@ -103,7 +101,7 @@ export function CustomerSignUpModal({ visible, onClose }: { visible: boolean; on
             </View>
 
             <View style={{ height: spacing.lg }} />
-            <Button title={isEditing ? 'Save changes' : 'Create account'} onPress={handleSave} disabled={!canSave} />
+            <Button title="Save changes" onPress={handleSave} disabled={!canSave} loading={loading} />
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -143,4 +141,5 @@ const styles = StyleSheet.create({
   field: { paddingVertical: spacing.sm },
   fieldBorder: { borderTopWidth: 1, borderTopColor: colors.border, marginTop: 2 },
   input: { fontSize: 15, color: colors.text, marginTop: 6, padding: 0 },
+  readOnlyText: { fontSize: 15, color: colors.textMuted, marginTop: 6 },
 });
