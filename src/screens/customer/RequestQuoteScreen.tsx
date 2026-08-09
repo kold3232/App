@@ -1,11 +1,12 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { Button, Card, SectionLabel } from '../../components/ui';
+import { Button, Card, Chip, SectionLabel } from '../../components/ui';
 import { getCompanyById } from '../../data/companies';
 import { useApp } from '../../context/AppContext';
 import { BrowseStackParamList } from '../../navigation/types';
 import { colors, spacing } from '../../theme';
+import { generateSlots } from '../../utils/booking';
 
 type Props = NativeStackScreenProps<BrowseStackParamList, 'RequestQuote'>;
 
@@ -17,7 +18,25 @@ export default function RequestQuoteScreen({ route, navigation }: Props) {
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [jobDetails, setJobDetails] = useState('');
-  const [preferredDate, setPreferredDate] = useState('');
+  const [preferredDay, setPreferredDay] = useState<string | null>(null);
+  const [preferredTime, setPreferredTime] = useState<string | null>(null);
+
+  const slots = useMemo(() => generateSlots(21), []);
+  const days = useMemo(() => {
+    const seen = new Set<string>();
+    const ordered: string[] = [];
+    slots.forEach((s) => {
+      if (!seen.has(s.dayLabel)) {
+        seen.add(s.dayLabel);
+        ordered.push(s.dayLabel);
+      }
+    });
+    return ordered;
+  }, [slots]);
+  const timesForDay = useMemo(
+    () => slots.filter((s) => s.dayLabel === preferredDay).map((s) => s.time),
+    [slots, preferredDay]
+  );
 
   if (!company) return null;
 
@@ -28,7 +47,18 @@ export default function RequestQuoteScreen({ route, navigation }: Props) {
     address.trim().length > 0 &&
     jobDetails.trim().length > 0;
 
+  function selectDay(day: string) {
+    setPreferredDay(day);
+    setPreferredTime(null);
+  }
+
+  function clearPreference() {
+    setPreferredDay(null);
+    setPreferredTime(null);
+  }
+
   function handleSubmit() {
+    const preferredDate = preferredDay && preferredTime ? `${preferredDay} · ${preferredTime}` : '';
     const id = addRequest({
       companyId: company!.id,
       companyName: company!.name,
@@ -38,7 +68,7 @@ export default function RequestQuoteScreen({ route, navigation }: Props) {
       phone: phone.trim(),
       address: address.trim(),
       jobDetails: jobDetails.trim(),
-      preferredDate: preferredDate.trim(),
+      preferredDate,
       scheduledSlot: '',
       status: 'pending',
     });
@@ -109,18 +139,29 @@ export default function RequestQuoteScreen({ route, navigation }: Props) {
               numberOfLines={4}
             />
           </View>
+        </Card>
 
-          <View style={[styles.field, styles.fieldBorder]}>
+        <Card style={{ marginTop: spacing.md }}>
+          <View style={styles.prefHeader}>
             <SectionLabel>Preferred date (optional)</SectionLabel>
-            <TextInput
-              style={styles.input}
-              value={preferredDate}
-              onChangeText={setPreferredDate}
-              placeholder="e.g. This week, or 12 August"
-              placeholderTextColor={colors.textFaint}
-              selectionColor={colors.primary}
-            />
+            {(preferredDay || preferredTime) && (
+              <Text style={styles.clearLink} onPress={clearPreference}>
+                Clear
+              </Text>
+            )}
           </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: spacing.sm }}>
+            {days.map((day) => (
+              <Chip key={day} label={day} selected={preferredDay === day} onPress={() => selectDay(day)} />
+            ))}
+          </ScrollView>
+          {preferredDay && (
+            <View style={styles.chipWrap}>
+              {timesForDay.map((time) => (
+                <Chip key={time} label={time} selected={preferredTime === time} onPress={() => setPreferredTime(time)} />
+              ))}
+            </View>
+          )}
         </Card>
 
         <View style={{ height: spacing.lg }} />
@@ -143,4 +184,7 @@ const styles = StyleSheet.create({
     padding: 0,
   },
   multiline: { minHeight: 70, textAlignVertical: 'top' },
+  prefHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  clearLink: { fontSize: 12, fontWeight: '700', color: colors.primary },
+  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', marginTop: spacing.md },
 });

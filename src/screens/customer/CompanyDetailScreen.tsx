@@ -5,7 +5,6 @@ import { Button, Card, RatingBadge, SectionLabel } from '../../components/ui';
 import { getCompanyById } from '../../data/companies';
 import { BrowseStackParamList } from '../../navigation/types';
 import { colors, radius, shadow, spacing } from '../../theme';
-import { canInstantBook } from '../../utils/booking';
 
 type Props = NativeStackScreenProps<BrowseStackParamList, 'CompanyDetail'>;
 
@@ -16,7 +15,6 @@ export default function CompanyDetailScreen({ route, navigation }: Props) {
   if (!company) return null;
 
   const showAvailability = company.tier !== 'standard';
-  const instantBookable = canInstantBook(company.tier);
 
   return (
     <ScrollView
@@ -72,16 +70,9 @@ export default function CompanyDetailScreen({ route, navigation }: Props) {
         <Text style={styles.description}>{company.phone}</Text>
       </Card>
 
-      {instantBookable && (
-        <>
-          <Button title="Book a time" onPress={() => navigation.navigate('InstantBook', { companyId: company.id })} />
-          <View style={{ height: spacing.sm }} />
-        </>
-      )}
       <Button
         title="Request a quote"
         onPress={() => navigation.navigate('RequestQuote', { companyId: company.id })}
-        variant={instantBookable ? 'outline' : 'primary'}
       />
     </ScrollView>
   );
