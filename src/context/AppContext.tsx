@@ -77,7 +77,7 @@ type AppContextValue = {
   sendImageMessage: (requestId: string, sender: ChatMessageSender, imageUri: string) => void;
   acceptQuote: (requestId: string, amount: number) => void;
   requests: ServiceRequest[];
-  addRequest: (input: Omit<ServiceRequest, 'id' | 'createdAt'>) => void;
+  addRequest: (input: Omit<ServiceRequest, 'id' | 'createdAt'>) => string;
   updateRequestStatus: (id: string, status: ServiceRequest['status']) => void;
   completeRequest: (id: string, jobValue: number) => void;
   confirmCompletion: (id: string) => void;
@@ -192,18 +192,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const addRequest = useCallback((input: Omit<ServiceRequest, 'id' | 'createdAt'>) => {
+    const id = `req-${Date.now()}-${Math.round(Math.random() * 10000)}`;
     setRequests((prev) => {
       const next: ServiceRequest[] = [
-        {
-          ...input,
-          id: `req-${Date.now()}-${Math.round(Math.random() * 10000)}`,
-          createdAt: new Date().toISOString(),
-        },
+        { ...input, id, createdAt: new Date().toISOString() },
         ...prev,
       ];
       AsyncStorage.setItem(STORAGE_KEYS.requests, JSON.stringify(next));
       return next;
     });
+    return id;
   }, []);
 
   const updateRequestStatus = useCallback((id: string, status: ServiceRequest['status']) => {

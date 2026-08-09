@@ -1,18 +1,32 @@
-import React, { useState } from 'react';
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
+import React, { useEffect, useState } from 'react';
 import { FlatList, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Button, Card, EmptyState, StatusBadge } from '../../components/ui';
 import { ChatModal } from '../../components/ChatModal';
 import { StarRating } from '../../components/StarRating';
 import { useApp } from '../../context/AppContext';
+import { CustomerTabParamList } from '../../navigation/types';
 import { colors, radius, spacing } from '../../theme';
+
+type MyRequestsRouteProp = RouteProp<CustomerTabParamList, 'MyRequests'>;
 
 export default function MyRequestsScreen() {
   const { requests, reviews, addReview, confirmCompletion } = useApp();
+  const route = useRoute<MyRequestsRouteProp>();
+  const navigation = useNavigation();
   const [activeReviewId, setActiveReviewId] = useState<string | null>(null);
   const [draftRating, setDraftRating] = useState(0);
   const [draftComment, setDraftComment] = useState('');
   const [chatRequestId, setChatRequestId] = useState<string | null>(null);
   const chatRequest = requests.find((r) => r.id === chatRequestId) ?? null;
+
+  useEffect(() => {
+    const openRequestId = route.params?.openRequestId;
+    if (openRequestId) {
+      setChatRequestId(openRequestId);
+      navigation.setParams({ openRequestId: undefined } as never);
+    }
+  }, [route.params?.openRequestId, navigation]);
 
   function openReview(requestId: string) {
     setActiveReviewId(requestId);
@@ -61,7 +75,7 @@ export default function MyRequestsScreen() {
               </Text>
               <Text style={styles.date}>{new Date(item.createdAt).toLocaleString()}</Text>
 
-              {item.type === 'quote' && (item.status === 'accepted' || item.status === 'completed') && (
+              {item.type === 'quote' && item.status !== 'declined' && (
                 <View style={styles.chatRow}>
                   {item.quoteAccepted && item.quotedAmount != null && (
                     <Text style={styles.quoteSummary}>Quote accepted · £{item.quotedAmount.toFixed(2)}</Text>

@@ -10,7 +10,7 @@ export type BrowseStackParamList = {
 
 export type CustomerTabParamList = {
   Browse: undefined;
-  MyRequests: undefined;
+  MyRequests: { openRequestId?: string } | undefined;
   Profile: undefined;
 };
 

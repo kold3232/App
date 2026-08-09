@@ -6,7 +6,6 @@ import { getCompanyById } from '../../data/companies';
 import { useApp } from '../../context/AppContext';
 import { BrowseStackParamList } from '../../navigation/types';
 import { colors, spacing } from '../../theme';
-import { notify } from '../../utils/alert';
 
 type Props = NativeStackScreenProps<BrowseStackParamList, 'RequestQuote'>;
 
@@ -30,7 +29,7 @@ export default function RequestQuoteScreen({ route, navigation }: Props) {
     jobDetails.trim().length > 0;
 
   function handleSubmit() {
-    addRequest({
+    const id = addRequest({
       companyId: company!.id,
       companyName: company!.name,
       categoryName,
@@ -43,9 +42,8 @@ export default function RequestQuoteScreen({ route, navigation }: Props) {
       scheduledSlot: '',
       status: 'pending',
     });
-    notify('Request sent', `Your request has been sent to ${company!.name}.`);
     navigation.popToTop();
-    (navigation as any).getParent()?.navigate('MyRequests');
+    (navigation as any).getParent()?.navigate('MyRequests', { openRequestId: id });
   }
 
   return (

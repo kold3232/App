@@ -1,30 +1,15 @@
-import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React from 'react';
-import { Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Button, Card, RatingBadge, SectionLabel } from '../../components/ui';
 import { getCompanyById } from '../../data/companies';
 import { BrowseStackParamList } from '../../navigation/types';
 import { colors, radius, shadow, spacing } from '../../theme';
 import { canInstantBook } from '../../utils/booking';
-import { notify } from '../../utils/alert';
 
 type Props = NativeStackScreenProps<BrowseStackParamList, 'CompanyDetail'>;
 
 const TIER_LABEL = { standard: 'Standard', premium: 'Premium', pro: 'Pro' } as const;
-
-function callCompany(phone: string) {
-  Linking.openURL(`tel:${phone.replace(/\s+/g, '')}`).catch(() =>
-    notify('Unable to call', 'Your device could not open the phone dialer.')
-  );
-}
-
-function whatsAppCompany(phone: string) {
-  const digits = phone.replace(/[^\d]/g, '');
-  Linking.openURL(`https://wa.me/${digits}`).catch(() =>
-    notify('Unable to open WhatsApp', 'WhatsApp may not be installed on this device.')
-  );
-}
 
 export default function CompanyDetailScreen({ route, navigation }: Props) {
   const company = getCompanyById(route.params.companyId);
@@ -98,15 +83,6 @@ export default function CompanyDetailScreen({ route, navigation }: Props) {
         onPress={() => navigation.navigate('RequestQuote', { companyId: company.id })}
         variant={instantBookable ? 'outline' : 'primary'}
       />
-
-      <View style={styles.calloutRow}>
-        <View style={styles.calloutButton}>
-          <Button title="Call" onPress={() => callCompany(company.phone)} variant="secondary" />
-        </View>
-        <View style={styles.calloutButton}>
-          <Button title="WhatsApp" onPress={() => whatsAppCompany(company.phone)} variant="secondary" />
-        </View>
-      </View>
     </ScrollView>
   );
 }
@@ -151,6 +127,4 @@ const styles = StyleSheet.create({
   listRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm },
   listDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primary, marginRight: 10 },
   listItem: { fontSize: 14, color: colors.text, lineHeight: 20 },
-  calloutRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
-  calloutButton: { flex: 1 },
 });

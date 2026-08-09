@@ -137,7 +137,7 @@ export default function DashboardScreen() {
                   />
                 </View>
               ))}
-            {item.type === 'quote' && item.status === 'accepted' && (
+            {item.type === 'quote' && (item.status === 'pending' || item.status === 'accepted') && (
               <View style={styles.actions}>
                 <Button title="Chat with customer" variant="outline" onPress={() => setChatRequestId(item.id)} />
               </View>
