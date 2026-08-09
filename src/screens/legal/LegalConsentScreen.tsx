@@ -20,7 +20,7 @@ export default function LegalConsentScreen() {
         </View>
         <Text style={styles.title}>Before you continue</Text>
         <Text style={styles.subtitle}>
-          TradeLink needs your agreement to our Terms of Service and Privacy Policy to connect you with local
+          Gib Trades needs your agreement to our Terms of Service and Privacy Policy to connect you with local
           businesses in Gibraltar.
         </Text>
       </View>

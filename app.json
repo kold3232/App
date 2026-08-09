@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "TradeLink",
-    "slug": "tradelink",
+    "name": "Gib Trades",
+    "slug": "gib-trades",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/splash-icon.png",

@@ -18,7 +18,7 @@ export default function AdminQueueScreen() {
 
   function handleApprove(id: string, name: string) {
     approveAdminApplication(id);
-    notify('Approved', `${name} is now live on TradeLink.`);
+    notify('Approved', `${name} is now live on Gib Trades.`);
   }
 
   function handleRejectConfirm(id: string, name: string) {

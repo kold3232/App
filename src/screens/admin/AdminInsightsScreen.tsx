@@ -55,7 +55,7 @@ export default function AdminInsightsScreen() {
     const rows = notifySignups.map((s) => `${s.categoryId},${s.contact},${s.createdAt}`);
     const csv = [header, ...rows].join('\n');
     try {
-      await Share.share({ message: csv, title: 'TradeLink waitlist export' });
+      await Share.share({ message: csv, title: 'Gib Trades waitlist export' });
     } catch {
       notify('Export failed', 'Could not open the share sheet.');
     }

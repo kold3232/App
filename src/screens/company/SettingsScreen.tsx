@@ -61,7 +61,7 @@ export default function SettingsScreen() {
             </View>
             <View style={{ flex: 1 }}>
               <SectionLabel>Account type</SectionLabel>
-              <Text style={styles.text}>You're using TradeLink as a business.</Text>
+              <Text style={styles.text}>You're using Gib Trades as a business.</Text>
             </View>
           </View>
         </Card>

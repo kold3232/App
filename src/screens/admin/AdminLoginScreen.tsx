@@ -26,7 +26,7 @@ export default function AdminLoginScreen() {
           <Ionicons name="lock-closed" size={30} color={colors.textInverse} />
         </View>
         <Text style={styles.title}>Admin sign-in</Text>
-        <Text style={styles.subtitle}>Enter the TradeLink team passcode to access the admin dashboard.</Text>
+        <Text style={styles.subtitle}>Enter the Gib Trades team passcode to access the admin dashboard.</Text>
       </View>
 
       <View style={styles.form}>
