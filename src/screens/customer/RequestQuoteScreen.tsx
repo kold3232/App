@@ -1,14 +1,16 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Button, Card, Chip, SectionLabel } from '../../components/ui';
+import { Calendar } from '../../components/Calendar';
 import { getCompanyById } from '../../data/companies';
 import { useApp } from '../../context/AppContext';
 import { BrowseStackParamList } from '../../navigation/types';
 import { colors, spacing } from '../../theme';
-import { generateSlots } from '../../utils/booking';
 
 type Props = NativeStackScreenProps<BrowseStackParamList, 'RequestQuote'>;
+
+const TIME_OPTIONS = ['09:00', '11:30', '14:00', '16:30'];
 
 export default function RequestQuoteScreen({ route, navigation }: Props) {
   const company = getCompanyById(route.params.companyId);
@@ -18,25 +20,8 @@ export default function RequestQuoteScreen({ route, navigation }: Props) {
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [jobDetails, setJobDetails] = useState('');
-  const [preferredDay, setPreferredDay] = useState<string | null>(null);
+  const [preferredIsoDate, setPreferredIsoDate] = useState<string | null>(null);
   const [preferredTime, setPreferredTime] = useState<string | null>(null);
-
-  const slots = useMemo(() => generateSlots(21), []);
-  const days = useMemo(() => {
-    const seen = new Set<string>();
-    const ordered: string[] = [];
-    slots.forEach((s) => {
-      if (!seen.has(s.dayLabel)) {
-        seen.add(s.dayLabel);
-        ordered.push(s.dayLabel);
-      }
-    });
-    return ordered;
-  }, [slots]);
-  const timesForDay = useMemo(
-    () => slots.filter((s) => s.dayLabel === preferredDay).map((s) => s.time),
-    [slots, preferredDay]
-  );
 
   if (!company) return null;
 
@@ -47,18 +32,21 @@ export default function RequestQuoteScreen({ route, navigation }: Props) {
     address.trim().length > 0 &&
     jobDetails.trim().length > 0;
 
-  function selectDay(day: string) {
-    setPreferredDay(day);
+  function selectDate(isoDate: string) {
+    setPreferredIsoDate(isoDate);
     setPreferredTime(null);
   }
 
   function clearPreference() {
-    setPreferredDay(null);
+    setPreferredIsoDate(null);
     setPreferredTime(null);
   }
 
   function handleSubmit() {
-    const preferredDate = preferredDay && preferredTime ? `${preferredDay} · ${preferredTime}` : '';
+    const dateLabel = preferredIsoDate
+      ? new Date(preferredIsoDate).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
+      : '';
+    const preferredDate = dateLabel && preferredTime ? `${dateLabel} · ${preferredTime}` : '';
     const id = addRequest({
       companyId: company!.id,
       companyName: company!.name,
@@ -144,20 +132,18 @@ export default function RequestQuoteScreen({ route, navigation }: Props) {
         <Card style={{ marginTop: spacing.md }}>
           <View style={styles.prefHeader}>
             <SectionLabel>Preferred date (optional)</SectionLabel>
-            {(preferredDay || preferredTime) && (
+            {(preferredIsoDate || preferredTime) && (
               <Text style={styles.clearLink} onPress={clearPreference}>
                 Clear
               </Text>
             )}
           </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: spacing.sm }}>
-            {days.map((day) => (
-              <Chip key={day} label={day} selected={preferredDay === day} onPress={() => selectDay(day)} />
-            ))}
-          </ScrollView>
-          {preferredDay && (
+          <View style={{ marginTop: spacing.sm }}>
+            <Calendar selectedDate={preferredIsoDate} onSelectDate={selectDate} />
+          </View>
+          {preferredIsoDate && (
             <View style={styles.chipWrap}>
-              {timesForDay.map((time) => (
+              {TIME_OPTIONS.map((time) => (
                 <Chip key={time} label={time} selected={preferredTime === time} onPress={() => setPreferredTime(time)} />
               ))}
             </View>
