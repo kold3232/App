@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { FlatList, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Button, Card, EmptyState, StatusBadge } from '../../components/ui';
+import { ChatModal } from '../../components/ChatModal';
 import { StarRating } from '../../components/StarRating';
 import { useApp } from '../../context/AppContext';
 import { colors, radius, spacing } from '../../theme';
@@ -10,6 +11,8 @@ export default function MyRequestsScreen() {
   const [activeReviewId, setActiveReviewId] = useState<string | null>(null);
   const [draftRating, setDraftRating] = useState(0);
   const [draftComment, setDraftComment] = useState('');
+  const [chatRequestId, setChatRequestId] = useState<string | null>(null);
+  const chatRequest = requests.find((r) => r.id === chatRequestId) ?? null;
 
   function openReview(requestId: string) {
     setActiveReviewId(requestId);
@@ -57,6 +60,15 @@ export default function MyRequestsScreen() {
                 {item.type === 'quote' && item.preferredDate ? `  ·  🗓️ ${item.preferredDate}` : ''}
               </Text>
               <Text style={styles.date}>{new Date(item.createdAt).toLocaleString()}</Text>
+
+              {item.type === 'quote' && (item.status === 'accepted' || item.status === 'completed') && (
+                <View style={styles.chatRow}>
+                  {item.quoteAccepted && item.quotedAmount != null && (
+                    <Text style={styles.quoteSummary}>Quote accepted · £{item.quotedAmount.toFixed(2)}</Text>
+                  )}
+                  <Button title="Chat with business" variant="outline" onPress={() => setChatRequestId(item.id)} />
+                </View>
+              )}
 
               {item.status === 'completed' && !item.customerConfirmed && (
                 <View style={styles.reviewSection}>
@@ -112,6 +124,14 @@ export default function MyRequestsScreen() {
           );
         }}
       />
+      {chatRequest && (
+        <ChatModal
+          visible={!!chatRequest}
+          onClose={() => setChatRequestId(null)}
+          request={chatRequest}
+          perspective="customer"
+        />
+      )}
     </View>
   );
 }
@@ -126,6 +146,8 @@ const styles = StyleSheet.create({
   detail: { fontSize: 13, color: colors.text, marginTop: spacing.sm },
   meta: { fontSize: 12, color: colors.textMuted, marginTop: spacing.sm },
   date: { fontSize: 11, color: colors.textMuted, marginTop: 6 },
+  chatRow: { marginTop: spacing.md, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.border },
+  quoteSummary: { fontSize: 12.5, fontWeight: '700', color: colors.primary, marginBottom: spacing.sm },
   reviewSection: { marginTop: spacing.md, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.border },
   reviewLabel: { fontSize: 12, fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 6 },
   confirmText: { fontSize: 13, color: colors.text, lineHeight: 19 },

@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { FlatList, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Button, Card, Chip, EmptyState, StatusBadge } from '../../components/ui';
+import { ChatModal } from '../../components/ChatModal';
 import { useApp } from '../../context/AppContext';
 import { RequestStatus } from '../../types';
 import { colors, radius, spacing } from '../../theme';
@@ -21,12 +22,14 @@ export default function DashboardScreen() {
   const [completingId, setCompletingId] = useState<string | null>(null);
   const [jobValueInput, setJobValueInput] = useState('');
   const [reschedulingId, setReschedulingId] = useState<string | null>(null);
+  const [chatRequestId, setChatRequestId] = useState<string | null>(null);
   const slots = useMemo(() => generateSlots(), []);
   const canReschedule = businessApplication.tier === 'pro';
+  const chatRequest = requests.find((r) => r.id === chatRequestId) ?? null;
 
-  function startCompleting(id: string) {
+  function startCompleting(id: string, quotedAmount?: number) {
     setCompletingId(id);
-    setJobValueInput('');
+    setJobValueInput(quotedAmount ? String(quotedAmount) : '');
   }
 
   function confirmCompleting(id: string) {
@@ -127,9 +130,18 @@ export default function DashboardScreen() {
                 </View>
               ) : (
                 <View style={styles.actions}>
-                  <Button title="Mark as completed" onPress={() => startCompleting(item.id)} variant="secondary" />
+                  <Button
+                    title="Mark as completed"
+                    onPress={() => startCompleting(item.id, item.quotedAmount)}
+                    variant="secondary"
+                  />
                 </View>
               ))}
+            {item.type === 'quote' && item.status === 'accepted' && (
+              <View style={styles.actions}>
+                <Button title="Chat with customer" variant="outline" onPress={() => setChatRequestId(item.id)} />
+              </View>
+            )}
             {item.status === 'accepted' && item.type === 'instant' && canReschedule && completingId !== item.id && (
               reschedulingId === item.id ? (
                 <View style={styles.completeForm}>
@@ -163,9 +175,22 @@ export default function DashboardScreen() {
                 {item.customerConfirmed ? '✓ Confirmed by customer' : 'Awaiting customer confirmation'}
               </Text>
             )}
+            {item.type === 'quote' && item.status === 'completed' && (
+              <View style={{ marginTop: spacing.sm }}>
+                <Button title="View chat" variant="outline" onPress={() => setChatRequestId(item.id)} />
+              </View>
+            )}
           </Card>
         )}
       />
+      {chatRequest && (
+        <ChatModal
+          visible={!!chatRequest}
+          onClose={() => setChatRequestId(null)}
+          request={chatRequest}
+          perspective="business"
+        />
+      )}
     </View>
   );
 }

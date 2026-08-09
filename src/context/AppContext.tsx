@@ -8,6 +8,8 @@ import {
   AdminBusiness,
   BusinessApplication,
   Category,
+  ChatMessage,
+  ChatMessageSender,
   CompanyProfile,
   NotifySignup,
   Review,
@@ -27,6 +29,7 @@ const STORAGE_KEYS = {
   hasAcceptedLegal: '@sortedforyou/hasAcceptedLegal',
   isAdminAuthenticated: '@sortedforyou/isAdminAuthenticated',
   reviews: '@sortedforyou/reviews',
+  messages: '@sortedforyou/messages',
 };
 
 const DEFAULT_COMPANY_PROFILE: CompanyProfile = {
@@ -68,6 +71,10 @@ type AppContextValue = {
   logoutAdmin: () => void;
   reviews: Review[];
   addReview: (requestId: string, companyId: string, rating: number, comment: string) => void;
+  messages: ChatMessage[];
+  sendMessage: (requestId: string, sender: ChatMessageSender, text: string) => void;
+  sendQuote: (requestId: string, amount: number) => void;
+  acceptQuote: (requestId: string, amount: number) => void;
   requests: ServiceRequest[];
   addRequest: (input: Omit<ServiceRequest, 'id' | 'createdAt'>) => void;
   updateRequestStatus: (id: string, status: ServiceRequest['status']) => void;
@@ -103,6 +110,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [hasAcceptedLegal, setHasAcceptedLegal] = useState(false);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [reviews, setReviews] = useState<Review[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [mode, setModeState] = useState<UserMode | null>(null);
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
   const [companyProfile, setCompanyProfile] = useState<CompanyProfile>(DEFAULT_COMPANY_PROFILE);
@@ -125,6 +133,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           storedHasAcceptedLegal,
           storedIsAdminAuthenticated,
           storedReviews,
+          storedMessages,
         ] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.mode),
           AsyncStorage.getItem(STORAGE_KEYS.requests),
@@ -136,6 +145,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           AsyncStorage.getItem(STORAGE_KEYS.hasAcceptedLegal),
           AsyncStorage.getItem(STORAGE_KEYS.isAdminAuthenticated),
           AsyncStorage.getItem(STORAGE_KEYS.reviews),
+          AsyncStorage.getItem(STORAGE_KEYS.messages),
         ]);
         if (storedMode) setModeState(JSON.parse(storedMode));
         if (storedRequests) setRequests(JSON.parse(storedRequests));
@@ -147,6 +157,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (storedHasAcceptedLegal) setHasAcceptedLegal(JSON.parse(storedHasAcceptedLegal));
         if (storedIsAdminAuthenticated) setIsAdminAuthenticated(JSON.parse(storedIsAdminAuthenticated));
         if (storedReviews) setReviews(JSON.parse(storedReviews));
+        if (storedMessages) setMessages(JSON.parse(storedMessages));
       } finally {
         setIsReady(true);
       }
@@ -240,6 +251,49 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         { id: `review-${Date.now()}`, requestId, companyId, rating, comment, createdAt: new Date().toISOString() },
       ];
       AsyncStorage.setItem(STORAGE_KEYS.reviews, JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  const persistMessages = useCallback((next: ChatMessage[]) => {
+    setMessages(next);
+    AsyncStorage.setItem(STORAGE_KEYS.messages, JSON.stringify(next));
+  }, []);
+
+  const sendMessage = useCallback(
+    (requestId: string, sender: ChatMessageSender, text: string) => {
+      const next: ChatMessage = {
+        id: `msg-${Date.now()}-${Math.round(Math.random() * 10000)}`,
+        requestId,
+        sender,
+        kind: 'text',
+        text,
+        createdAt: new Date().toISOString(),
+      };
+      persistMessages([...messages, next]);
+    },
+    [messages, persistMessages]
+  );
+
+  const sendQuote = useCallback(
+    (requestId: string, amount: number) => {
+      const next: ChatMessage = {
+        id: `msg-${Date.now()}-${Math.round(Math.random() * 10000)}`,
+        requestId,
+        sender: 'business',
+        kind: 'quote',
+        amount,
+        createdAt: new Date().toISOString(),
+      };
+      persistMessages([...messages, next]);
+    },
+    [messages, persistMessages]
+  );
+
+  const acceptQuote = useCallback((requestId: string, amount: number) => {
+    setRequests((prev) => {
+      const next = prev.map((r) => (r.id === requestId ? { ...r, quotedAmount: amount, quoteAccepted: true } : r));
+      AsyncStorage.setItem(STORAGE_KEYS.requests, JSON.stringify(next));
       return next;
     });
   }, []);
@@ -418,6 +472,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       logoutAdmin,
       reviews,
       addReview,
+      messages,
+      sendMessage,
+      sendQuote,
+      acceptQuote,
       requests,
       addRequest,
       updateRequestStatus,
@@ -456,6 +514,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       logoutAdmin,
       reviews,
       addReview,
+      messages,
+      sendMessage,
+      sendQuote,
+      acceptQuote,
       requests,
       addRequest,
       updateRequestStatus,

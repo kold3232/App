@@ -60,6 +60,20 @@ export type ServiceRequest = {
   jobValue?: number;
   commission?: number;
   customerConfirmed?: boolean;
+  quotedAmount?: number;
+  quoteAccepted?: boolean;
+};
+
+export type ChatMessageSender = 'customer' | 'business';
+
+export type ChatMessage = {
+  id: string;
+  requestId: string;
+  sender: ChatMessageSender;
+  kind: 'text' | 'quote';
+  text?: string;
+  amount?: number;
+  createdAt: string;
 };
 
 export type CompanyProfile = {
