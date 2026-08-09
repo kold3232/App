@@ -64,6 +64,13 @@ export type ServiceRequest = {
   quoteAccepted?: boolean;
 };
 
+export type CustomerProfile = {
+  name: string;
+  email: string;
+  phone: string;
+  address: string;
+};
+
 export type ChatMessageSender = 'customer' | 'business';
 
 export type ChatMessage = {

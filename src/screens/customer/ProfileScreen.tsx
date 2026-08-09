@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import { Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { CustomerSignUpModal } from '../../components/CustomerSignUpModal';
 import { LegalTextModal } from '../../components/LegalTextModal';
 import { Button, Card, SectionLabel } from '../../components/ui';
 import { useApp } from '../../context/AppContext';
@@ -9,9 +10,10 @@ import { colors, radius, spacing } from '../../theme';
 import { confirmAction } from '../../utils/alert';
 
 export default function ProfileScreen() {
-  const { setMode } = useApp();
+  const { setMode, customerProfile } = useApp();
   const [showTerms, setShowTerms] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
+  const [showSignUp, setShowSignUp] = useState(false);
 
   function handleSwitchToBusiness() {
     confirmAction(
@@ -34,7 +36,26 @@ export default function ProfileScreen() {
             </View>
             <View style={{ flex: 1 }}>
               <SectionLabel>Account</SectionLabel>
-              <Text style={styles.text}>You're browsing Gib Trades as a customer.</Text>
+              {customerProfile ? (
+                <>
+                  <Text style={styles.text}>{customerProfile.name}</Text>
+                  <Text style={styles.accountDetail}>{customerProfile.email}</Text>
+                  <Text style={styles.accountDetail}>{customerProfile.phone}</Text>
+                  <Text style={styles.accountDetail}>{customerProfile.address}</Text>
+                  <View style={{ marginTop: spacing.sm }}>
+                    <Button title="Edit account" variant="outline" onPress={() => setShowSignUp(true)} />
+                  </View>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.text}>
+                    Save your name, email, phone and address so requesting a service is faster.
+                  </Text>
+                  <View style={{ marginTop: spacing.sm }}>
+                    <Button title="Create account" onPress={() => setShowSignUp(true)} />
+                  </View>
+                </>
+              )}
             </View>
           </View>
         </Card>
@@ -68,6 +89,8 @@ export default function ProfileScreen() {
         </View>
       </View>
 
+      <CustomerSignUpModal visible={showSignUp} onClose={() => setShowSignUp(false)} />
+
       <LegalTextModal
         visible={showTerms}
         onClose={() => setShowTerms(false)}
@@ -99,6 +122,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   text: { fontSize: 14, color: colors.text, marginTop: 6, lineHeight: 20 },
+  accountDetail: { fontSize: 13, color: colors.textMuted, marginTop: 2 },
   legalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6 },
   legalText: { fontSize: 14, fontWeight: '600', color: colors.text },
   legalDivider: { height: 1, backgroundColor: colors.border, marginVertical: 4 },

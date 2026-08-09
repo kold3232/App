@@ -14,10 +14,11 @@ const TIME_OPTIONS = ['09:00', '11:30', '14:00', '16:30'];
 
 export default function RequestQuoteScreen({ route, navigation }: Props) {
   const company = getCompanyById(route.params.companyId);
-  const { addRequest, categories } = useApp();
+  const { addRequest, categories, customerProfile } = useApp();
 
-  const [customerName, setCustomerName] = useState('');
-  const [phone, setPhone] = useState('');
+  const [customerName, setCustomerName] = useState(customerProfile?.name ?? '');
+  const [phone, setPhone] = useState(customerProfile?.phone ?? '');
+  const [useSavedAddress, setUseSavedAddress] = useState(!!customerProfile?.address);
   const [address, setAddress] = useState('');
   const [jobDetails, setJobDetails] = useState('');
   const [preferredIsoDate, setPreferredIsoDate] = useState<string | null>(null);
@@ -26,10 +27,11 @@ export default function RequestQuoteScreen({ route, navigation }: Props) {
   if (!company) return null;
 
   const categoryName = categories.find((c) => c.id === company.categoryIds[0])?.name ?? '';
+  const resolvedAddress = useSavedAddress && customerProfile?.address ? customerProfile.address : address.trim();
   const canSubmit =
     customerName.trim().length > 0 &&
     phone.trim().length > 0 &&
-    address.trim().length > 0 &&
+    resolvedAddress.length > 0 &&
     jobDetails.trim().length > 0;
 
   function selectDate(isoDate: string) {
@@ -54,7 +56,7 @@ export default function RequestQuoteScreen({ route, navigation }: Props) {
       type: 'quote',
       customerName: customerName.trim(),
       phone: phone.trim(),
-      address: address.trim(),
+      address: resolvedAddress,
       jobDetails: jobDetails.trim(),
       preferredDate,
       scheduledSlot: '',
@@ -104,14 +106,35 @@ export default function RequestQuoteScreen({ route, navigation }: Props) {
 
           <View style={[styles.field, styles.fieldBorder]}>
             <SectionLabel>Your address</SectionLabel>
-            <TextInput
-              style={styles.input}
-              value={address}
-              onChangeText={setAddress}
-              placeholder="Street, block, floor, flat number..."
-              placeholderTextColor={colors.textFaint}
-              selectionColor={colors.primary}
-            />
+            {customerProfile?.address ? (
+              <>
+                <View style={styles.addressChipRow}>
+                  <Chip label="Use saved address" selected={useSavedAddress} onPress={() => setUseSavedAddress(true)} />
+                  <Chip label="Different address" selected={!useSavedAddress} onPress={() => setUseSavedAddress(false)} />
+                </View>
+                {useSavedAddress ? (
+                  <Text style={styles.savedAddressText}>{customerProfile.address}</Text>
+                ) : (
+                  <TextInput
+                    style={[styles.input, { marginTop: spacing.sm }]}
+                    value={address}
+                    onChangeText={setAddress}
+                    placeholder="Street, block, floor, flat number..."
+                    placeholderTextColor={colors.textFaint}
+                    selectionColor={colors.primary}
+                  />
+                )}
+              </>
+            ) : (
+              <TextInput
+                style={styles.input}
+                value={address}
+                onChangeText={setAddress}
+                placeholder="Street, block, floor, flat number..."
+                placeholderTextColor={colors.textFaint}
+                selectionColor={colors.primary}
+              />
+            )}
           </View>
 
           <View style={[styles.field, styles.fieldBorder]}>
@@ -170,6 +193,8 @@ const styles = StyleSheet.create({
     padding: 0,
   },
   multiline: { minHeight: 70, textAlignVertical: 'top' },
+  addressChipRow: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 6 },
+  savedAddressText: { fontSize: 14.5, color: colors.text, marginTop: spacing.xs, lineHeight: 20 },
   prefHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   clearLink: { fontSize: 12, fontWeight: '700', color: colors.primary },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', marginTop: spacing.md },

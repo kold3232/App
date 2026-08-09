@@ -11,6 +11,7 @@ import {
   ChatMessage,
   ChatMessageSender,
   CompanyProfile,
+  CustomerProfile,
   NotifySignup,
   Review,
   ServiceRequest,
@@ -30,6 +31,7 @@ const STORAGE_KEYS = {
   isAdminAuthenticated: '@sortedforyou/isAdminAuthenticated',
   reviews: '@sortedforyou/reviews',
   messages: '@sortedforyou/messages',
+  customerProfile: '@sortedforyou/customerProfile',
 };
 
 const DEFAULT_COMPANY_PROFILE: CompanyProfile = {
@@ -85,6 +87,8 @@ type AppContextValue = {
   rescheduleRequest: (id: string, newSlot: string) => void;
   companyProfile: CompanyProfile;
   updateCompanyProfile: (profile: CompanyProfile) => void;
+  customerProfile: CustomerProfile | null;
+  saveCustomerProfile: (profile: CustomerProfile) => void;
   notifySignups: NotifySignup[];
   addNotifySignup: (categoryId: string, contact: string) => void;
   businessApplication: BusinessApplication;
@@ -113,6 +117,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [customerProfile, setCustomerProfile] = useState<CustomerProfile | null>(null);
   const [mode, setModeState] = useState<UserMode | null>(null);
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
   const [companyProfile, setCompanyProfile] = useState<CompanyProfile>(DEFAULT_COMPANY_PROFILE);
@@ -136,6 +141,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           storedIsAdminAuthenticated,
           storedReviews,
           storedMessages,
+          storedCustomerProfile,
         ] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.mode),
           AsyncStorage.getItem(STORAGE_KEYS.requests),
@@ -148,6 +154,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           AsyncStorage.getItem(STORAGE_KEYS.isAdminAuthenticated),
           AsyncStorage.getItem(STORAGE_KEYS.reviews),
           AsyncStorage.getItem(STORAGE_KEYS.messages),
+          AsyncStorage.getItem(STORAGE_KEYS.customerProfile),
         ]);
         if (storedMode) setModeState(JSON.parse(storedMode));
         if (storedRequests) setRequests(JSON.parse(storedRequests));
@@ -160,6 +167,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (storedIsAdminAuthenticated) setIsAdminAuthenticated(JSON.parse(storedIsAdminAuthenticated));
         if (storedReviews) setReviews(JSON.parse(storedReviews));
         if (storedMessages) setMessages(JSON.parse(storedMessages));
+        if (storedCustomerProfile) setCustomerProfile(JSON.parse(storedCustomerProfile));
       } finally {
         setIsReady(true);
       }
@@ -316,6 +324,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const updateCompanyProfile = useCallback((profile: CompanyProfile) => {
     setCompanyProfile(profile);
     AsyncStorage.setItem(STORAGE_KEYS.companyProfile, JSON.stringify(profile));
+  }, []);
+
+  const saveCustomerProfile = useCallback((profile: CustomerProfile) => {
+    setCustomerProfile(profile);
+    AsyncStorage.setItem(STORAGE_KEYS.customerProfile, JSON.stringify(profile));
   }, []);
 
   const addNotifySignup = useCallback((categoryId: string, contact: string) => {
@@ -500,6 +513,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       rescheduleRequest,
       companyProfile,
       updateCompanyProfile,
+      customerProfile,
+      saveCustomerProfile,
       notifySignups,
       addNotifySignup,
       businessApplication,
@@ -543,6 +558,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       rescheduleRequest,
       companyProfile,
       updateCompanyProfile,
+      customerProfile,
+      saveCustomerProfile,
       notifySignups,
       addNotifySignup,
       businessApplication,
