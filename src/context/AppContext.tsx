@@ -58,6 +58,7 @@ const DEFAULT_BUSINESS_APPLICATION: BusinessApplication = {
   promoCode: '',
   submittedAt: '',
   rejectionReason: '',
+  unlicensedExplanation: '',
 };
 
 type AppContextValue = {

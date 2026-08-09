@@ -36,6 +36,16 @@ export default function BusinessSignupScreen({ navigation }: Props) {
     navigation.navigate('DocumentUpload');
   }
 
+  function handleUnlicensed() {
+    updateApplicationDraft({
+      businessName: businessName.trim(),
+      contactEmail: contactEmail.trim(),
+      contactPhone: contactPhone.trim(),
+      categoryIds,
+    });
+    navigation.navigate('UnlicensedExplanation');
+  }
+
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView
@@ -94,6 +104,8 @@ export default function BusinessSignupScreen({ navigation }: Props) {
 
         <View style={{ height: spacing.lg }} />
         <Button title="Continue to documents" onPress={handleContinue} disabled={!canSubmit} />
+        <View style={{ height: spacing.sm }} />
+        <Button title="Unlicensed / Sole Trader" variant="outline" onPress={handleUnlicensed} disabled={!canSubmit} />
       </ScrollView>
     </KeyboardAvoidingView>
   );

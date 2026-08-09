@@ -117,6 +117,7 @@ export type BusinessApplication = {
   promoCode: string;
   submittedAt: string;
   rejectionReason: string;
+  unlicensedExplanation: string;
 };
 
 export type AdminBusinessStatus = 'active' | 'suspended';
