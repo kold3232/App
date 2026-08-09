@@ -74,6 +74,7 @@ type AppContextValue = {
   messages: ChatMessage[];
   sendMessage: (requestId: string, sender: ChatMessageSender, text: string) => void;
   sendQuote: (requestId: string, amount: number) => void;
+  sendImageMessage: (requestId: string, sender: ChatMessageSender, imageUri: string) => void;
   acceptQuote: (requestId: string, amount: number) => void;
   requests: ServiceRequest[];
   addRequest: (input: Omit<ServiceRequest, 'id' | 'createdAt'>) => void;
@@ -290,6 +291,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [messages, persistMessages]
   );
 
+  const sendImageMessage = useCallback(
+    (requestId: string, sender: ChatMessageSender, imageUri: string) => {
+      const next: ChatMessage = {
+        id: `msg-${Date.now()}-${Math.round(Math.random() * 10000)}`,
+        requestId,
+        sender,
+        kind: 'image',
+        imageUri,
+        createdAt: new Date().toISOString(),
+      };
+      persistMessages([...messages, next]);
+    },
+    [messages, persistMessages]
+  );
+
   const acceptQuote = useCallback((requestId: string, amount: number) => {
     setRequests((prev) => {
       const next = prev.map((r) => (r.id === requestId ? { ...r, quotedAmount: amount, quoteAccepted: true } : r));
@@ -475,6 +491,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       messages,
       sendMessage,
       sendQuote,
+      sendImageMessage,
       acceptQuote,
       requests,
       addRequest,
@@ -517,6 +534,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       messages,
       sendMessage,
       sendQuote,
+      sendImageMessage,
       acceptQuote,
       requests,
       addRequest,

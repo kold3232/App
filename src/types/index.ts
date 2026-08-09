@@ -70,9 +70,10 @@ export type ChatMessage = {
   id: string;
   requestId: string;
   sender: ChatMessageSender;
-  kind: 'text' | 'quote';
+  kind: 'text' | 'quote' | 'image';
   text?: string;
   amount?: number;
+  imageUri?: string;
   createdAt: string;
 };
 

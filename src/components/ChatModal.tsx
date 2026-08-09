@@ -1,6 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import React, { useMemo, useState } from 'react';
 import {
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -29,7 +31,7 @@ export function ChatModal({
   request: ServiceRequest;
   perspective: ChatMessageSender;
 }) {
-  const { messages, sendMessage, sendQuote, acceptQuote } = useApp();
+  const { messages, sendMessage, sendQuote, sendImageMessage, acceptQuote } = useApp();
   const [text, setText] = useState('');
   const [showQuoteForm, setShowQuoteForm] = useState(false);
   const [quoteAmount, setQuoteAmount] = useState('');
@@ -63,6 +65,23 @@ export function ChatModal({
 
   function handleAcceptQuote(amount: number) {
     acceptQuote(request.id, amount);
+  }
+
+  async function handlePickImage() {
+    if (Platform.OS !== 'web') {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        notify('Photo access needed', 'Please allow photo library access to attach a picture.');
+        return;
+      }
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.6,
+    });
+    if (!result.canceled && result.assets?.[0]?.uri) {
+      sendImageMessage(request.id, perspective, result.assets[0].uri);
+    }
   }
 
   const otherPartyName = perspective === 'customer' ? request.companyName : request.customerName;
@@ -107,6 +126,13 @@ export function ChatModal({
                   </View>
                 );
               }
+              if (m.kind === 'image') {
+                return (
+                  <View key={m.id} style={[styles.imageBubble, isMine ? styles.bubbleMine : styles.bubbleTheirs]}>
+                    <Image source={{ uri: m.imageUri }} style={styles.chatImage} resizeMode="cover" />
+                  </View>
+                );
+              }
               return (
                 <View key={m.id} style={[styles.bubble, isMine ? styles.bubbleMine : styles.bubbleTheirs]}>
                   <Text style={[styles.bubbleText, isMine && styles.bubbleTextMine]}>{m.text}</Text>
@@ -144,6 +170,9 @@ export function ChatModal({
             ))}
 
           <View style={styles.inputRow}>
+            <Pressable style={styles.attachButton} onPress={handlePickImage}>
+              <Ionicons name="image-outline" size={20} color={colors.primary} />
+            </Pressable>
             <TextInput
               style={styles.textInput}
               value={text}
@@ -192,6 +221,8 @@ const styles = StyleSheet.create({
   bubbleTheirs: { backgroundColor: colors.surface, alignSelf: 'flex-start', borderWidth: 1, borderColor: colors.border },
   bubbleText: { fontSize: 14, color: colors.text, lineHeight: 19 },
   bubbleTextMine: { color: colors.textInverse },
+  imageBubble: { maxWidth: '70%', borderRadius: radius.md, padding: 4, marginBottom: 4 },
+  chatImage: { width: 200, height: 200, borderRadius: radius.sm, backgroundColor: colors.surfaceAlt },
   quoteCard: { maxWidth: '80%', borderRadius: radius.md, padding: spacing.md, marginBottom: 4, borderWidth: 1, borderColor: colors.border },
   quoteLabel: { fontSize: 10.5, fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.4 },
   quoteAmount: { fontSize: 22, fontWeight: '800', color: colors.text, marginTop: 2 },
@@ -239,6 +270,16 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderTopWidth: 1,
     borderTopColor: colors.border,
+  },
+  attachButton: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   textInput: {
     flex: 1,
