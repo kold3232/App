@@ -7,7 +7,8 @@ import { colors, radius, shadow, spacing } from '../../theme';
 import { notify } from '../../utils/alert';
 
 export default function BusinessAuthScreen() {
-  const { signUpBusiness, signInBusiness, setMode } = useApp();
+  const { signUpBusiness, signInBusiness, setMode, authEmail } = useApp();
+  const addingRoleToExistingAccount = !!authEmail;
   const [mode, setLocalMode] = useState<'signup' | 'login'>('signup');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -15,14 +16,20 @@ export default function BusinessAuthScreen() {
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const canSubmit =
-    mode === 'login'
+  const canSubmit = addingRoleToExistingAccount
+    ? name.trim().length > 0 && phone.trim().length > 0
+    : mode === 'login'
       ? email.trim().length > 0 && password.length > 0
       : name.trim().length > 0 && email.trim().length > 0 && password.length >= 6 && phone.trim().length > 0;
 
   async function handleSubmit() {
     setLoading(true);
     try {
+      if (addingRoleToExistingAccount) {
+        const { error } = await signUpBusiness(authEmail!, '', { name: name.trim(), phone: phone.trim() });
+        if (error) notify('Could not add business profile', error);
+        return;
+      }
       if (mode === 'login') {
         const { error } = await signInBusiness(email.trim(), password);
         if (error) notify('Log in failed', error);
@@ -51,16 +58,22 @@ export default function BusinessAuthScreen() {
             <Ionicons name="briefcase" size={28} color={colors.textInverse} />
           </View>
           <Text style={styles.title}>Business account</Text>
-          <Text style={styles.subtitle}>Sign up or log in to list your business and manage requests.</Text>
+          <Text style={styles.subtitle}>
+            {addingRoleToExistingAccount
+              ? `Add a business profile to ${authEmail} so you can list your business and manage requests.`
+              : 'Sign up or log in to list your business and manage requests.'}
+          </Text>
         </View>
 
-        <View style={styles.toggleRow}>
-          <Chip label="Sign up" selected={mode === 'signup'} onPress={() => setLocalMode('signup')} />
-          <Chip label="Log in" selected={mode === 'login'} onPress={() => setLocalMode('login')} />
-        </View>
+        {!addingRoleToExistingAccount && (
+          <View style={styles.toggleRow}>
+            <Chip label="Sign up" selected={mode === 'signup'} onPress={() => setLocalMode('signup')} />
+            <Chip label="Log in" selected={mode === 'login'} onPress={() => setLocalMode('login')} />
+          </View>
+        )}
 
         <Card>
-          {mode === 'signup' && (
+          {(addingRoleToExistingAccount || mode === 'signup') && (
             <View style={styles.field}>
               <SectionLabel>Your name</SectionLabel>
               <TextInput
@@ -73,32 +86,36 @@ export default function BusinessAuthScreen() {
               />
             </View>
           )}
-          <View style={[styles.field, mode === 'signup' && styles.fieldBorder]}>
-            <SectionLabel>Email</SectionLabel>
-            <TextInput
-              style={styles.input}
-              value={email}
-              onChangeText={setEmail}
-              placeholder="you@business.com"
-              placeholderTextColor={colors.textFaint}
-              selectionColor={colors.primary}
-              autoCapitalize="none"
-              keyboardType="email-address"
-            />
-          </View>
-          <View style={[styles.field, styles.fieldBorder]}>
-            <SectionLabel>Password</SectionLabel>
-            <TextInput
-              style={styles.input}
-              value={password}
-              onChangeText={setPassword}
-              placeholder={mode === 'signup' ? 'At least 6 characters' : 'Your password'}
-              placeholderTextColor={colors.textFaint}
-              selectionColor={colors.primary}
-              secureTextEntry
-            />
-          </View>
-          {mode === 'signup' && (
+          {!addingRoleToExistingAccount && (
+            <>
+              <View style={[styles.field, mode === 'signup' && styles.fieldBorder]}>
+                <SectionLabel>Email</SectionLabel>
+                <TextInput
+                  style={styles.input}
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder="you@business.com"
+                  placeholderTextColor={colors.textFaint}
+                  selectionColor={colors.primary}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                />
+              </View>
+              <View style={[styles.field, styles.fieldBorder]}>
+                <SectionLabel>Password</SectionLabel>
+                <TextInput
+                  style={styles.input}
+                  value={password}
+                  onChangeText={setPassword}
+                  placeholder={mode === 'signup' ? 'At least 6 characters' : 'Your password'}
+                  placeholderTextColor={colors.textFaint}
+                  selectionColor={colors.primary}
+                  secureTextEntry
+                />
+              </View>
+            </>
+          )}
+          {(addingRoleToExistingAccount || mode === 'signup') && (
             <View style={[styles.field, styles.fieldBorder]}>
               <SectionLabel>Phone number</SectionLabel>
               <TextInput
@@ -116,7 +133,7 @@ export default function BusinessAuthScreen() {
 
         <View style={{ height: spacing.lg }} />
         <Button
-          title={mode === 'signup' ? 'Create business account' : 'Log in'}
+          title={addingRoleToExistingAccount ? 'Add business profile' : mode === 'signup' ? 'Create business account' : 'Log in'}
           onPress={handleSubmit}
           disabled={!canSubmit}
           loading={loading}

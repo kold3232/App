@@ -13,22 +13,10 @@ import CustomerSignUpScreen from '../screens/customer/CustomerSignUpScreen';
 import BusinessAuthScreen from '../screens/company/BusinessAuthScreen';
 
 export default function RootNavigator() {
-  const {
-    isReady,
-    hasAcceptedLegal,
-    mode,
-    isAdminAuthenticated,
-    customerProfile,
-    customerAuthLoading,
-    businessAccount,
-    businessAuthLoading,
-  } = useApp();
+  const { isReady, hasAcceptedLegal, mode, isAdminAuthenticated, customerProfile, businessAccount, authLoading } =
+    useApp();
 
-  if (
-    !isReady ||
-    (mode === 'customer' && customerAuthLoading) ||
-    (mode === 'company' && businessAuthLoading)
-  ) {
+  if (!isReady || ((mode === 'customer' || mode === 'company') && authLoading)) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background }}>
         <ActivityIndicator color={colors.accent} size="large" />

@@ -7,7 +7,8 @@ import { colors, radius, shadow, spacing } from '../../theme';
 import { notify } from '../../utils/alert';
 
 export default function CustomerSignUpScreen() {
-  const { signUpCustomer, signInCustomer, setMode } = useApp();
+  const { signUpCustomer, signInCustomer, setMode, authEmail } = useApp();
+  const addingRoleToExistingAccount = !!authEmail;
   const [mode, setFormMode] = useState<'signup' | 'login'>('signup');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -16,8 +17,9 @@ export default function CustomerSignUpScreen() {
   const [address, setAddress] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const canSubmit =
-    mode === 'login'
+  const canSubmit = addingRoleToExistingAccount
+    ? name.trim().length > 0 && phone.trim().length > 0 && address.trim().length > 0
+    : mode === 'login'
       ? email.trim().length > 0 && password.length > 0
       : name.trim().length > 0 &&
         email.trim().length > 0 &&
@@ -27,6 +29,16 @@ export default function CustomerSignUpScreen() {
 
   async function handleSubmit() {
     setLoading(true);
+    if (addingRoleToExistingAccount) {
+      const { error } = await signUpCustomer(authEmail!, '', {
+        name: name.trim(),
+        phone: phone.trim(),
+        address: address.trim(),
+      });
+      setLoading(false);
+      if (error) notify('Could not add customer profile', error);
+      return;
+    }
     if (mode === 'login') {
       const { error } = await signInCustomer(email.trim(), password);
       setLoading(false);
@@ -57,21 +69,27 @@ export default function CustomerSignUpScreen() {
           <View style={styles.iconBadge}>
             <Ionicons name="person-add" size={28} color={colors.textInverse} />
           </View>
-          <Text style={styles.title}>{mode === 'login' ? 'Log in' : 'Create your account'}</Text>
+          <Text style={styles.title}>
+            {addingRoleToExistingAccount ? 'Add a customer profile' : mode === 'login' ? 'Log in' : 'Create your account'}
+          </Text>
           <Text style={styles.subtitle}>
-            {mode === 'login'
-              ? 'Log in to your existing account to continue.'
-              : 'Sign up with your details so businesses can get back to you about your requests.'}
+            {addingRoleToExistingAccount
+              ? `Add customer details to ${authEmail} so you can request services too.`
+              : mode === 'login'
+                ? 'Log in to your existing account to continue.'
+                : 'Sign up with your details so businesses can get back to you about your requests.'}
           </Text>
         </View>
 
-        <View style={styles.modeRow}>
-          <Chip label="Sign up" selected={mode === 'signup'} onPress={() => setFormMode('signup')} />
-          <Chip label="Log in" selected={mode === 'login'} onPress={() => setFormMode('login')} />
-        </View>
+        {!addingRoleToExistingAccount && (
+          <View style={styles.modeRow}>
+            <Chip label="Sign up" selected={mode === 'signup'} onPress={() => setFormMode('signup')} />
+            <Chip label="Log in" selected={mode === 'login'} onPress={() => setFormMode('login')} />
+          </View>
+        )}
 
         <Card>
-          {mode === 'signup' && (
+          {(addingRoleToExistingAccount || mode === 'signup') && (
             <View style={styles.field}>
               <SectionLabel>Name</SectionLabel>
               <TextInput
@@ -84,33 +102,37 @@ export default function CustomerSignUpScreen() {
               />
             </View>
           )}
-          <View style={[styles.field, mode === 'signup' && styles.fieldBorder]}>
-            <SectionLabel>Email</SectionLabel>
-            <TextInput
-              style={styles.input}
-              value={email}
-              onChangeText={setEmail}
-              placeholder="you@example.com"
-              placeholderTextColor={colors.textFaint}
-              selectionColor={colors.primary}
-              autoCapitalize="none"
-              keyboardType="email-address"
-            />
-          </View>
-          <View style={[styles.field, styles.fieldBorder]}>
-            <SectionLabel>Password</SectionLabel>
-            <TextInput
-              style={styles.input}
-              value={password}
-              onChangeText={setPassword}
-              placeholder={mode === 'signup' ? 'At least 6 characters' : 'Your password'}
-              placeholderTextColor={colors.textFaint}
-              selectionColor={colors.primary}
-              autoCapitalize="none"
-              secureTextEntry
-            />
-          </View>
-          {mode === 'signup' && (
+          {!addingRoleToExistingAccount && (
+            <>
+              <View style={[styles.field, mode === 'signup' && styles.fieldBorder]}>
+                <SectionLabel>Email</SectionLabel>
+                <TextInput
+                  style={styles.input}
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder="you@example.com"
+                  placeholderTextColor={colors.textFaint}
+                  selectionColor={colors.primary}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                />
+              </View>
+              <View style={[styles.field, styles.fieldBorder]}>
+                <SectionLabel>Password</SectionLabel>
+                <TextInput
+                  style={styles.input}
+                  value={password}
+                  onChangeText={setPassword}
+                  placeholder={mode === 'signup' ? 'At least 6 characters' : 'Your password'}
+                  placeholderTextColor={colors.textFaint}
+                  selectionColor={colors.primary}
+                  autoCapitalize="none"
+                  secureTextEntry
+                />
+              </View>
+            </>
+          )}
+          {(addingRoleToExistingAccount || mode === 'signup') && (
             <>
               <View style={[styles.field, styles.fieldBorder]}>
                 <SectionLabel>Phone number</SectionLabel>
@@ -141,7 +163,7 @@ export default function CustomerSignUpScreen() {
 
         <View style={{ height: spacing.lg }} />
         <Button
-          title={mode === 'login' ? 'Log in' : 'Create account'}
+          title={addingRoleToExistingAccount ? 'Add customer profile' : mode === 'login' ? 'Log in' : 'Create account'}
           onPress={handleSubmit}
           disabled={!canSubmit}
           loading={loading}

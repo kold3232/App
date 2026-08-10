@@ -89,7 +89,9 @@ type AppContextValue = {
   companyProfile: CompanyProfile;
   updateCompanyProfile: (profile: CompanyProfile) => void;
   customerProfile: CustomerProfile | null;
-  customerAuthLoading: boolean;
+  businessAccount: BusinessAccount | null;
+  authEmail: string | null;
+  authLoading: boolean;
   signUpCustomer: (
     email: string,
     password: string,
@@ -98,8 +100,6 @@ type AppContextValue = {
   signInCustomer: (email: string, password: string) => Promise<{ error?: string }>;
   signOutCustomer: () => Promise<void>;
   saveCustomerProfile: (profile: CustomerProfile) => Promise<{ error?: string }>;
-  businessAccount: BusinessAccount | null;
-  businessAuthLoading: boolean;
   signUpBusiness: (
     email: string,
     password: string,
@@ -136,9 +136,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [customerProfile, setCustomerProfile] = useState<CustomerProfile | null>(null);
-  const [customerAuthLoading, setCustomerAuthLoading] = useState(isSupabaseConfigured);
   const [businessAccount, setBusinessAccount] = useState<BusinessAccount | null>(null);
-  const [businessAuthLoading, setBusinessAuthLoading] = useState(isSupabaseConfigured);
+  const [authEmail, setAuthEmail] = useState<string | null>(null);
+  const [authLoading, setAuthLoading] = useState(isSupabaseConfigured);
   const [mode, setModeState] = useState<UserMode | null>(null);
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
   const [companyProfile, setCompanyProfile] = useState<CompanyProfile>(DEFAULT_COMPANY_PROFILE);
@@ -198,31 +198,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       .select('name, email, phone, address')
       .eq('id', userId)
       .maybeSingle();
-    if (!error && data) setCustomerProfile(data);
+    setCustomerProfile(!error && data ? data : null);
   }, []);
-
-  useEffect(() => {
-    if (!isSupabaseConfigured) {
-      setCustomerAuthLoading(false);
-      return;
-    }
-    let isMounted = true;
-    supabase.auth.getSession().then(async ({ data }) => {
-      if (data.session) await fetchCustomerProfile(data.session.user.id);
-      if (isMounted) setCustomerAuthLoading(false);
-    });
-    const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) {
-        fetchCustomerProfile(session.user.id);
-      } else {
-        setCustomerProfile(null);
-      }
-    });
-    return () => {
-      isMounted = false;
-      subscription.subscription.unsubscribe();
-    };
-  }, [fetchCustomerProfile]);
 
   const fetchBusinessAccount = useCallback(async (userId: string) => {
     const { data, error } = await supabase
@@ -233,28 +210,36 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setBusinessAccount(!error && data ? data : null);
   }, []);
 
+  // A single Supabase auth session backs both roles — one account can be a
+  // customer, a business, or both, so both profiles are fetched together.
   useEffect(() => {
     if (!isSupabaseConfigured) {
-      setBusinessAuthLoading(false);
+      setAuthLoading(false);
       return;
     }
     let isMounted = true;
-    supabase.auth.getSession().then(async ({ data }) => {
-      if (data.session) await fetchBusinessAccount(data.session.user.id);
-      if (isMounted) setBusinessAuthLoading(false);
-    });
-    const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
+    const syncSession = async (session: { user: { id: string; email?: string } } | null) => {
       if (session) {
-        fetchBusinessAccount(session.user.id);
+        setAuthEmail(session.user.email ?? null);
+        await Promise.all([fetchCustomerProfile(session.user.id), fetchBusinessAccount(session.user.id)]);
       } else {
+        setAuthEmail(null);
+        setCustomerProfile(null);
         setBusinessAccount(null);
       }
+    };
+    supabase.auth.getSession().then(async ({ data }) => {
+      await syncSession(data.session);
+      if (isMounted) setAuthLoading(false);
+    });
+    const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
+      syncSession(session);
     });
     return () => {
       isMounted = false;
       subscription.subscription.unsubscribe();
     };
-  }, [fetchBusinessAccount]);
+  }, [fetchCustomerProfile, fetchBusinessAccount]);
 
   const acceptLegal = useCallback(() => {
     setHasAcceptedLegal(true);
@@ -410,6 +395,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const signUpCustomer = useCallback(
     async (email: string, password: string, profile: Omit<CustomerProfile, 'email'>) => {
+      const { data: existing } = await supabase.auth.getSession();
+      if (existing.session) {
+        // Already logged in (e.g. as a business) — add a customer profile to the same account.
+        const userId = existing.session.user.id;
+        const sessionEmail = existing.session.user.email ?? email;
+        const { error: insertError } = await supabase
+          .from('customers')
+          .insert({ id: userId, email: sessionEmail, ...profile });
+        if (insertError) return { error: insertError.message };
+        setCustomerProfile({ email: sessionEmail, ...profile });
+        return {};
+      }
       const { data, error } = await supabase.auth.signUp({ email, password });
       if (error) return { error: error.message };
       if (!data.session) {
@@ -435,6 +432,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const signOutCustomer = useCallback(async () => {
     await supabase.auth.signOut();
     setCustomerProfile(null);
+    setBusinessAccount(null);
+    setAuthEmail(null);
   }, []);
 
   const saveCustomerProfile = useCallback(async (profile: CustomerProfile) => {
@@ -447,8 +446,34 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return {};
   }, []);
 
+  const applyBusinessAccount = useCallback((email: string, account: Omit<BusinessAccount, 'email'>) => {
+    setBusinessAccount({ email, ...account });
+    setBusinessApplication((prev) => {
+      const next: BusinessApplication = {
+        ...prev,
+        businessName: prev.businessName || account.name,
+        contactEmail: prev.contactEmail || email,
+        contactPhone: prev.contactPhone || account.phone,
+      };
+      AsyncStorage.setItem(STORAGE_KEYS.businessApplication, JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
   const signUpBusiness = useCallback(
     async (email: string, password: string, account: Omit<BusinessAccount, 'email'>) => {
+      const { data: existing } = await supabase.auth.getSession();
+      if (existing.session) {
+        // Already logged in (e.g. as a customer) — add a business profile to the same account.
+        const userId = existing.session.user.id;
+        const sessionEmail = existing.session.user.email ?? email;
+        const { error: insertError } = await supabase
+          .from('businesses')
+          .insert({ id: userId, email: sessionEmail, ...account });
+        if (insertError) return { error: insertError.message };
+        applyBusinessAccount(sessionEmail, account);
+        return {};
+      }
       const { data, error } = await supabase.auth.signUp({ email, password });
       if (error) return { error: error.message };
       if (!data.session) {
@@ -458,20 +483,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         .from('businesses')
         .insert({ id: data.session.user.id, email, ...account });
       if (insertError) return { error: insertError.message };
-      setBusinessAccount({ email, ...account });
-      setBusinessApplication((prev) => {
-        const next: BusinessApplication = {
-          ...prev,
-          businessName: prev.businessName || account.name,
-          contactEmail: prev.contactEmail || email,
-          contactPhone: prev.contactPhone || account.phone,
-        };
-        AsyncStorage.setItem(STORAGE_KEYS.businessApplication, JSON.stringify(next));
-        return next;
-      });
+      applyBusinessAccount(email, account);
       return {};
     },
-    []
+    [applyBusinessAccount]
   );
 
   const signInBusiness = useCallback(
@@ -487,6 +502,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const signOutBusiness = useCallback(async () => {
     await supabase.auth.signOut();
     setBusinessAccount(null);
+    setCustomerProfile(null);
+    setAuthEmail(null);
   }, []);
 
   const addNotifySignup = useCallback((categoryId: string, contact: string) => {
@@ -672,13 +689,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       companyProfile,
       updateCompanyProfile,
       customerProfile,
-      customerAuthLoading,
+      businessAccount,
+      authEmail,
+      authLoading,
       signUpCustomer,
       signInCustomer,
       signOutCustomer,
       saveCustomerProfile,
-      businessAccount,
-      businessAuthLoading,
       signUpBusiness,
       signInBusiness,
       signOutBusiness,
@@ -726,13 +743,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       companyProfile,
       updateCompanyProfile,
       customerProfile,
-      customerAuthLoading,
+      businessAccount,
+      authEmail,
+      authLoading,
       signUpCustomer,
       signInCustomer,
       signOutCustomer,
       saveCustomerProfile,
-      businessAccount,
-      businessAuthLoading,
       signUpBusiness,
       signInBusiness,
       signOutBusiness,
