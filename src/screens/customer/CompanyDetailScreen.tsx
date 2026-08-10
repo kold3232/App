@@ -1,7 +1,9 @@
+import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useEffect, useState } from 'react';
-import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Dimensions, FlatList, Image, Modal, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Button, Card, EmptyState, RatingBadge, SectionLabel } from '../../components/ui';
+import { StarRating } from '../../components/StarRating';
 import { useApp } from '../../context/AppContext';
 import { BrowseStackParamList } from '../../navigation/types';
 import { GalleryImage } from '../../types';
@@ -10,16 +12,28 @@ import { colors, radius, shadow, spacing } from '../../theme';
 type Props = NativeStackScreenProps<BrowseStackParamList, 'CompanyDetail'>;
 
 const TIER_LABEL = { standard: 'Standard', premium: 'Premium', pro: 'Pro' } as const;
+const SCREEN_WIDTH = Dimensions.get('window').width;
 
 export default function CompanyDetailScreen({ route, navigation }: Props) {
-  const { businessListings, fetchGalleryImages } = useApp();
+  const { businessListings, fetchGalleryImages, reviews } = useApp();
   const company = businessListings.find((c) => c.id === route.params.companyId);
   const [gallery, setGallery] = useState<GalleryImage[]>([]);
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (!company) return;
     fetchGalleryImages(company.id).then(setGallery);
   }, [company, fetchGalleryImages]);
+
+  const companyReviews = useMemo(
+    () =>
+      company
+        ? reviews
+            .filter((r) => r.companyId === company.id)
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        : [],
+    [reviews, company]
+  );
 
   if (!company) return null;
 
@@ -78,16 +92,35 @@ export default function CompanyDetailScreen({ route, navigation }: Props) {
         ))}
       </Card>
 
-      <Card style={{ marginTop: spacing.md, marginBottom: spacing.lg }}>
+      <Card style={{ marginTop: spacing.md }}>
         <SectionLabel>Gallery</SectionLabel>
         {gallery.length === 0 ? (
           <EmptyState icon="images-outline" title="No photos yet" subtitle="This business hasn't added any portfolio photos." />
         ) : (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.galleryRow}>
-            {gallery.map((image) => (
-              <Image key={image.id} source={{ uri: image.url }} style={styles.galleryImage} resizeMode="cover" />
+            {gallery.map((image, index) => (
+              <Pressable key={image.id} onPress={() => setViewerIndex(index)}>
+                <Image source={{ uri: image.url }} style={styles.galleryImage} resizeMode="cover" />
+              </Pressable>
             ))}
           </ScrollView>
+        )}
+      </Card>
+
+      <Card style={{ marginTop: spacing.md, marginBottom: spacing.lg }}>
+        <SectionLabel>Reviews</SectionLabel>
+        {companyReviews.length === 0 ? (
+          <EmptyState icon="chatbubble-ellipses-outline" title="No reviews yet" subtitle="Be the first to leave a review after a job is done." />
+        ) : (
+          companyReviews.map((review) => (
+            <View key={review.id} style={styles.reviewRow}>
+              <View style={styles.reviewHeader}>
+                <StarRating rating={review.rating} size={14} />
+                <Text style={styles.reviewDate}>{new Date(review.createdAt).toLocaleDateString()}</Text>
+              </View>
+              {review.comment ? <Text style={styles.reviewComment}>{review.comment}</Text> : null}
+            </View>
+          ))
         )}
       </Card>
 
@@ -95,6 +128,30 @@ export default function CompanyDetailScreen({ route, navigation }: Props) {
         title="Request a quote"
         onPress={() => navigation.navigate('RequestQuote', { companyId: company.id })}
       />
+
+      <Modal visible={viewerIndex !== null} animationType="fade" onRequestClose={() => setViewerIndex(null)}>
+        <SafeAreaView style={styles.viewerContainer}>
+          <Pressable style={styles.viewerClose} onPress={() => setViewerIndex(null)} hitSlop={12}>
+            <Ionicons name="close" size={26} color="#fff" />
+          </Pressable>
+          {viewerIndex !== null && (
+            <FlatList
+              data={gallery}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              keyExtractor={(item) => item.id}
+              initialScrollIndex={viewerIndex}
+              getItemLayout={(_, index) => ({ length: SCREEN_WIDTH, offset: SCREEN_WIDTH * index, index })}
+              renderItem={({ item }) => (
+                <View style={styles.viewerPage}>
+                  <Image source={{ uri: item.url }} style={styles.viewerImage} resizeMode="contain" />
+                </View>
+              )}
+            />
+          )}
+        </SafeAreaView>
+      </Modal>
     </ScrollView>
   );
 }
@@ -141,4 +198,23 @@ const styles = StyleSheet.create({
   listItem: { fontSize: 14, color: colors.text, lineHeight: 20 },
   galleryRow: { gap: spacing.sm, marginTop: spacing.xs },
   galleryImage: { width: 120, height: 120, borderRadius: radius.md, backgroundColor: colors.surfaceAlt },
+  reviewRow: { paddingVertical: spacing.sm, borderTopWidth: 1, borderTopColor: colors.border, marginTop: spacing.sm },
+  reviewHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  reviewDate: { fontSize: 11.5, color: colors.textMuted },
+  reviewComment: { fontSize: 13.5, color: colors.text, marginTop: 6, lineHeight: 19 },
+  viewerContainer: { flex: 1, backgroundColor: '#000' },
+  viewerClose: {
+    position: 'absolute',
+    top: spacing.lg,
+    right: spacing.lg,
+    zIndex: 1,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  viewerPage: { width: SCREEN_WIDTH, alignItems: 'center', justifyContent: 'center' },
+  viewerImage: { width: SCREEN_WIDTH, height: '100%' },
 });
