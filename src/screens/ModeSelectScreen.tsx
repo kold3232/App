@@ -1,6 +1,5 @@
-import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
-import { Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import { Button } from '../components/ui';
 import { useApp } from '../context/AppContext';
 import { colors, radius, shadow, spacing } from '../theme';
@@ -12,7 +11,7 @@ export default function ModeSelectScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.hero}>
         <View style={styles.boltBadge}>
-          <Ionicons name="flash" size={34} color={colors.textInverse} />
+          <Image source={require('../../assets/logo-glyph-white.png')} style={styles.logo} resizeMode="contain" />
         </View>
         <Text style={styles.title}>Gib Trades</Text>
         <Text style={styles.subtitle}>Find trusted local tradespeople in Gibraltar, fast.</Text>
@@ -48,6 +47,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     ...shadow.raised,
   },
+  logo: { width: 54, height: 54 },
   title: { fontSize: 30, fontWeight: '800', color: colors.textInverse, marginTop: spacing.lg, letterSpacing: 0.2 },
   subtitle: {
     fontSize: 15,

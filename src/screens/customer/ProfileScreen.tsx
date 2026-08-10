@@ -93,8 +93,10 @@ export default function ProfileScreen() {
           </Pressable>
         </Card>
 
-        <View style={{ marginTop: spacing.lg }}>
+        <View style={styles.bottomActions}>
           <Button title="Switch to business mode" onPress={handleSwitchToBusiness} variant="outline" />
+          <View style={{ height: spacing.sm }} />
+          <Button title="Back to start" onPress={() => setMode(null)} variant="secondary" />
         </View>
       </View>
 
@@ -133,6 +135,7 @@ const styles = StyleSheet.create({
   text: { fontSize: 14, color: colors.text, marginTop: 6, lineHeight: 20 },
   accountDetail: { fontSize: 13, color: colors.textMuted, marginTop: 2 },
   accountActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
+  bottomActions: { marginTop: spacing.lg },
   legalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6 },
   legalText: { fontSize: 14, fontWeight: '600', color: colors.text },
   legalDivider: { height: 1, backgroundColor: colors.border, marginVertical: 4 },

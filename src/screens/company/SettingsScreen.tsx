@@ -102,6 +102,9 @@ export default function SettingsScreen() {
             <Button title="Log out" onPress={handleLogOut} variant="secondary" />
           </View>
         </View>
+        <View style={{ marginTop: spacing.sm }}>
+          <Button title="Back to start" onPress={() => setMode(null)} variant="secondary" />
+        </View>
       </View>
 
       <LegalTextModal

@@ -1,7 +1,6 @@
-import { Ionicons } from '@expo/vector-icons';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 import { CATEGORY_GROUPS } from '../data/categoryGroups';
 import { useApp } from '../context/AppContext';
 import CategoryGroupScreen from '../screens/customer/CategoryGroupScreen';
@@ -20,7 +19,7 @@ function BrandTitle() {
   return (
     <View style={brandStyles.row}>
       <View style={brandStyles.badge}>
-        <Ionicons name="flash" size={13} color={colors.textInverse} />
+        <Image source={require('../../assets/logo-glyph-white.png')} style={brandStyles.logo} resizeMode="contain" />
       </View>
       <Text style={brandStyles.title}>Gib Trades</Text>
     </View>
@@ -37,6 +36,7 @@ const brandStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  logo: { width: 20, height: 20 },
   title: { fontSize: 17, fontWeight: '700', color: colors.text },
 });
 
