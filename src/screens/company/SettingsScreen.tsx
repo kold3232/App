@@ -11,9 +11,9 @@ import { colors, radius, spacing } from '../../theme';
 import { confirmAction } from '../../utils/alert';
 
 export default function SettingsScreen() {
-  const { setMode, businessApplication, businessAccount, signOutBusiness } = useApp();
+  const { setMode, businessTier, businessAccount, signOutBusiness } = useApp();
   const navigation = useNavigation<any>();
-  const tierInfo = businessApplication.tier ? getTierInfo(businessApplication.tier) : null;
+  const tierInfo = businessTier ? getTierInfo(businessTier) : null;
   const [showTerms, setShowTerms] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
 
@@ -50,7 +50,7 @@ export default function SettingsScreen() {
                   <Button
                     title="Change plan"
                     variant="outline"
-                    onPress={() => navigation.navigate('TierSelection', { mode: 'change' })}
+                    onPress={() => navigation.navigate('TierSelection')}
                   />
                 </View>
               </View>

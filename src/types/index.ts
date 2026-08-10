@@ -121,28 +121,6 @@ export type NotifySignup = {
 
 export type ApplicationStatus = 'not_started' | 'pending' | 'approved' | 'rejected';
 
-export type BusinessDocument = {
-  id: string;
-  label: string;
-  uploaded: boolean;
-  fileName?: string;
-  expiryDate?: string;
-};
-
-export type BusinessApplication = {
-  status: ApplicationStatus;
-  businessName: string;
-  contactEmail: string;
-  contactPhone: string;
-  categoryIds: string[];
-  documents: BusinessDocument[];
-  tier: SubscriptionTier | null;
-  promoCode: string;
-  submittedAt: string;
-  rejectionReason: string;
-  unlicensedExplanation: string;
-};
-
 export type AdminBusinessStatus = 'active' | 'suspended';
 
 export type ComplaintFlag = {

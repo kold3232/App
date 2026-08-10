@@ -6,8 +6,8 @@ import { getTierInfo } from '../../data/tiers';
 import { colors, spacing } from '../../theme';
 
 export default function InvoicesScreen() {
-  const { requests, businessApplication } = useApp();
-  const tierInfo = businessApplication.tier ? getTierInfo(businessApplication.tier) : null;
+  const { requests, businessTier } = useApp();
+  const tierInfo = businessTier ? getTierInfo(businessTier) : null;
 
   const invoices = useMemo(
     () =>

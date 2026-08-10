@@ -8,22 +8,28 @@ import { useApp } from '../../context/AppContext';
 import { CompanyStackParamList } from '../../navigation/types';
 import { SubscriptionTier } from '../../types';
 import { colors, radius, shadow, spacing } from '../../theme';
+import { notify } from '../../utils/alert';
 
 type Props = NativeStackScreenProps<CompanyStackParamList, 'TierSelection'>;
 
-export default function TierSelectionScreen({ route, navigation }: Props) {
-  const { mode } = route.params;
-  const { businessApplication } = useApp();
-  const [selected, setSelected] = useState<SubscriptionTier | null>(businessApplication.tier);
+export default function TierSelectionScreen({ navigation }: Props) {
+  const { businessTier, changeTier } = useApp();
+  const [selected, setSelected] = useState<SubscriptionTier | null>(businessTier);
+  const [saving, setSaving] = useState(false);
+
+  async function handleConfirm() {
+    if (!selected) return;
+    setSaving(true);
+    await changeTier(selected);
+    setSaving(false);
+    notify('Plan updated', `You're now on the ${TIERS.find((t) => t.id === selected)?.name} plan.`);
+    navigation.goBack();
+  }
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xl * 2 }}>
-      <Text style={styles.title}>{mode === 'change' ? 'Change your plan' : 'Choose your plan'}</Text>
-      <Text style={styles.subtitle}>
-        {mode === 'change'
-          ? 'Switch anytime — no re-vetting needed, just a subscription change.'
-          : 'Step 3 of 4 — Pick the plan that fits your business'}
-      </Text>
+      <Text style={styles.title}>Change your plan</Text>
+      <Text style={styles.subtitle}>Switch anytime — no re-vetting needed, just a subscription change.</Text>
 
       {TIERS.map((tier) => {
         const isSelected = selected === tier.id;
@@ -55,11 +61,7 @@ export default function TierSelectionScreen({ route, navigation }: Props) {
       })}
 
       <View style={{ height: spacing.sm }} />
-      <Button
-        title={mode === 'change' ? 'Continue' : 'Continue to payment'}
-        onPress={() => navigation.navigate('Payment', { mode, tier: selected! })}
-        disabled={!selected}
-      />
+      <Button title="Confirm change" onPress={handleConfirm} disabled={!selected} loading={saving} />
     </ScrollView>
   );
 }

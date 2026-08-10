@@ -40,7 +40,7 @@ async function pickImage() {
 }
 
 export default function MyListingScreen() {
-  const { companyProfile, updateCompanyProfile, businessApplication, categories, businessAccount, uploadCoverPhoto, fetchGalleryImages, addGalleryImage, removeGalleryImage } =
+  const { companyProfile, updateCompanyProfile, businessTier, categories, businessAccount, uploadCoverPhoto, fetchGalleryImages, addGalleryImage, removeGalleryImage } =
     useApp();
   const [profile, setProfile] = useState<CompanyProfile>(companyProfile);
   const [newService, setNewService] = useState('');
@@ -48,7 +48,7 @@ export default function MyListingScreen() {
   const [coverUploading, setCoverUploading] = useState(false);
   const [gallery, setGallery] = useState<GalleryImage[]>([]);
   const [galleryUploading, setGalleryUploading] = useState(false);
-  const tier = businessApplication.tier;
+  const tier = businessTier;
   const canShowAvailability = tier === 'premium' || tier === 'pro';
 
   useEffect(() => {

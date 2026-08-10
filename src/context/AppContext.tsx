@@ -10,7 +10,6 @@ import {
   AdminBusinessStatus,
   ApplicationStatus,
   BusinessAccount,
-  BusinessApplication,
   Category,
   ChatMessage,
   ChatMessageSender,
@@ -28,7 +27,7 @@ import {
 const STORAGE_KEYS = {
   mode: '@sortedforyou/mode',
   notifySignups: '@sortedforyou/notifySignups',
-  businessApplication: '@sortedforyou/businessApplication',
+  businessTier: '@sortedforyou/businessTier',
   categories: '@sortedforyou/categories',
   hasAcceptedLegal: '@sortedforyou/hasAcceptedLegal',
 };
@@ -41,25 +40,6 @@ const DEFAULT_COMPANY_PROFILE: CompanyProfile = {
   phone: '+350 200 00000',
   priceRange: '££',
   services: ['Add your first service'],
-};
-
-const DEFAULT_BUSINESS_APPLICATION: BusinessApplication = {
-  status: 'not_started',
-  businessName: '',
-  contactEmail: '',
-  contactPhone: '',
-  categoryIds: [],
-  documents: [
-    { id: 'id-proof', label: 'ID / proof of address', uploaded: false },
-    { id: 'trade-licence', label: 'Trade Licence', uploaded: false },
-    { id: 'insurance', label: 'Public liability insurance', uploaded: false, expiryDate: '' },
-    { id: 'business-registration', label: 'Business registration proof', uploaded: false },
-  ],
-  tier: null,
-  promoCode: '',
-  submittedAt: '',
-  rejectionReason: '',
-  unlicensedExplanation: '',
 };
 
 type AppContextValue = {
@@ -114,11 +94,8 @@ type AppContextValue = {
   signOutBusiness: () => Promise<void>;
   notifySignups: NotifySignup[];
   addNotifySignup: (categoryId: string, contact: string) => void;
-  businessApplication: BusinessApplication;
-  updateApplicationDraft: (patch: Partial<BusinessApplication>) => void;
-  submitApplication: () => void;
-  approveApplication: () => void;
-  changeTier: (tier: SubscriptionTier) => void;
+  businessTier: SubscriptionTier | null;
+  changeTier: (tier: SubscriptionTier) => Promise<void>;
   categories: Category[];
   toggleCategoryStatus: (id: string) => void;
   addCategory: (category: Category) => void;
@@ -163,7 +140,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
   const [companyProfile, setCompanyProfile] = useState<CompanyProfile>(DEFAULT_COMPANY_PROFILE);
   const [notifySignups, setNotifySignups] = useState<NotifySignup[]>([]);
-  const [businessApplication, setBusinessApplication] = useState<BusinessApplication>(DEFAULT_BUSINESS_APPLICATION);
+  const [businessTier, setBusinessTier] = useState<SubscriptionTier | null>(null);
   const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
   const [adminBusinesses, setAdminBusinesses] = useState<AdminBusiness[]>([]);
   const [rawBusinessListings, setRawBusinessListings] = useState<BusinessListingRow[]>([]);
@@ -198,17 +175,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     (async () => {
       try {
-        const [storedMode, storedSignups, storedApplication, storedCategories, storedHasAcceptedLegal] =
+        const [storedMode, storedSignups, storedBusinessTier, storedCategories, storedHasAcceptedLegal] =
           await Promise.all([
             AsyncStorage.getItem(STORAGE_KEYS.mode),
             AsyncStorage.getItem(STORAGE_KEYS.notifySignups),
-            AsyncStorage.getItem(STORAGE_KEYS.businessApplication),
+            AsyncStorage.getItem(STORAGE_KEYS.businessTier),
             AsyncStorage.getItem(STORAGE_KEYS.categories),
             AsyncStorage.getItem(STORAGE_KEYS.hasAcceptedLegal),
           ]);
         if (storedMode) setModeState(JSON.parse(storedMode));
         if (storedSignups) setNotifySignups(JSON.parse(storedSignups));
-        if (storedApplication) setBusinessApplication(JSON.parse(storedApplication));
+        if (storedBusinessTier) setBusinessTier(JSON.parse(storedBusinessTier));
         if (storedCategories) setCategories(JSON.parse(storedCategories));
         if (storedHasAcceptedLegal) setHasAcceptedLegal(JSON.parse(storedHasAcceptedLegal));
       } finally {
@@ -454,7 +431,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const completeRequest = useCallback(
     async (id: string, jobValue: number) => {
-      const rate = getTierInfo(businessApplication.tier ?? 'standard').commissionRate;
+      const rate = getTierInfo(businessTier ?? 'standard').commissionRate;
       const commission = Math.round(jobValue * rate * 100) / 100;
       const { error } = await supabase
         .from('service_requests')
@@ -468,7 +445,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         );
       }
     },
-    [businessApplication.tier]
+    [businessTier]
   );
 
   const confirmCompletion = useCallback(async (id: string) => {
@@ -710,16 +687,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         .insert({ id: userId, email: sessionEmail, name: account.name, phone: account.phone });
       if (insertError) return { error: insertError.message };
       await fetchBusinessAccount(userId);
-      setBusinessApplication((prev) => {
-        const next: BusinessApplication = {
-          ...prev,
-          businessName: prev.businessName || account.name,
-          contactEmail: prev.contactEmail || sessionEmail,
-          contactPhone: prev.contactPhone || account.phone,
-        };
-        AsyncStorage.setItem(STORAGE_KEYS.businessApplication, JSON.stringify(next));
-        return next;
-      });
       refreshBusinessListings();
       return {};
     },
@@ -751,47 +718,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const updateApplicationDraft = useCallback(
-    (patch: Partial<BusinessApplication>) => {
-      setBusinessApplication((prev) => {
-        const next = { ...prev, ...patch };
-        AsyncStorage.setItem(STORAGE_KEYS.businessApplication, JSON.stringify(next));
-        return next;
-      });
-    },
-    []
-  );
-
-  const submitApplication = useCallback(() => {
-    setBusinessApplication((prev) => {
-      const next: BusinessApplication = { ...prev, status: 'pending', submittedAt: new Date().toISOString() };
-      AsyncStorage.setItem(STORAGE_KEYS.businessApplication, JSON.stringify(next));
-      return next;
-    });
-  }, []);
-
-  const approveApplication = useCallback(() => {
-    setBusinessApplication((prev) => {
-      const next: BusinessApplication = { ...prev, status: 'approved' };
-      AsyncStorage.setItem(STORAGE_KEYS.businessApplication, JSON.stringify(next));
-      return next;
-    });
-    const next: CompanyProfile = {
-      ...companyProfile,
-      name: businessApplication.businessName || companyProfile.name,
-      categoryIds: businessApplication.categoryIds.length > 0 ? businessApplication.categoryIds : companyProfile.categoryIds,
-      phone: businessApplication.contactPhone || companyProfile.phone,
-    };
-    updateCompanyProfile(next);
-  }, [businessApplication.businessName, businessApplication.categoryIds, businessApplication.contactPhone, companyProfile, updateCompanyProfile]);
-
   const changeTier = useCallback(
     async (tier: SubscriptionTier) => {
-      setBusinessApplication((prev) => {
-        const next: BusinessApplication = { ...prev, tier };
-        AsyncStorage.setItem(STORAGE_KEYS.businessApplication, JSON.stringify(next));
-        return next;
-      });
+      setBusinessTier(tier);
+      AsyncStorage.setItem(STORAGE_KEYS.businessTier, JSON.stringify(tier));
       const { data: sessionData } = await supabase.auth.getSession();
       const userId = sessionData.session?.user.id;
       if (userId) {
@@ -973,10 +903,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       signOutBusiness,
       notifySignups,
       addNotifySignup,
-      businessApplication,
-      updateApplicationDraft,
-      submitApplication,
-      approveApplication,
+      businessTier,
       changeTier,
       categories,
       toggleCategoryStatus,
@@ -1034,10 +961,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       signOutBusiness,
       notifySignups,
       addNotifySignup,
-      businessApplication,
-      updateApplicationDraft,
-      submitApplication,
-      approveApplication,
+      businessTier,
       changeTier,
       categories,
       toggleCategoryStatus,

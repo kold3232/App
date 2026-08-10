@@ -18,7 +18,7 @@ const FILTERS: { id: RequestStatus | 'all'; label: string }[] = [
 ];
 
 export default function DashboardScreen() {
-  const { requests: allRequests, updateRequestStatus, completeRequest, rescheduleRequest, companyProfile, businessApplication, businessAccount, refreshRequests } = useApp();
+  const { requests: allRequests, updateRequestStatus, completeRequest, rescheduleRequest, companyProfile, businessTier, businessAccount, refreshRequests } = useApp();
   const [filter, setFilter] = useState<RequestStatus | 'all'>('all');
 
   useFocusEffect(
@@ -31,7 +31,7 @@ export default function DashboardScreen() {
   const [reschedulingId, setReschedulingId] = useState<string | null>(null);
   const [chatRequestId, setChatRequestId] = useState<string | null>(null);
   const slots = useMemo(() => generateSlots(), []);
-  const canReschedule = businessApplication.tier === 'pro';
+  const canReschedule = businessTier === 'pro';
   // A single account can hold both roles — only show requests addressed to this business.
   const requests = useMemo(
     () => allRequests.filter((r) => r.companyId === businessAccount?.id),
