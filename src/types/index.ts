@@ -162,7 +162,6 @@ export type AdminBusiness = {
   tier: SubscriptionTier;
   applicationStatus: ApplicationStatus;
   businessStatus: AdminBusinessStatus;
-  documents: BusinessDocument[];
   submittedAt: string;
   rejectionReason: string;
   jobsCompleted: number;

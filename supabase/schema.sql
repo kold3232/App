@@ -49,9 +49,6 @@ create policy "Businesses can update their own account"
   using (auth.uid() = id);
 
 -- Gib Trades — marketplace slice (real listings, requests, chat, reviews)
--- Any signed-up business is immediately listed (is_approved defaults to
--- true) — admin approval doesn't gate real visibility yet, that's still a
--- local/mock flow on top of this.
 
 alter table public.businesses
   add column if not exists category_ids text[] not null default '{}',
@@ -163,3 +160,68 @@ create policy "Anyone can view reviews"
 create policy "Customers can create their own reviews"
   on public.reviews for insert
   with check (auth.uid() = customer_id);
+
+-- Gib Trades — admin approval slice
+-- Businesses are no longer public the moment they sign up: is_approved now
+-- defaults to false, and admin has to explicitly approve. There is no
+-- self-signup for admins — rows only ever get added to public.admins by
+-- hand in the SQL editor (see bootstrap instructions).
+
+create table if not exists public.admins (
+  id uuid primary key references auth.users (id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
+alter table public.admins enable row level security;
+
+create policy "Admins can view their own admin row"
+  on public.admins for select
+  using (auth.uid() = id);
+
+alter table public.businesses
+  add column if not exists application_status text not null default 'pending',
+  add column if not exists business_status text not null default 'active',
+  add column if not exists rejection_reason text not null default '';
+
+alter table public.businesses alter column is_approved set default false;
+
+drop policy if exists "Anyone can view approved businesses" on public.businesses;
+create policy "Anyone can view approved businesses"
+  on public.businesses for select
+  using (is_approved = true and business_status = 'active');
+
+create policy "Admins can view all businesses"
+  on public.businesses for select
+  using (exists (select 1 from public.admins a where a.id = auth.uid()));
+
+create policy "Admins can update any business"
+  on public.businesses for update
+  using (exists (select 1 from public.admins a where a.id = auth.uid()));
+
+alter table public.service_requests
+  add column if not exists commission_paid boolean not null default false;
+
+create policy "Admins can view all requests"
+  on public.service_requests for select
+  using (exists (select 1 from public.admins a where a.id = auth.uid()));
+
+create policy "Admins can update any request"
+  on public.service_requests for update
+  using (exists (select 1 from public.admins a where a.id = auth.uid()));
+
+create table if not exists public.business_flags (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid not null references public.businesses (id) on delete cascade,
+  note text not null,
+  created_at timestamptz not null default now()
+);
+
+alter table public.business_flags enable row level security;
+
+create policy "Admins can view flags"
+  on public.business_flags for select
+  using (exists (select 1 from public.admins a where a.id = auth.uid()));
+
+create policy "Admins can create flags"
+  on public.business_flags for insert
+  with check (exists (select 1 from public.admins a where a.id = auth.uid()));

@@ -1,6 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { ADMIN_BUSINESSES } from '../data/adminBusinesses';
 import { ADMIN_PASSCODE } from '../data/adminAuth';
 import { DEFAULT_CATEGORIES } from '../data/categories';
 import { getTierInfo } from '../data/tiers';
@@ -8,6 +7,8 @@ import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { colorFromId } from '../utils/color';
 import {
   AdminBusiness,
+  AdminBusinessStatus,
+  ApplicationStatus,
   BusinessAccount,
   BusinessApplication,
   Category,
@@ -28,9 +29,8 @@ const STORAGE_KEYS = {
   notifySignups: '@sortedforyou/notifySignups',
   businessApplication: '@sortedforyou/businessApplication',
   categories: '@sortedforyou/categories',
-  adminBusinesses: '@sortedforyou/adminBusinesses',
   hasAcceptedLegal: '@sortedforyou/hasAcceptedLegal',
-  isAdminAuthenticated: '@sortedforyou/isAdminAuthenticated',
+  adminPasscodeVerified: '@sortedforyou/isAdminAuthenticated',
 };
 
 const DEFAULT_COMPANY_PROFILE: CompanyProfile = {
@@ -70,7 +70,8 @@ type AppContextValue = {
   setMode: (mode: UserMode | null) => void;
   isAdminAuthenticated: boolean;
   authenticateAdmin: (passcode: string) => boolean;
-  logoutAdmin: () => void;
+  signInAdmin: (email: string, password: string) => Promise<{ error?: string }>;
+  logoutAdmin: () => Promise<void>;
   reviews: Review[];
   addReview: (requestId: string, companyId: string, rating: number, comment: string) => Promise<void>;
   messages: ChatMessage[];
@@ -119,13 +120,13 @@ type AppContextValue = {
   toggleCategoryStatus: (id: string) => void;
   addCategory: (category: Category) => void;
   adminBusinesses: AdminBusiness[];
-  approveAdminApplication: (id: string) => void;
-  rejectAdminApplication: (id: string, reason: string) => void;
-  suspendBusiness: (id: string) => void;
-  reinstateBusiness: (id: string) => void;
-  addComplaintFlag: (id: string, note: string) => void;
-  markCommissionPaid: (id: string) => void;
-  runExpiryCheck: () => number;
+  refreshAdminBusinesses: () => Promise<void>;
+  approveAdminApplication: (id: string) => Promise<void>;
+  rejectAdminApplication: (id: string, reason: string) => Promise<void>;
+  suspendBusiness: (id: string) => Promise<void>;
+  reinstateBusiness: (id: string) => Promise<void>;
+  addComplaintFlag: (id: string, note: string) => Promise<void>;
+  markCommissionPaid: (id: string) => Promise<void>;
 };
 
 type BusinessListingRow = {
@@ -146,7 +147,9 @@ const AppContext = createContext<AppContextValue | undefined>(undefined);
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [isReady, setIsReady] = useState(false);
   const [hasAcceptedLegal, setHasAcceptedLegal] = useState(false);
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
+  const [adminPasscodeVerified, setAdminPasscodeVerified] = useState(false);
+  const [isAdminUser, setIsAdminUser] = useState(false);
+  const isAdminAuthenticated = adminPasscodeVerified && isAdminUser;
   const [reviews, setReviews] = useState<Review[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [customerProfile, setCustomerProfile] = useState<CustomerProfile | null>(null);
@@ -159,7 +162,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [notifySignups, setNotifySignups] = useState<NotifySignup[]>([]);
   const [businessApplication, setBusinessApplication] = useState<BusinessApplication>(DEFAULT_BUSINESS_APPLICATION);
   const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
-  const [adminBusinesses, setAdminBusinesses] = useState<AdminBusiness[]>(ADMIN_BUSINESSES);
+  const [adminBusinesses, setAdminBusinesses] = useState<AdminBusiness[]>([]);
   const [rawBusinessListings, setRawBusinessListings] = useState<BusinessListingRow[]>([]);
 
   const businessListings = useMemo<Company[]>(
@@ -196,25 +199,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           storedSignups,
           storedApplication,
           storedCategories,
-          storedAdminBusinesses,
           storedHasAcceptedLegal,
-          storedIsAdminAuthenticated,
+          storedAdminPasscodeVerified,
         ] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.mode),
           AsyncStorage.getItem(STORAGE_KEYS.notifySignups),
           AsyncStorage.getItem(STORAGE_KEYS.businessApplication),
           AsyncStorage.getItem(STORAGE_KEYS.categories),
-          AsyncStorage.getItem(STORAGE_KEYS.adminBusinesses),
           AsyncStorage.getItem(STORAGE_KEYS.hasAcceptedLegal),
-          AsyncStorage.getItem(STORAGE_KEYS.isAdminAuthenticated),
+          AsyncStorage.getItem(STORAGE_KEYS.adminPasscodeVerified),
         ]);
         if (storedMode) setModeState(JSON.parse(storedMode));
         if (storedSignups) setNotifySignups(JSON.parse(storedSignups));
         if (storedApplication) setBusinessApplication(JSON.parse(storedApplication));
         if (storedCategories) setCategories(JSON.parse(storedCategories));
-        if (storedAdminBusinesses) setAdminBusinesses(JSON.parse(storedAdminBusinesses));
         if (storedHasAcceptedLegal) setHasAcceptedLegal(JSON.parse(storedHasAcceptedLegal));
-        if (storedIsAdminAuthenticated) setIsAdminAuthenticated(JSON.parse(storedIsAdminAuthenticated));
+        if (storedAdminPasscodeVerified) setAdminPasscodeVerified(JSON.parse(storedAdminPasscodeVerified));
       } finally {
         setIsReady(true);
       }
@@ -228,6 +228,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       .eq('id', userId)
       .maybeSingle();
     setCustomerProfile(!error && data ? data : null);
+  }, []);
+
+  const fetchIsAdmin = useCallback(async (userId: string) => {
+    const { data, error } = await supabase.from('admins').select('id').eq('id', userId).maybeSingle();
+    const result = !error && !!data;
+    setIsAdminUser(result);
+    return result;
   }, []);
 
   const fetchBusinessAccount = useCallback(async (userId: string) => {
@@ -343,11 +350,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const syncSession = async (session: { user: { id: string; email?: string } } | null) => {
       if (session) {
         setAuthEmail(session.user.email ?? null);
-        await Promise.all([fetchCustomerProfile(session.user.id), fetchBusinessAccount(session.user.id)]);
+        await Promise.all([
+          fetchCustomerProfile(session.user.id),
+          fetchBusinessAccount(session.user.id),
+          fetchIsAdmin(session.user.id),
+        ]);
       } else {
         setAuthEmail(null);
         setCustomerProfile(null);
         setBusinessAccount(null);
+        setIsAdminUser(false);
         setRequests([]);
         setMessages([]);
       }
@@ -363,7 +375,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       isMounted = false;
       subscription.subscription.unsubscribe();
     };
-  }, [fetchCustomerProfile, fetchBusinessAccount]);
+  }, [fetchCustomerProfile, fetchBusinessAccount, fetchIsAdmin]);
 
   // Business listings and reviews are public — anyone can browse them regardless of login state.
   useEffect(() => {
@@ -395,15 +407,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const authenticateAdmin = useCallback((passcode: string) => {
     const success = passcode.trim() === ADMIN_PASSCODE;
     if (success) {
-      setIsAdminAuthenticated(true);
-      AsyncStorage.setItem(STORAGE_KEYS.isAdminAuthenticated, JSON.stringify(true));
+      setAdminPasscodeVerified(true);
+      AsyncStorage.setItem(STORAGE_KEYS.adminPasscodeVerified, JSON.stringify(true));
     }
     return success;
   }, []);
 
-  const logoutAdmin = useCallback(() => {
-    setIsAdminAuthenticated(false);
-    AsyncStorage.setItem(STORAGE_KEYS.isAdminAuthenticated, JSON.stringify(false));
+  const signInAdmin = useCallback(async (email: string, password: string) => {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) return { error: error.message };
+    const userId = data.session?.user.id;
+    if (!userId) return { error: 'Sign in failed.' };
+    const admin = await fetchIsAdmin(userId);
+    if (!admin) return { error: 'This account is not authorized as an admin.' };
+    return {};
+  }, [fetchIsAdmin]);
+
+  const logoutAdmin = useCallback(async () => {
+    await supabase.auth.signOut();
+    setAdminPasscodeVerified(false);
+    AsyncStorage.setItem(STORAGE_KEYS.adminPasscodeVerified, JSON.stringify(false));
     setModeState(null);
     AsyncStorage.setItem(STORAGE_KEYS.mode, JSON.stringify(null));
   }, []);
@@ -750,91 +773,113 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const persistAdminBusinesses = useCallback((next: AdminBusiness[]) => {
-    setAdminBusinesses(next);
-    AsyncStorage.setItem(STORAGE_KEYS.adminBusinesses, JSON.stringify(next));
+  const refreshAdminBusinesses = useCallback(async () => {
+    const [{ data: bizRows, error: bizError }, { data: reqRows }, { data: flagRows }] = await Promise.all([
+      supabase
+        .from('businesses')
+        .select('id, name, email, phone, category_ids, tier, application_status, business_status, rejection_reason, created_at')
+        .order('created_at', { ascending: false }),
+      supabase.from('service_requests').select('business_id, status, commission, commission_paid'),
+      supabase.from('business_flags').select('id, business_id, note, created_at'),
+    ]);
+    if (bizError || !bizRows) return;
+    const requestsByBusiness = reqRows ?? [];
+    const flagsByBusiness = flagRows ?? [];
+    setAdminBusinesses(
+      bizRows.map((b) => {
+        const completed = requestsByBusiness.filter((r) => r.business_id === b.id && r.status === 'completed');
+        const jobsCompleted = completed.length;
+        const commissionOwed = completed
+          .filter((r) => !r.commission_paid)
+          .reduce((sum, r) => sum + (r.commission ?? 0), 0);
+        const commissionPaid = completed
+          .filter((r) => r.commission_paid)
+          .reduce((sum, r) => sum + (r.commission ?? 0), 0);
+        return {
+          id: b.id,
+          businessName: b.name,
+          contactEmail: b.email,
+          contactPhone: b.phone,
+          categoryIds: b.category_ids ?? [],
+          tier: (b.tier ?? 'standard') as SubscriptionTier,
+          applicationStatus: b.application_status as ApplicationStatus,
+          businessStatus: b.business_status as AdminBusinessStatus,
+          rejectionReason: b.rejection_reason ?? '',
+          submittedAt: b.created_at,
+          jobsCompleted,
+          commissionOwed,
+          commissionPaid,
+          flags: flagsByBusiness
+            .filter((f) => f.business_id === b.id)
+            .map((f) => ({ id: f.id, note: f.note, createdAt: f.created_at })),
+        };
+      })
+    );
   }, []);
 
+  useEffect(() => {
+    if (!isSupabaseConfigured || !isAdminAuthenticated) return;
+    refreshAdminBusinesses();
+  }, [isAdminAuthenticated, refreshAdminBusinesses]);
+
   const approveAdminApplication = useCallback(
-    (id: string) => {
-      persistAdminBusinesses(
-        adminBusinesses.map((b) => (b.id === id ? { ...b, applicationStatus: 'approved', businessStatus: 'active' } : b))
-      );
+    async (id: string) => {
+      await supabase
+        .from('businesses')
+        .update({ application_status: 'approved', business_status: 'active', is_approved: true })
+        .eq('id', id);
+      refreshAdminBusinesses();
     },
-    [adminBusinesses, persistAdminBusinesses]
+    [refreshAdminBusinesses]
   );
 
   const rejectAdminApplication = useCallback(
-    (id: string, reason: string) => {
-      persistAdminBusinesses(
-        adminBusinesses.map((b) => (b.id === id ? { ...b, applicationStatus: 'rejected', rejectionReason: reason } : b))
-      );
+    async (id: string, reason: string) => {
+      await supabase
+        .from('businesses')
+        .update({ application_status: 'rejected', rejection_reason: reason })
+        .eq('id', id);
+      refreshAdminBusinesses();
     },
-    [adminBusinesses, persistAdminBusinesses]
+    [refreshAdminBusinesses]
   );
 
   const suspendBusiness = useCallback(
-    (id: string) => {
-      persistAdminBusinesses(adminBusinesses.map((b) => (b.id === id ? { ...b, businessStatus: 'suspended' } : b)));
+    async (id: string) => {
+      await supabase.from('businesses').update({ business_status: 'suspended' }).eq('id', id);
+      refreshAdminBusinesses();
     },
-    [adminBusinesses, persistAdminBusinesses]
+    [refreshAdminBusinesses]
   );
 
   const reinstateBusiness = useCallback(
-    (id: string) => {
-      persistAdminBusinesses(adminBusinesses.map((b) => (b.id === id ? { ...b, businessStatus: 'active' } : b)));
+    async (id: string) => {
+      await supabase.from('businesses').update({ business_status: 'active' }).eq('id', id);
+      refreshAdminBusinesses();
     },
-    [adminBusinesses, persistAdminBusinesses]
+    [refreshAdminBusinesses]
   );
 
   const addComplaintFlag = useCallback(
-    (id: string, note: string) => {
-      persistAdminBusinesses(
-        adminBusinesses.map((b) =>
-          b.id === id
-            ? { ...b, flags: [...b.flags, { id: `flag-${Date.now()}`, note, createdAt: new Date().toISOString() }] }
-            : b
-        )
-      );
+    async (id: string, note: string) => {
+      await supabase.from('business_flags').insert({ business_id: id, note });
+      refreshAdminBusinesses();
     },
-    [adminBusinesses, persistAdminBusinesses]
+    [refreshAdminBusinesses]
   );
 
   const markCommissionPaid = useCallback(
-    (id: string) => {
-      persistAdminBusinesses(
-        adminBusinesses.map((b) =>
-          b.id === id ? { ...b, commissionPaid: b.commissionPaid + b.commissionOwed, commissionOwed: 0 } : b
-        )
-      );
+    async (id: string) => {
+      await supabase
+        .from('service_requests')
+        .update({ commission_paid: true })
+        .eq('business_id', id)
+        .eq('status', 'completed')
+        .eq('commission_paid', false);
+      refreshAdminBusinesses();
     },
-    [adminBusinesses, persistAdminBusinesses]
+    [refreshAdminBusinesses]
   );
-
-  const runExpiryCheck = useCallback(() => {
-    const today = new Date();
-    let suspendedCount = 0;
-    const next = adminBusinesses.map((b) => {
-      const insurance = b.documents.find((d) => d.id === 'insurance');
-      if (!insurance?.expiryDate) return b;
-      const [day, month, year] = insurance.expiryDate.split('/').map(Number);
-      const expiry = new Date(year, (month || 1) - 1, day || 1);
-      if (expiry < today && b.businessStatus === 'active') {
-        suspendedCount += 1;
-        return {
-          ...b,
-          businessStatus: 'suspended' as const,
-          flags: [
-            ...b.flags,
-            { id: `flag-${Date.now()}-${b.id}`, note: 'Auto-suspended — public liability insurance expired.', createdAt: new Date().toISOString() },
-          ],
-        };
-      }
-      return b;
-    });
-    persistAdminBusinesses(next);
-    return suspendedCount;
-  }, [adminBusinesses, persistAdminBusinesses]);
 
   const value = useMemo(
     () => ({
@@ -845,6 +890,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setMode,
       isAdminAuthenticated,
       authenticateAdmin,
+      signInAdmin,
       logoutAdmin,
       reviews,
       addReview,
@@ -886,13 +932,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       toggleCategoryStatus,
       addCategory,
       adminBusinesses,
+      refreshAdminBusinesses,
       approveAdminApplication,
       rejectAdminApplication,
       suspendBusiness,
       reinstateBusiness,
       addComplaintFlag,
       markCommissionPaid,
-      runExpiryCheck,
     }),
     [
       isReady,
@@ -900,8 +946,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       acceptLegal,
       mode,
       setMode,
-      isAdminAuthenticated,
+      adminPasscodeVerified,
+      isAdminUser,
       authenticateAdmin,
+      signInAdmin,
       logoutAdmin,
       reviews,
       addReview,
@@ -943,13 +991,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       toggleCategoryStatus,
       addCategory,
       adminBusinesses,
+      refreshAdminBusinesses,
       approveAdminApplication,
       rejectAdminApplication,
       suspendBusiness,
       reinstateBusiness,
       addComplaintFlag,
       markCommissionPaid,
-      runExpiryCheck,
     ]
   );
 

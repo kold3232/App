@@ -44,7 +44,6 @@ export default function AdminQueueScreen() {
         ListEmptyComponent={<EmptyState icon="checkmark-done-outline" title="Queue is clear" subtitle="No pending applications right now." />}
         ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
         renderItem={({ item }) => {
-          const uploadedCount = item.documents.filter((d) => d.uploaded).length;
           const isRejecting = rejectingId === item.id;
           return (
             <Card>
@@ -54,12 +53,12 @@ export default function AdminQueueScreen() {
                 <View style={styles.tierBadge}>
                   <Text style={styles.tierBadgeText}>{item.tier}</Text>
                 </View>
-                <Text style={styles.docCount}>
-                  {uploadedCount}/{item.documents.length} documents uploaded
-                </Text>
               </View>
               <Text style={styles.submitted}>Submitted {new Date(item.submittedAt).toLocaleDateString()}</Text>
               <Text style={styles.contact}>{item.contactEmail} · {item.contactPhone}</Text>
+              <Text style={styles.docNote}>
+                Document verification isn't wired up yet — review based on this profile for now.
+              </Text>
 
               {isRejecting ? (
                 <View style={styles.rejectBox}>
@@ -116,7 +115,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
   },
   tierBadgeText: { fontSize: 10.5, fontWeight: '700', color: colors.info, textTransform: 'capitalize' },
-  docCount: { fontSize: 12, color: colors.textMuted },
+  docNote: { fontSize: 11.5, color: colors.textMuted, marginTop: spacing.sm, fontStyle: 'italic' },
   submitted: { fontSize: 11.5, color: colors.textMuted, marginTop: spacing.sm },
   contact: { fontSize: 12, color: colors.text, marginTop: 4 },
   actions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },

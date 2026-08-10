@@ -2,12 +2,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { Button, Card, Chip, EmptyState } from '../../components/ui';
+import { Card, Chip, EmptyState } from '../../components/ui';
 import { useApp } from '../../context/AppContext';
 import { AdminBusinessesStackParamList } from '../../navigation/types';
 import { colors, radius, shadow, spacing } from '../../theme';
-import { notify } from '../../utils/alert';
-import { getInsuranceStatus } from '../../utils/admin';
 
 type Props = NativeStackScreenProps<AdminBusinessesStackParamList, 'BusinessesList'>;
 
@@ -21,17 +19,9 @@ const FILTERS: { id: FilterOption; label: string }[] = [
 ];
 
 export default function AdminBusinessesListScreen({ navigation }: Props) {
-  const { adminBusinesses, runExpiryCheck } = useApp();
+  const { adminBusinesses } = useApp();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<FilterOption>('all');
-
-  function handleExpiryCheck() {
-    const count = runExpiryCheck();
-    notify(
-      'Expiry check complete',
-      count > 0 ? `${count} business${count > 1 ? 'es were' : ' was'} auto-suspended for expired insurance.` : 'No businesses had expired insurance.'
-    );
-  }
 
   const businesses = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -69,15 +59,12 @@ export default function AdminBusinessesListScreen({ navigation }: Props) {
                 <Chip key={f.id} label={f.label} selected={filter === f.id} onPress={() => setFilter(f.id)} />
               ))}
             </View>
-            <Button title="Run expiry check" variant="outline" onPress={handleExpiryCheck} />
             <View style={{ height: spacing.md }} />
           </View>
         }
         ListEmptyComponent={<EmptyState icon="business-outline" title="No businesses found" subtitle="Try a different filter or search." />}
         ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
         renderItem={({ item }) => {
-          const insurance = item.documents.find((d) => d.id === 'insurance');
-          const insuranceStatus = getInsuranceStatus(insurance?.expiryDate);
           return (
             <Pressable onPress={() => navigation.navigate('BusinessDetail', { businessId: item.id })}>
               {({ pressed }) => (
@@ -115,14 +102,6 @@ export default function AdminBusinessesListScreen({ navigation }: Props) {
                       </>
                     )}
                   </View>
-                  {(insuranceStatus === 'expired' || insuranceStatus === 'expiring') && (
-                    <View style={styles.warningRow}>
-                      <Ionicons name="warning-outline" size={13} color={insuranceStatus === 'expired' ? colors.danger : colors.pending} />
-                      <Text style={[styles.warningText, insuranceStatus === 'expired' && styles.warningTextExpired]}>
-                        Insurance {insuranceStatus === 'expired' ? 'expired' : 'expiring soon'} ({insurance?.expiryDate})
-                      </Text>
-                    </View>
-                  )}
                   {item.flags.length > 0 && (
                     <View style={styles.warningRow}>
                       <Ionicons name="flag-outline" size={13} color={colors.danger} />

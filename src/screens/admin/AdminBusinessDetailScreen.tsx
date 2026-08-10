@@ -1,4 +1,3 @@
-import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -7,7 +6,6 @@ import { useApp } from '../../context/AppContext';
 import { AdminBusinessesStackParamList } from '../../navigation/types';
 import { colors, radius, spacing } from '../../theme';
 import { notify } from '../../utils/alert';
-import { getInsuranceStatus } from '../../utils/admin';
 
 type Props = NativeStackScreenProps<AdminBusinessesStackParamList, 'BusinessDetail'>;
 
@@ -19,8 +17,6 @@ export default function AdminBusinessDetailScreen({ route }: Props) {
   if (!business) return null;
 
   const categoryNames = business.categoryIds.map((id) => categories.find((c) => c.id === id)?.name ?? id).join(', ');
-  const insurance = business.documents.find((d) => d.id === 'insurance');
-  const insuranceStatus = getInsuranceStatus(insurance?.expiryDate);
 
   function handleAddFlag() {
     if (!flagNote.trim()) return;
@@ -66,21 +62,6 @@ export default function AdminBusinessDetailScreen({ route }: Props) {
             <Button title="Mark commission as paid" variant="outline" onPress={handleMarkPaid} />
           </View>
         )}
-      </Card>
-
-      <Card style={{ marginTop: spacing.md }}>
-        <SectionLabel>Documents</SectionLabel>
-        {business.documents.map((doc) => (
-          <View key={doc.id} style={styles.docRow}>
-            <Ionicons name={doc.uploaded ? 'checkmark-circle' : 'close-circle-outline'} size={16} color={doc.uploaded ? colors.success : colors.textFaint} />
-            <Text style={styles.docLabel}>{doc.label}</Text>
-            {doc.expiryDate ? (
-              <Text style={[styles.docExpiry, insuranceStatus !== 'ok' && styles.docExpiryWarning]}>exp. {doc.expiryDate}</Text>
-            ) : null}
-          </View>
-        ))}
-        {insuranceStatus === 'expired' && <Text style={styles.dangerNote}>⚠️ Insurance has expired — this business should be suspended.</Text>}
-        {insuranceStatus === 'expiring' && <Text style={styles.warnNote}>⚠️ Insurance expires within 30 days.</Text>}
       </Card>
 
       {business.applicationStatus === 'rejected' && business.rejectionReason ? (

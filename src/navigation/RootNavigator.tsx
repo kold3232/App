@@ -16,7 +16,7 @@ export default function RootNavigator() {
   const { isReady, hasAcceptedLegal, mode, isAdminAuthenticated, customerProfile, businessAccount, authLoading } =
     useApp();
 
-  if (!isReady || ((mode === 'customer' || mode === 'company') && authLoading)) {
+  if (!isReady || ((mode === 'customer' || mode === 'company' || mode === 'admin') && authLoading)) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background }}>
         <ActivityIndicator color={colors.accent} size="large" />
