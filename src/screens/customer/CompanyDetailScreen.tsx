@@ -2,7 +2,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Button, Card, RatingBadge, SectionLabel } from '../../components/ui';
-import { getCompanyById } from '../../data/companies';
+import { useApp } from '../../context/AppContext';
 import { BrowseStackParamList } from '../../navigation/types';
 import { colors, radius, shadow, spacing } from '../../theme';
 
@@ -11,7 +11,8 @@ type Props = NativeStackScreenProps<BrowseStackParamList, 'CompanyDetail'>;
 const TIER_LABEL = { standard: 'Standard', premium: 'Premium', pro: 'Pro' } as const;
 
 export default function CompanyDetailScreen({ route, navigation }: Props) {
-  const company = getCompanyById(route.params.companyId);
+  const { businessListings } = useApp();
+  const company = businessListings.find((c) => c.id === route.params.companyId);
   if (!company) return null;
 
   const showAvailability = company.tier !== 'standard';
@@ -47,7 +48,7 @@ export default function CompanyDetailScreen({ route, navigation }: Props) {
         <Text style={styles.dot}>·</Text>
         <Text style={styles.meta}>{company.priceRange}</Text>
         <Text style={styles.dot}>·</Text>
-        <Text style={styles.meta}>{company.yearsActive} years in Gibraltar</Text>
+        <Text style={styles.meta}>{company.yearsActive > 0 ? `${company.yearsActive} years in Gibraltar` : 'New to Gib Trades'}</Text>
       </View>
 
       <Card style={{ marginTop: spacing.lg }}>

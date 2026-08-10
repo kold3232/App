@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
-import { getCompaniesByCategory } from '../../data/companies';
 import { CATEGORY_GROUPS } from '../../data/categoryGroups';
 import { useApp } from '../../context/AppContext';
 import { BrowseStackParamList } from '../../navigation/types';
@@ -11,7 +10,7 @@ import { colors, radius, shadow, spacing } from '../../theme';
 type Props = NativeStackScreenProps<BrowseStackParamList, 'CategoryGroup'>;
 
 export default function CategoryGroupScreen({ route, navigation }: Props) {
-  const { categories } = useApp();
+  const { categories, businessListings } = useApp();
   const group = CATEGORY_GROUPS.find((g) => g.id === route.params.groupId);
   const groupCategories = categories.filter((c) => c.groupId === route.params.groupId);
 
@@ -30,7 +29,7 @@ export default function CategoryGroupScreen({ route, navigation }: Props) {
         ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
         renderItem={({ item }) => {
           const isComingSoon = item.status === 'coming-soon';
-          const count = isComingSoon ? 0 : getCompaniesByCategory(item.id).length;
+          const count = isComingSoon ? 0 : businessListings.filter((c) => c.categoryIds.includes(item.id)).length;
           return (
             <Pressable
               style={({ pressed }) => [styles.tile, isComingSoon && styles.tileComingSoon, pressed && styles.tilePressed]}

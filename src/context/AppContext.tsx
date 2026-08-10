@@ -5,6 +5,7 @@ import { ADMIN_PASSCODE } from '../data/adminAuth';
 import { DEFAULT_CATEGORIES } from '../data/categories';
 import { getTierInfo } from '../data/tiers';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
+import { colorFromId } from '../utils/color';
 import {
   AdminBusiness,
   BusinessAccount,
@@ -12,6 +13,7 @@ import {
   Category,
   ChatMessage,
   ChatMessageSender,
+  Company,
   CompanyProfile,
   CustomerProfile,
   NotifySignup,
@@ -23,16 +25,12 @@ import {
 
 const STORAGE_KEYS = {
   mode: '@sortedforyou/mode',
-  requests: '@sortedforyou/requests',
-  companyProfile: '@sortedforyou/companyProfile',
   notifySignups: '@sortedforyou/notifySignups',
   businessApplication: '@sortedforyou/businessApplication',
   categories: '@sortedforyou/categories',
   adminBusinesses: '@sortedforyou/adminBusinesses',
   hasAcceptedLegal: '@sortedforyou/hasAcceptedLegal',
   isAdminAuthenticated: '@sortedforyou/isAdminAuthenticated',
-  reviews: '@sortedforyou/reviews',
-  messages: '@sortedforyou/messages',
 };
 
 const DEFAULT_COMPANY_PROFILE: CompanyProfile = {
@@ -74,20 +72,23 @@ type AppContextValue = {
   authenticateAdmin: (passcode: string) => boolean;
   logoutAdmin: () => void;
   reviews: Review[];
-  addReview: (requestId: string, companyId: string, rating: number, comment: string) => void;
+  addReview: (requestId: string, companyId: string, rating: number, comment: string) => Promise<void>;
   messages: ChatMessage[];
-  sendMessage: (requestId: string, sender: ChatMessageSender, text: string) => void;
-  sendQuote: (requestId: string, amount: number) => void;
-  sendImageMessage: (requestId: string, sender: ChatMessageSender, imageUri: string) => void;
-  acceptQuote: (requestId: string, amount: number) => void;
+  sendMessage: (requestId: string, sender: ChatMessageSender, text: string) => Promise<void>;
+  sendQuote: (requestId: string, amount: number) => Promise<void>;
+  sendImageMessage: (requestId: string, sender: ChatMessageSender, imageUri: string) => Promise<void>;
+  acceptQuote: (requestId: string, amount: number) => Promise<void>;
   requests: ServiceRequest[];
-  addRequest: (input: Omit<ServiceRequest, 'id' | 'createdAt'>) => string;
-  updateRequestStatus: (id: string, status: ServiceRequest['status']) => void;
-  completeRequest: (id: string, jobValue: number) => void;
-  confirmCompletion: (id: string) => void;
-  rescheduleRequest: (id: string, newSlot: string) => void;
+  addRequest: (input: Omit<ServiceRequest, 'id' | 'createdAt' | 'customerId'>) => Promise<string>;
+  updateRequestStatus: (id: string, status: ServiceRequest['status']) => Promise<void>;
+  completeRequest: (id: string, jobValue: number) => Promise<void>;
+  confirmCompletion: (id: string) => Promise<void>;
+  rescheduleRequest: (id: string, newSlot: string) => Promise<void>;
   companyProfile: CompanyProfile;
-  updateCompanyProfile: (profile: CompanyProfile) => void;
+  updateCompanyProfile: (profile: CompanyProfile) => Promise<{ error?: string }>;
+  businessListings: Company[];
+  refreshRequests: () => Promise<void>;
+  refreshMessages: () => Promise<void>;
   customerProfile: CustomerProfile | null;
   businessAccount: BusinessAccount | null;
   authEmail: string | null;
@@ -95,7 +96,7 @@ type AppContextValue = {
   signUpCustomer: (
     email: string,
     password: string,
-    profile: Omit<CustomerProfile, 'email'>
+    profile: Omit<CustomerProfile, 'id' | 'email'>
   ) => Promise<{ error?: string; needsEmailConfirmation?: boolean }>;
   signInCustomer: (email: string, password: string) => Promise<{ error?: string }>;
   signOutCustomer: () => Promise<void>;
@@ -103,7 +104,7 @@ type AppContextValue = {
   signUpBusiness: (
     email: string,
     password: string,
-    account: Omit<BusinessAccount, 'email'>
+    account: Omit<BusinessAccount, 'id' | 'email'>
   ) => Promise<{ error?: string; needsEmailConfirmation?: boolean }>;
   signInBusiness: (email: string, password: string) => Promise<{ error?: string }>;
   signOutBusiness: () => Promise<void>;
@@ -127,6 +128,19 @@ type AppContextValue = {
   runExpiryCheck: () => number;
 };
 
+type BusinessListingRow = {
+  id: string;
+  name: string;
+  phone: string;
+  category_ids: string[] | null;
+  tagline: string | null;
+  description: string | null;
+  price_range: string | null;
+  services: string[] | null;
+  available_now: boolean | null;
+  tier: string | null;
+};
+
 const AppContext = createContext<AppContextValue | undefined>(undefined);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
@@ -146,46 +160,61 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [businessApplication, setBusinessApplication] = useState<BusinessApplication>(DEFAULT_BUSINESS_APPLICATION);
   const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
   const [adminBusinesses, setAdminBusinesses] = useState<AdminBusiness[]>(ADMIN_BUSINESSES);
+  const [rawBusinessListings, setRawBusinessListings] = useState<BusinessListingRow[]>([]);
+
+  const businessListings = useMemo<Company[]>(
+    () =>
+      rawBusinessListings.map((b) => {
+        const businessReviews = reviews.filter((r) => r.companyId === b.id);
+        const reviewCount = businessReviews.length;
+        const rating = reviewCount > 0 ? businessReviews.reduce((sum, r) => sum + r.rating, 0) / reviewCount : 0;
+        return {
+          id: b.id,
+          name: b.name,
+          categoryIds: b.category_ids ?? [],
+          tagline: b.tagline ?? '',
+          description: b.description ?? '',
+          rating,
+          reviewCount,
+          priceRange: (b.price_range ?? '££') as Company['priceRange'],
+          phone: b.phone,
+          yearsActive: 0,
+          services: b.services ?? [],
+          color: colorFromId(b.id),
+          tier: (b.tier ?? 'standard') as SubscriptionTier,
+          availableNow: !!b.available_now,
+        };
+      }),
+    [rawBusinessListings, reviews]
+  );
 
   useEffect(() => {
     (async () => {
       try {
         const [
           storedMode,
-          storedRequests,
-          storedProfile,
           storedSignups,
           storedApplication,
           storedCategories,
           storedAdminBusinesses,
           storedHasAcceptedLegal,
           storedIsAdminAuthenticated,
-          storedReviews,
-          storedMessages,
         ] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.mode),
-          AsyncStorage.getItem(STORAGE_KEYS.requests),
-          AsyncStorage.getItem(STORAGE_KEYS.companyProfile),
           AsyncStorage.getItem(STORAGE_KEYS.notifySignups),
           AsyncStorage.getItem(STORAGE_KEYS.businessApplication),
           AsyncStorage.getItem(STORAGE_KEYS.categories),
           AsyncStorage.getItem(STORAGE_KEYS.adminBusinesses),
           AsyncStorage.getItem(STORAGE_KEYS.hasAcceptedLegal),
           AsyncStorage.getItem(STORAGE_KEYS.isAdminAuthenticated),
-          AsyncStorage.getItem(STORAGE_KEYS.reviews),
-          AsyncStorage.getItem(STORAGE_KEYS.messages),
         ]);
         if (storedMode) setModeState(JSON.parse(storedMode));
-        if (storedRequests) setRequests(JSON.parse(storedRequests));
-        if (storedProfile) setCompanyProfile(JSON.parse(storedProfile));
         if (storedSignups) setNotifySignups(JSON.parse(storedSignups));
         if (storedApplication) setBusinessApplication(JSON.parse(storedApplication));
         if (storedCategories) setCategories(JSON.parse(storedCategories));
         if (storedAdminBusinesses) setAdminBusinesses(JSON.parse(storedAdminBusinesses));
         if (storedHasAcceptedLegal) setHasAcceptedLegal(JSON.parse(storedHasAcceptedLegal));
         if (storedIsAdminAuthenticated) setIsAdminAuthenticated(JSON.parse(storedIsAdminAuthenticated));
-        if (storedReviews) setReviews(JSON.parse(storedReviews));
-        if (storedMessages) setMessages(JSON.parse(storedMessages));
       } finally {
         setIsReady(true);
       }
@@ -195,7 +224,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const fetchCustomerProfile = useCallback(async (userId: string) => {
     const { data, error } = await supabase
       .from('customers')
-      .select('name, email, phone, address')
+      .select('id, name, email, phone, address')
       .eq('id', userId)
       .maybeSingle();
     setCustomerProfile(!error && data ? data : null);
@@ -204,11 +233,104 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const fetchBusinessAccount = useCallback(async (userId: string) => {
     const { data, error } = await supabase
       .from('businesses')
-      .select('name, email, phone')
+      .select('id, name, email, phone, category_ids, tagline, description, price_range, services, available_now')
       .eq('id', userId)
       .maybeSingle();
-    setBusinessAccount(!error && data ? data : null);
+    if (!error && data) {
+      setBusinessAccount({ id: data.id, name: data.name, email: data.email, phone: data.phone });
+      setCompanyProfile({
+        name: data.name,
+        categoryIds: data.category_ids ?? [],
+        tagline: data.tagline ?? '',
+        description: data.description ?? '',
+        phone: data.phone,
+        priceRange: (data.price_range ?? '££') as CompanyProfile['priceRange'],
+        services: data.services ?? [],
+        availableNow: !!data.available_now,
+      });
+    } else {
+      setBusinessAccount(null);
+    }
   }, []);
+
+  const refreshBusinessListings = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('businesses')
+      .select('id, name, phone, category_ids, tagline, description, price_range, services, available_now, tier')
+      .eq('is_approved', true);
+    if (!error && data) setRawBusinessListings(data);
+  }, []);
+
+  const refreshReviews = useCallback(async () => {
+    const { data, error } = await supabase.from('reviews').select('*');
+    if (!error && data) {
+      setReviews(
+        data.map((r) => ({
+          id: r.id,
+          requestId: r.request_id,
+          companyId: r.business_id,
+          rating: r.rating,
+          comment: r.comment ?? '',
+          createdAt: r.created_at,
+        }))
+      );
+    }
+  }, []);
+
+  const mapRequestRow = useCallback(
+    (row: any): ServiceRequest => ({
+      id: row.id,
+      companyId: row.business_id,
+      customerId: row.customer_id,
+      companyName: row.company_name,
+      categoryName: row.category_name,
+      type: row.type,
+      customerName: row.customer_name,
+      phone: row.phone,
+      address: row.address,
+      jobDetails: row.job_details ?? '',
+      preferredDate: row.preferred_date ?? '',
+      scheduledSlot: row.scheduled_slot ?? '',
+      status: row.status,
+      createdAt: row.created_at,
+      jobValue: row.job_value ?? undefined,
+      commission: row.commission ?? undefined,
+      customerConfirmed: !!row.customer_confirmed,
+      quotedAmount: row.quoted_amount ?? undefined,
+      quoteAccepted: !!row.quote_accepted,
+    }),
+    []
+  );
+
+  const refreshRequests = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('service_requests')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (!error && data) setRequests(data.map(mapRequestRow));
+  }, [mapRequestRow]);
+
+  const mapMessageRow = useCallback(
+    (row: any): ChatMessage => ({
+      id: row.id,
+      requestId: row.request_id,
+      sender: row.sender,
+      kind: row.kind,
+      text: row.text ?? undefined,
+      amount: row.amount ?? undefined,
+      imageUri: row.image_uri ?? undefined,
+      createdAt: row.created_at,
+    }),
+    []
+  );
+
+  const refreshMessages = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('chat_messages')
+      .select('*')
+      .order('created_at', { ascending: true });
+    if (!error && data) setMessages(data.map(mapMessageRow));
+  }, [mapMessageRow]);
 
   // A single Supabase auth session backs both roles — one account can be a
   // customer, a business, or both, so both profiles are fetched together.
@@ -226,6 +348,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setAuthEmail(null);
         setCustomerProfile(null);
         setBusinessAccount(null);
+        setRequests([]);
+        setMessages([]);
       }
     };
     supabase.auth.getSession().then(async ({ data }) => {
@@ -240,6 +364,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       subscription.subscription.unsubscribe();
     };
   }, [fetchCustomerProfile, fetchBusinessAccount]);
+
+  // Business listings and reviews are public — anyone can browse them regardless of login state.
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    refreshBusinessListings();
+    refreshReviews();
+  }, [refreshBusinessListings, refreshReviews]);
+
+  // Requests/messages are only visible to their two participants (enforced by RLS),
+  // so fetch them once we know who's logged in.
+  useEffect(() => {
+    if (!isSupabaseConfigured || authLoading) return;
+    if (customerProfile || businessAccount) {
+      refreshRequests();
+      refreshMessages();
+    }
+  }, [customerProfile, businessAccount, authLoading, refreshRequests, refreshMessages]);
 
   const acceptLegal = useCallback(() => {
     setHasAcceptedLegal(true);
@@ -267,134 +408,164 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     AsyncStorage.setItem(STORAGE_KEYS.mode, JSON.stringify(null));
   }, []);
 
-  const addRequest = useCallback((input: Omit<ServiceRequest, 'id' | 'createdAt'>) => {
-    const id = `req-${Date.now()}-${Math.round(Math.random() * 10000)}`;
-    setRequests((prev) => {
-      const next: ServiceRequest[] = [
-        { ...input, id, createdAt: new Date().toISOString() },
-        ...prev,
-      ];
-      AsyncStorage.setItem(STORAGE_KEYS.requests, JSON.stringify(next));
-      return next;
-    });
-    return id;
-  }, []);
+  const addRequest = useCallback(
+    async (input: Omit<ServiceRequest, 'id' | 'createdAt' | 'customerId'>) => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const customerId = sessionData.session?.user.id;
+      if (!customerId) return '';
+      const { data, error } = await supabase
+        .from('service_requests')
+        .insert({
+          business_id: input.companyId,
+          customer_id: customerId,
+          company_name: input.companyName,
+          category_name: input.categoryName,
+          type: input.type,
+          customer_name: input.customerName,
+          phone: input.phone,
+          address: input.address,
+          job_details: input.jobDetails,
+          preferred_date: input.preferredDate,
+          scheduled_slot: input.scheduledSlot,
+          status: input.status,
+        })
+        .select()
+        .single();
+      if (error || !data) return '';
+      setRequests((prev) => [mapRequestRow(data), ...prev]);
+      return data.id as string;
+    },
+    [mapRequestRow]
+  );
 
-  const updateRequestStatus = useCallback((id: string, status: ServiceRequest['status']) => {
-    setRequests((prev) => {
-      const next = prev.map((r) => (r.id === id ? { ...r, status } : r));
-      AsyncStorage.setItem(STORAGE_KEYS.requests, JSON.stringify(next));
-      return next;
-    });
+  const updateRequestStatus = useCallback(async (id: string, status: ServiceRequest['status']) => {
+    const { error } = await supabase.from('service_requests').update({ status }).eq('id', id);
+    if (!error) setRequests((prev) => prev.map((r) => (r.id === id ? { ...r, status } : r)));
   }, []);
 
   const completeRequest = useCallback(
-    (id: string, jobValue: number) => {
+    async (id: string, jobValue: number) => {
       const rate = getTierInfo(businessApplication.tier ?? 'standard').commissionRate;
       const commission = Math.round(jobValue * rate * 100) / 100;
-      setRequests((prev) => {
-        const next = prev.map((r) =>
-          r.id === id ? { ...r, status: 'completed' as const, jobValue, commission, customerConfirmed: false } : r
+      const { error } = await supabase
+        .from('service_requests')
+        .update({ status: 'completed', job_value: jobValue, commission, customer_confirmed: false })
+        .eq('id', id);
+      if (!error) {
+        setRequests((prev) =>
+          prev.map((r) =>
+            r.id === id ? { ...r, status: 'completed' as const, jobValue, commission, customerConfirmed: false } : r
+          )
         );
-        AsyncStorage.setItem(STORAGE_KEYS.requests, JSON.stringify(next));
-        return next;
-      });
+      }
     },
     [businessApplication.tier]
   );
 
-  const confirmCompletion = useCallback((id: string) => {
-    setRequests((prev) => {
-      const next = prev.map((r) => (r.id === id ? { ...r, customerConfirmed: true } : r));
-      AsyncStorage.setItem(STORAGE_KEYS.requests, JSON.stringify(next));
-      return next;
-    });
+  const confirmCompletion = useCallback(async (id: string) => {
+    const { error } = await supabase.from('service_requests').update({ customer_confirmed: true }).eq('id', id);
+    if (!error) setRequests((prev) => prev.map((r) => (r.id === id ? { ...r, customerConfirmed: true } : r)));
   }, []);
 
-  const rescheduleRequest = useCallback((id: string, newSlot: string) => {
-    setRequests((prev) => {
-      const next = prev.map((r) => (r.id === id ? { ...r, scheduledSlot: newSlot } : r));
-      AsyncStorage.setItem(STORAGE_KEYS.requests, JSON.stringify(next));
-      return next;
-    });
+  const rescheduleRequest = useCallback(async (id: string, newSlot: string) => {
+    const { error } = await supabase.from('service_requests').update({ scheduled_slot: newSlot }).eq('id', id);
+    if (!error) setRequests((prev) => prev.map((r) => (r.id === id ? { ...r, scheduledSlot: newSlot } : r)));
   }, []);
 
-  const addReview = useCallback((requestId: string, companyId: string, rating: number, comment: string) => {
-    setReviews((prev) => {
-      const next: Review[] = [
+  const addReview = useCallback(async (requestId: string, companyId: string, rating: number, comment: string) => {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const customerId = sessionData.session?.user.id;
+    if (!customerId) return;
+    const { data, error } = await supabase
+      .from('reviews')
+      .insert({ request_id: requestId, business_id: companyId, customer_id: customerId, rating, comment })
+      .select()
+      .single();
+    if (!error && data) {
+      setReviews((prev) => [
         ...prev,
-        { id: `review-${Date.now()}`, requestId, companyId, rating, comment, createdAt: new Date().toISOString() },
-      ];
-      AsyncStorage.setItem(STORAGE_KEYS.reviews, JSON.stringify(next));
-      return next;
-    });
-  }, []);
-
-  const persistMessages = useCallback((next: ChatMessage[]) => {
-    setMessages(next);
-    AsyncStorage.setItem(STORAGE_KEYS.messages, JSON.stringify(next));
+        { id: data.id, requestId: data.request_id, companyId: data.business_id, rating: data.rating, comment: data.comment ?? '', createdAt: data.created_at },
+      ]);
+    }
   }, []);
 
   const sendMessage = useCallback(
-    (requestId: string, sender: ChatMessageSender, text: string) => {
-      const next: ChatMessage = {
-        id: `msg-${Date.now()}-${Math.round(Math.random() * 10000)}`,
-        requestId,
-        sender,
-        kind: 'text',
-        text,
-        createdAt: new Date().toISOString(),
-      };
-      persistMessages([...messages, next]);
+    async (requestId: string, sender: ChatMessageSender, text: string) => {
+      const { data, error } = await supabase
+        .from('chat_messages')
+        .insert({ request_id: requestId, sender, kind: 'text', text })
+        .select()
+        .single();
+      if (!error && data) setMessages((prev) => [...prev, mapMessageRow(data)]);
     },
-    [messages, persistMessages]
+    [mapMessageRow]
   );
 
   const sendQuote = useCallback(
-    (requestId: string, amount: number) => {
-      const next: ChatMessage = {
-        id: `msg-${Date.now()}-${Math.round(Math.random() * 10000)}`,
-        requestId,
-        sender: 'business',
-        kind: 'quote',
-        amount,
-        createdAt: new Date().toISOString(),
-      };
-      persistMessages([...messages, next]);
+    async (requestId: string, amount: number) => {
+      const { data, error } = await supabase
+        .from('chat_messages')
+        .insert({ request_id: requestId, sender: 'business', kind: 'quote', amount })
+        .select()
+        .single();
+      if (!error && data) setMessages((prev) => [...prev, mapMessageRow(data)]);
     },
-    [messages, persistMessages]
+    [mapMessageRow]
   );
 
   const sendImageMessage = useCallback(
-    (requestId: string, sender: ChatMessageSender, imageUri: string) => {
-      const next: ChatMessage = {
-        id: `msg-${Date.now()}-${Math.round(Math.random() * 10000)}`,
-        requestId,
-        sender,
-        kind: 'image',
-        imageUri,
-        createdAt: new Date().toISOString(),
-      };
-      persistMessages([...messages, next]);
+    async (requestId: string, sender: ChatMessageSender, imageUri: string) => {
+      const { data, error } = await supabase
+        .from('chat_messages')
+        .insert({ request_id: requestId, sender, kind: 'image', image_uri: imageUri })
+        .select()
+        .single();
+      if (!error && data) setMessages((prev) => [...prev, mapMessageRow(data)]);
     },
-    [messages, persistMessages]
+    [mapMessageRow]
   );
 
-  const acceptQuote = useCallback((requestId: string, amount: number) => {
-    setRequests((prev) => {
-      const next = prev.map((r) => (r.id === requestId ? { ...r, quotedAmount: amount, quoteAccepted: true } : r));
-      AsyncStorage.setItem(STORAGE_KEYS.requests, JSON.stringify(next));
-      return next;
-    });
+  const acceptQuote = useCallback(async (requestId: string, amount: number) => {
+    const { error } = await supabase
+      .from('service_requests')
+      .update({ quoted_amount: amount, quote_accepted: true })
+      .eq('id', requestId);
+    if (!error) {
+      setRequests((prev) =>
+        prev.map((r) => (r.id === requestId ? { ...r, quotedAmount: amount, quoteAccepted: true } : r))
+      );
+    }
   }, []);
 
-  const updateCompanyProfile = useCallback((profile: CompanyProfile) => {
-    setCompanyProfile(profile);
-    AsyncStorage.setItem(STORAGE_KEYS.companyProfile, JSON.stringify(profile));
-  }, []);
+  const updateCompanyProfile = useCallback(
+    async (profile: CompanyProfile) => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const userId = sessionData.session?.user.id;
+      if (!userId) return { error: 'Not signed in.' };
+      const { error } = await supabase
+        .from('businesses')
+        .update({
+          name: profile.name,
+          category_ids: profile.categoryIds,
+          tagline: profile.tagline,
+          description: profile.description,
+          phone: profile.phone,
+          price_range: profile.priceRange,
+          services: profile.services,
+          available_now: !!profile.availableNow,
+        })
+        .eq('id', userId);
+      if (error) return { error: error.message };
+      setCompanyProfile(profile);
+      setBusinessAccount((prev) => (prev ? { ...prev, name: profile.name, phone: profile.phone } : prev));
+      refreshBusinessListings();
+      return {};
+    },
+    [refreshBusinessListings]
+  );
 
   const signUpCustomer = useCallback(
-    async (email: string, password: string, profile: Omit<CustomerProfile, 'email'>) => {
+    async (email: string, password: string, profile: Omit<CustomerProfile, 'id' | 'email'>) => {
       const { data: existing } = await supabase.auth.getSession();
       if (existing.session) {
         // Already logged in (e.g. as a business) — add a customer profile to the same account.
@@ -404,7 +575,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           .from('customers')
           .insert({ id: userId, email: sessionEmail, ...profile });
         if (insertError) return { error: insertError.message };
-        setCustomerProfile({ email: sessionEmail, ...profile });
+        setCustomerProfile({ id: userId, email: sessionEmail, ...profile });
         return {};
       }
       const { data, error } = await supabase.auth.signUp({ email, password });
@@ -416,7 +587,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         .from('customers')
         .insert({ id: data.session.user.id, email, ...profile });
       if (insertError) return { error: insertError.message };
-      setCustomerProfile({ email, ...profile });
+      setCustomerProfile({ id: data.session.user.id, email, ...profile });
       return {};
     },
     []
@@ -446,47 +617,43 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return {};
   }, []);
 
-  const applyBusinessAccount = useCallback((email: string, account: Omit<BusinessAccount, 'email'>) => {
-    setBusinessAccount({ email, ...account });
-    setBusinessApplication((prev) => {
-      const next: BusinessApplication = {
-        ...prev,
-        businessName: prev.businessName || account.name,
-        contactEmail: prev.contactEmail || email,
-        contactPhone: prev.contactPhone || account.phone,
-      };
-      AsyncStorage.setItem(STORAGE_KEYS.businessApplication, JSON.stringify(next));
-      return next;
-    });
-  }, []);
-
   const signUpBusiness = useCallback(
-    async (email: string, password: string, account: Omit<BusinessAccount, 'email'>) => {
+    async (email: string, password: string, account: Omit<BusinessAccount, 'id' | 'email'>) => {
       const { data: existing } = await supabase.auth.getSession();
+      let userId: string;
+      let sessionEmail: string;
       if (existing.session) {
         // Already logged in (e.g. as a customer) — add a business profile to the same account.
-        const userId = existing.session.user.id;
-        const sessionEmail = existing.session.user.email ?? email;
-        const { error: insertError } = await supabase
-          .from('businesses')
-          .insert({ id: userId, email: sessionEmail, ...account });
-        if (insertError) return { error: insertError.message };
-        applyBusinessAccount(sessionEmail, account);
-        return {};
-      }
-      const { data, error } = await supabase.auth.signUp({ email, password });
-      if (error) return { error: error.message };
-      if (!data.session) {
-        return { needsEmailConfirmation: true };
+        userId = existing.session.user.id;
+        sessionEmail = existing.session.user.email ?? email;
+      } else {
+        const { data, error } = await supabase.auth.signUp({ email, password });
+        if (error) return { error: error.message };
+        if (!data.session) {
+          return { needsEmailConfirmation: true };
+        }
+        userId = data.session.user.id;
+        sessionEmail = email;
       }
       const { error: insertError } = await supabase
         .from('businesses')
-        .insert({ id: data.session.user.id, email, ...account });
+        .insert({ id: userId, email: sessionEmail, name: account.name, phone: account.phone });
       if (insertError) return { error: insertError.message };
-      applyBusinessAccount(email, account);
+      await fetchBusinessAccount(userId);
+      setBusinessApplication((prev) => {
+        const next: BusinessApplication = {
+          ...prev,
+          businessName: prev.businessName || account.name,
+          contactEmail: prev.contactEmail || sessionEmail,
+          contactPhone: prev.contactPhone || account.phone,
+        };
+        AsyncStorage.setItem(STORAGE_KEYS.businessApplication, JSON.stringify(next));
+        return next;
+      });
+      refreshBusinessListings();
       return {};
     },
-    [applyBusinessAccount]
+    [fetchBusinessAccount, refreshBusinessListings]
   );
 
   const signInBusiness = useCallback(
@@ -539,25 +706,31 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       AsyncStorage.setItem(STORAGE_KEYS.businessApplication, JSON.stringify(next));
       return next;
     });
-    setCompanyProfile((prev) => {
-      const next: CompanyProfile = {
-        ...prev,
-        name: businessApplication.businessName || prev.name,
-        categoryIds: businessApplication.categoryIds.length > 0 ? businessApplication.categoryIds : prev.categoryIds,
-        phone: businessApplication.contactPhone || prev.phone,
-      };
-      AsyncStorage.setItem(STORAGE_KEYS.companyProfile, JSON.stringify(next));
-      return next;
-    });
-  }, [businessApplication.businessName, businessApplication.categoryIds, businessApplication.contactPhone]);
+    const next: CompanyProfile = {
+      ...companyProfile,
+      name: businessApplication.businessName || companyProfile.name,
+      categoryIds: businessApplication.categoryIds.length > 0 ? businessApplication.categoryIds : companyProfile.categoryIds,
+      phone: businessApplication.contactPhone || companyProfile.phone,
+    };
+    updateCompanyProfile(next);
+  }, [businessApplication.businessName, businessApplication.categoryIds, businessApplication.contactPhone, companyProfile, updateCompanyProfile]);
 
-  const changeTier = useCallback((tier: SubscriptionTier) => {
-    setBusinessApplication((prev) => {
-      const next: BusinessApplication = { ...prev, tier };
-      AsyncStorage.setItem(STORAGE_KEYS.businessApplication, JSON.stringify(next));
-      return next;
-    });
-  }, []);
+  const changeTier = useCallback(
+    async (tier: SubscriptionTier) => {
+      setBusinessApplication((prev) => {
+        const next: BusinessApplication = { ...prev, tier };
+        AsyncStorage.setItem(STORAGE_KEYS.businessApplication, JSON.stringify(next));
+        return next;
+      });
+      const { data: sessionData } = await supabase.auth.getSession();
+      const userId = sessionData.session?.user.id;
+      if (userId) {
+        await supabase.from('businesses').update({ tier }).eq('id', userId);
+        refreshBusinessListings();
+      }
+    },
+    [refreshBusinessListings]
+  );
 
   const toggleCategoryStatus = useCallback((id: string) => {
     setCategories((prev) => {
@@ -688,6 +861,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       rescheduleRequest,
       companyProfile,
       updateCompanyProfile,
+      businessListings,
+      refreshRequests,
+      refreshMessages,
       customerProfile,
       businessAccount,
       authEmail,
@@ -742,6 +918,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       rescheduleRequest,
       companyProfile,
       updateCompanyProfile,
+      businessListings,
+      refreshRequests,
+      refreshMessages,
       customerProfile,
       businessAccount,
       authEmail,

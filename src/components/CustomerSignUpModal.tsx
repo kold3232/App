@@ -30,6 +30,7 @@ export function CustomerSignUpModal({ visible, onClose }: { visible: boolean; on
     if (!customerProfile) return;
     setLoading(true);
     const { error } = await saveCustomerProfile({
+      id: customerProfile.id,
       email: customerProfile.email,
       name: name.trim(),
       phone: phone.trim(),

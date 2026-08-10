@@ -1,5 +1,5 @@
-import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
-import React, { useEffect, useState } from 'react';
+import { RouteProp, useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Button, Card, EmptyState, StatusBadge } from '../../components/ui';
 import { ChatModal } from '../../components/ChatModal';
@@ -11,13 +11,24 @@ import { colors, radius, spacing } from '../../theme';
 type MyRequestsRouteProp = RouteProp<CustomerTabParamList, 'MyRequests'>;
 
 export default function MyRequestsScreen() {
-  const { requests, reviews, addReview, confirmCompletion } = useApp();
+  const { requests: allRequests, reviews, addReview, confirmCompletion, customerProfile, refreshRequests } = useApp();
   const route = useRoute<MyRequestsRouteProp>();
   const navigation = useNavigation();
   const [activeReviewId, setActiveReviewId] = useState<string | null>(null);
   const [draftRating, setDraftRating] = useState(0);
   const [draftComment, setDraftComment] = useState('');
   const [chatRequestId, setChatRequestId] = useState<string | null>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshRequests();
+    }, [refreshRequests])
+  );
+  // A single account can hold both roles — only show requests this customer sent.
+  const requests = useMemo(
+    () => allRequests.filter((r) => r.customerId === customerProfile?.id),
+    [allRequests, customerProfile?.id]
+  );
   const chatRequest = requests.find((r) => r.id === chatRequestId) ?? null;
 
   useEffect(() => {

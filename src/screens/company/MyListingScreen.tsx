@@ -13,6 +13,7 @@ export default function MyListingScreen() {
   const { companyProfile, updateCompanyProfile, businessApplication, categories } = useApp();
   const [profile, setProfile] = useState<CompanyProfile>(companyProfile);
   const [newService, setNewService] = useState('');
+  const [saving, setSaving] = useState(false);
   const tier = businessApplication.tier;
   const canShowAvailability = tier === 'premium' || tier === 'pro';
 
@@ -34,8 +35,14 @@ export default function MyListingScreen() {
     setProfile((p) => ({ ...p, services: p.services.filter((_, i) => i !== index) }));
   }
 
-  function handleSave() {
-    updateCompanyProfile(profile);
+  async function handleSave() {
+    setSaving(true);
+    const { error } = await updateCompanyProfile(profile);
+    setSaving(false);
+    if (error) {
+      notify('Could not save', error);
+      return;
+    }
     notify('Saved', 'Your business listing has been updated.');
   }
 
@@ -155,7 +162,7 @@ export default function MyListingScreen() {
         </View>
 
         <View style={{ height: spacing.lg }} />
-        <Button title="Save listing" onPress={handleSave} />
+        <Button title="Save listing" onPress={handleSave} loading={saving} />
       </ScrollView>
     </KeyboardAvoidingView>
   );

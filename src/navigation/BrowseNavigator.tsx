@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { getCompanyById } from '../data/companies';
 import { CATEGORY_GROUPS } from '../data/categoryGroups';
 import { useApp } from '../context/AppContext';
 import CategoryGroupScreen from '../screens/customer/CategoryGroupScreen';
@@ -42,7 +41,7 @@ const brandStyles = StyleSheet.create({
 });
 
 export default function BrowseNavigator() {
-  const { categories } = useApp();
+  const { categories, businessListings } = useApp();
 
   return (
     <Stack.Navigator
@@ -74,7 +73,9 @@ export default function BrowseNavigator() {
       <Stack.Screen
         name="CompanyDetail"
         component={CompanyDetailScreen}
-        options={({ route }) => ({ title: getCompanyById(route.params.companyId)?.name ?? 'Company' })}
+        options={({ route }) => ({
+          title: businessListings.find((c) => c.id === route.params.companyId)?.name ?? 'Company',
+        })}
       />
       <Stack.Screen name="RequestQuote" component={RequestQuoteScreen} options={{ title: 'Request a quote' }} />
       <Stack.Screen name="InstantBook" component={InstantBookScreen} options={{ title: 'Book a time' }} />

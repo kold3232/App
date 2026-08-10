@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Image,
   KeyboardAvoidingView,
@@ -31,10 +31,17 @@ export function ChatModal({
   request: ServiceRequest;
   perspective: ChatMessageSender;
 }) {
-  const { messages, sendMessage, sendQuote, sendImageMessage, acceptQuote } = useApp();
+  const { messages, sendMessage, sendQuote, sendImageMessage, acceptQuote, refreshMessages, refreshRequests } = useApp();
   const [text, setText] = useState('');
   const [showQuoteForm, setShowQuoteForm] = useState(false);
   const [quoteAmount, setQuoteAmount] = useState('');
+
+  useEffect(() => {
+    if (visible) {
+      refreshMessages();
+      refreshRequests();
+    }
+  }, [visible, refreshMessages, refreshRequests]);
 
   const thread = useMemo(
     () =>

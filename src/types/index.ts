@@ -46,6 +46,7 @@ export type BookingType = 'quote' | 'instant';
 export type ServiceRequest = {
   id: string;
   companyId: string;
+  customerId: string;
   companyName: string;
   categoryName: string;
   type: BookingType;
@@ -65,6 +66,7 @@ export type ServiceRequest = {
 };
 
 export type CustomerProfile = {
+  id: string;
   name: string;
   email: string;
   phone: string;
@@ -72,6 +74,7 @@ export type CustomerProfile = {
 };
 
 export type BusinessAccount = {
+  id: string;
   name: string;
   email: string;
   phone: string;

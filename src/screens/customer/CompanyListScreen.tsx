@@ -3,7 +3,6 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Card, Chip, EmptyState, RatingBadge, SectionLabel } from '../../components/ui';
-import { getCompaniesByCategory } from '../../data/companies';
 import { useApp } from '../../context/AppContext';
 import { BrowseStackParamList } from '../../navigation/types';
 import { Company } from '../../types';
@@ -17,9 +16,9 @@ type PriceFilter = 'any' | Company['priceRange'];
 const PRICE_FILTERS: PriceFilter[] = ['any', '£', '££', '£££'];
 
 export default function CompanyListScreen({ route, navigation }: Props) {
-  const { categories } = useApp();
+  const { categories, businessListings } = useApp();
   const category = categories.find((c) => c.id === route.params.categoryId);
-  const allCompanies = getCompaniesByCategory(route.params.categoryId);
+  const allCompanies = businessListings.filter((c) => c.categoryIds.includes(route.params.categoryId));
 
   const [query, setQuery] = useState('');
   const [priceFilter, setPriceFilter] = useState<PriceFilter>('any');
@@ -114,7 +113,7 @@ export default function CompanyListScreen({ route, navigation }: Props) {
                       <Text style={styles.dot}>·</Text>
                       <Text style={styles.priceRange}>{item.priceRange}</Text>
                       <Text style={styles.dot}>·</Text>
-                      <Text style={styles.years}>{item.yearsActive} yrs</Text>
+                      <Text style={styles.years}>{item.yearsActive > 0 ? `${item.yearsActive} yrs` : 'New'}</Text>
                     </View>
                     {item.tier === 'pro' && (
                       <View style={styles.instantPill}>

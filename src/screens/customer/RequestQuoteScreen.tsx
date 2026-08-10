@@ -3,18 +3,18 @@ import React, { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Button, Card, Chip, SectionLabel } from '../../components/ui';
 import { Calendar } from '../../components/Calendar';
-import { getCompanyById } from '../../data/companies';
 import { useApp } from '../../context/AppContext';
 import { BrowseStackParamList } from '../../navigation/types';
 import { colors, spacing } from '../../theme';
+import { notify } from '../../utils/alert';
 
 type Props = NativeStackScreenProps<BrowseStackParamList, 'RequestQuote'>;
 
 const TIME_OPTIONS = ['09:00', '11:30', '14:00', '16:30'];
 
 export default function RequestQuoteScreen({ route, navigation }: Props) {
-  const company = getCompanyById(route.params.companyId);
-  const { addRequest, categories, customerProfile } = useApp();
+  const { addRequest, categories, customerProfile, businessListings } = useApp();
+  const company = businessListings.find((c) => c.id === route.params.companyId);
 
   const [customerName, setCustomerName] = useState(customerProfile?.name ?? '');
   const [phone, setPhone] = useState(customerProfile?.phone ?? '');
@@ -23,6 +23,7 @@ export default function RequestQuoteScreen({ route, navigation }: Props) {
   const [jobDetails, setJobDetails] = useState('');
   const [preferredIsoDate, setPreferredIsoDate] = useState<string | null>(null);
   const [preferredTime, setPreferredTime] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   if (!company) return null;
 
@@ -44,12 +45,13 @@ export default function RequestQuoteScreen({ route, navigation }: Props) {
     setPreferredTime(null);
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     const dateLabel = preferredIsoDate
       ? new Date(preferredIsoDate).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
       : '';
     const preferredDate = dateLabel && preferredTime ? `${dateLabel} · ${preferredTime}` : '';
-    const id = addRequest({
+    setSubmitting(true);
+    const id = await addRequest({
       companyId: company!.id,
       companyName: company!.name,
       categoryName,
@@ -62,6 +64,11 @@ export default function RequestQuoteScreen({ route, navigation }: Props) {
       scheduledSlot: '',
       status: 'pending',
     });
+    setSubmitting(false);
+    if (!id) {
+      notify('Could not send request', 'Something went wrong sending your request. Please try again.');
+      return;
+    }
     navigation.popToTop();
     (navigation as any).getParent()?.navigate('MyRequests', { openRequestId: id });
   }
@@ -174,7 +181,7 @@ export default function RequestQuoteScreen({ route, navigation }: Props) {
         </Card>
 
         <View style={{ height: spacing.lg }} />
-        <Button title="Send request" onPress={handleSubmit} disabled={!canSubmit} />
+        <Button title="Send request" onPress={handleSubmit} disabled={!canSubmit} loading={submitting} />
       </ScrollView>
     </KeyboardAvoidingView>
   );

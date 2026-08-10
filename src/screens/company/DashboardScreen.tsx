@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import React, { useCallback, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Button, Card, Chip, EmptyState, StatusBadge } from '../../components/ui';
 import { ChatModal } from '../../components/ChatModal';
@@ -17,14 +18,25 @@ const FILTERS: { id: RequestStatus | 'all'; label: string }[] = [
 ];
 
 export default function DashboardScreen() {
-  const { requests, updateRequestStatus, completeRequest, rescheduleRequest, companyProfile, businessApplication } = useApp();
+  const { requests: allRequests, updateRequestStatus, completeRequest, rescheduleRequest, companyProfile, businessApplication, businessAccount, refreshRequests } = useApp();
   const [filter, setFilter] = useState<RequestStatus | 'all'>('all');
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshRequests();
+    }, [refreshRequests])
+  );
   const [completingId, setCompletingId] = useState<string | null>(null);
   const [jobValueInput, setJobValueInput] = useState('');
   const [reschedulingId, setReschedulingId] = useState<string | null>(null);
   const [chatRequestId, setChatRequestId] = useState<string | null>(null);
   const slots = useMemo(() => generateSlots(), []);
   const canReschedule = businessApplication.tier === 'pro';
+  // A single account can hold both roles — only show requests addressed to this business.
+  const requests = useMemo(
+    () => allRequests.filter((r) => r.companyId === businessAccount?.id),
+    [allRequests, businessAccount?.id]
+  );
   const chatRequest = requests.find((r) => r.id === chatRequestId) ?? null;
 
   function startCompleting(id: string, quotedAmount?: number) {
