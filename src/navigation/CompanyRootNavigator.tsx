@@ -16,18 +16,17 @@ import { CompanyStackParamList } from './types';
 const Stack = createNativeStackNavigator<CompanyStackParamList>();
 
 export default function CompanyRootNavigator() {
-  const { businessApplication, setMode } = useApp();
+  const { setMode } = useApp();
 
-  const initialRouteName: keyof CompanyStackParamList =
-    businessApplication.status === 'approved'
-      ? 'CompanyTabs'
-      : businessApplication.status === 'pending' || businessApplication.status === 'rejected'
-        ? 'ApplicationStatus'
-        : 'BusinessSignup';
-
+  // Real visibility to customers is gated by Supabase admin approval now
+  // (see the businesses.is_approved column), not this local application
+  // flow — so any authenticated business account goes straight to their
+  // dashboard. The old signup/documents/tier/payment/status screens stay
+  // reachable (e.g. "Change plan" in Settings still opens TierSelection
+  // directly) but no longer block getting here.
   return (
     <Stack.Navigator
-      initialRouteName={initialRouteName}
+      initialRouteName="CompanyTabs"
       screenOptions={{
         headerStyle: { backgroundColor: colors.surface },
         headerTintColor: colors.text,
