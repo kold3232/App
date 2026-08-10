@@ -1,6 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { ADMIN_PASSCODE } from '../data/adminAuth';
 import { DEFAULT_CATEGORIES } from '../data/categories';
 import { getTierInfo } from '../data/tiers';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
@@ -32,7 +31,6 @@ const STORAGE_KEYS = {
   businessApplication: '@sortedforyou/businessApplication',
   categories: '@sortedforyou/categories',
   hasAcceptedLegal: '@sortedforyou/hasAcceptedLegal',
-  adminPasscodeVerified: '@sortedforyou/isAdminAuthenticated',
 };
 
 const DEFAULT_COMPANY_PROFILE: CompanyProfile = {
@@ -71,7 +69,6 @@ type AppContextValue = {
   mode: UserMode | null;
   setMode: (mode: UserMode | null) => void;
   isAdminAuthenticated: boolean;
-  authenticateAdmin: (passcode: string) => boolean;
   signInAdmin: (email: string, password: string) => Promise<{ error?: string }>;
   logoutAdmin: () => Promise<void>;
   reviews: Review[];
@@ -154,9 +151,8 @@ const AppContext = createContext<AppContextValue | undefined>(undefined);
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [isReady, setIsReady] = useState(false);
   const [hasAcceptedLegal, setHasAcceptedLegal] = useState(false);
-  const [adminPasscodeVerified, setAdminPasscodeVerified] = useState(false);
   const [isAdminUser, setIsAdminUser] = useState(false);
-  const isAdminAuthenticated = adminPasscodeVerified && isAdminUser;
+  const isAdminAuthenticated = isAdminUser;
   const [reviews, setReviews] = useState<Review[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [customerProfile, setCustomerProfile] = useState<CustomerProfile | null>(null);
@@ -202,27 +198,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     (async () => {
       try {
-        const [
-          storedMode,
-          storedSignups,
-          storedApplication,
-          storedCategories,
-          storedHasAcceptedLegal,
-          storedAdminPasscodeVerified,
-        ] = await Promise.all([
-          AsyncStorage.getItem(STORAGE_KEYS.mode),
-          AsyncStorage.getItem(STORAGE_KEYS.notifySignups),
-          AsyncStorage.getItem(STORAGE_KEYS.businessApplication),
-          AsyncStorage.getItem(STORAGE_KEYS.categories),
-          AsyncStorage.getItem(STORAGE_KEYS.hasAcceptedLegal),
-          AsyncStorage.getItem(STORAGE_KEYS.adminPasscodeVerified),
-        ]);
+        const [storedMode, storedSignups, storedApplication, storedCategories, storedHasAcceptedLegal] =
+          await Promise.all([
+            AsyncStorage.getItem(STORAGE_KEYS.mode),
+            AsyncStorage.getItem(STORAGE_KEYS.notifySignups),
+            AsyncStorage.getItem(STORAGE_KEYS.businessApplication),
+            AsyncStorage.getItem(STORAGE_KEYS.categories),
+            AsyncStorage.getItem(STORAGE_KEYS.hasAcceptedLegal),
+          ]);
         if (storedMode) setModeState(JSON.parse(storedMode));
         if (storedSignups) setNotifySignups(JSON.parse(storedSignups));
         if (storedApplication) setBusinessApplication(JSON.parse(storedApplication));
         if (storedCategories) setCategories(JSON.parse(storedCategories));
         if (storedHasAcceptedLegal) setHasAcceptedLegal(JSON.parse(storedHasAcceptedLegal));
-        if (storedAdminPasscodeVerified) setAdminPasscodeVerified(JSON.parse(storedAdminPasscodeVerified));
       } finally {
         setIsReady(true);
       }
@@ -413,15 +401,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     AsyncStorage.setItem(STORAGE_KEYS.mode, JSON.stringify(next));
   }, []);
 
-  const authenticateAdmin = useCallback((passcode: string) => {
-    const success = passcode.trim() === ADMIN_PASSCODE;
-    if (success) {
-      setAdminPasscodeVerified(true);
-      AsyncStorage.setItem(STORAGE_KEYS.adminPasscodeVerified, JSON.stringify(true));
-    }
-    return success;
-  }, []);
-
   const signInAdmin = useCallback(async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) return { error: error.message };
@@ -434,8 +413,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const logoutAdmin = useCallback(async () => {
     await supabase.auth.signOut();
-    setAdminPasscodeVerified(false);
-    AsyncStorage.setItem(STORAGE_KEYS.adminPasscodeVerified, JSON.stringify(false));
     setModeState(null);
     AsyncStorage.setItem(STORAGE_KEYS.mode, JSON.stringify(null));
   }, []);
@@ -959,7 +936,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       mode,
       setMode,
       isAdminAuthenticated,
-      authenticateAdmin,
       signInAdmin,
       logoutAdmin,
       reviews,
@@ -1020,9 +996,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       acceptLegal,
       mode,
       setMode,
-      adminPasscodeVerified,
       isAdminUser,
-      authenticateAdmin,
       signInAdmin,
       logoutAdmin,
       reviews,
