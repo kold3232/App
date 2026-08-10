@@ -71,6 +71,12 @@ export type CustomerProfile = {
   address: string;
 };
 
+export type BusinessAccount = {
+  name: string;
+  email: string;
+  phone: string;
+};
+
 export type ChatMessageSender = 'customer' | 'business';
 
 export type ChatMessage = {

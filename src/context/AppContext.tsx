@@ -7,6 +7,7 @@ import { getTierInfo } from '../data/tiers';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import {
   AdminBusiness,
+  BusinessAccount,
   BusinessApplication,
   Category,
   ChatMessage,
@@ -97,6 +98,15 @@ type AppContextValue = {
   signInCustomer: (email: string, password: string) => Promise<{ error?: string }>;
   signOutCustomer: () => Promise<void>;
   saveCustomerProfile: (profile: CustomerProfile) => Promise<{ error?: string }>;
+  businessAccount: BusinessAccount | null;
+  businessAuthLoading: boolean;
+  signUpBusiness: (
+    email: string,
+    password: string,
+    account: Omit<BusinessAccount, 'email'>
+  ) => Promise<{ error?: string; needsEmailConfirmation?: boolean }>;
+  signInBusiness: (email: string, password: string) => Promise<{ error?: string }>;
+  signOutBusiness: () => Promise<void>;
   notifySignups: NotifySignup[];
   addNotifySignup: (categoryId: string, contact: string) => void;
   businessApplication: BusinessApplication;
@@ -127,6 +137,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [customerProfile, setCustomerProfile] = useState<CustomerProfile | null>(null);
   const [customerAuthLoading, setCustomerAuthLoading] = useState(isSupabaseConfigured);
+  const [businessAccount, setBusinessAccount] = useState<BusinessAccount | null>(null);
+  const [businessAuthLoading, setBusinessAuthLoading] = useState(isSupabaseConfigured);
   const [mode, setModeState] = useState<UserMode | null>(null);
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
   const [companyProfile, setCompanyProfile] = useState<CompanyProfile>(DEFAULT_COMPANY_PROFILE);
@@ -211,6 +223,38 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       subscription.subscription.unsubscribe();
     };
   }, [fetchCustomerProfile]);
+
+  const fetchBusinessAccount = useCallback(async (userId: string) => {
+    const { data, error } = await supabase
+      .from('businesses')
+      .select('name, email, phone')
+      .eq('id', userId)
+      .maybeSingle();
+    setBusinessAccount(!error && data ? data : null);
+  }, []);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) {
+      setBusinessAuthLoading(false);
+      return;
+    }
+    let isMounted = true;
+    supabase.auth.getSession().then(async ({ data }) => {
+      if (data.session) await fetchBusinessAccount(data.session.user.id);
+      if (isMounted) setBusinessAuthLoading(false);
+    });
+    const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        fetchBusinessAccount(session.user.id);
+      } else {
+        setBusinessAccount(null);
+      }
+    });
+    return () => {
+      isMounted = false;
+      subscription.subscription.unsubscribe();
+    };
+  }, [fetchBusinessAccount]);
 
   const acceptLegal = useCallback(() => {
     setHasAcceptedLegal(true);
@@ -403,6 +447,48 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return {};
   }, []);
 
+  const signUpBusiness = useCallback(
+    async (email: string, password: string, account: Omit<BusinessAccount, 'email'>) => {
+      const { data, error } = await supabase.auth.signUp({ email, password });
+      if (error) return { error: error.message };
+      if (!data.session) {
+        return { needsEmailConfirmation: true };
+      }
+      const { error: insertError } = await supabase
+        .from('businesses')
+        .insert({ id: data.session.user.id, email, ...account });
+      if (insertError) return { error: insertError.message };
+      setBusinessAccount({ email, ...account });
+      setBusinessApplication((prev) => {
+        const next: BusinessApplication = {
+          ...prev,
+          businessName: prev.businessName || account.name,
+          contactEmail: prev.contactEmail || email,
+          contactPhone: prev.contactPhone || account.phone,
+        };
+        AsyncStorage.setItem(STORAGE_KEYS.businessApplication, JSON.stringify(next));
+        return next;
+      });
+      return {};
+    },
+    []
+  );
+
+  const signInBusiness = useCallback(
+    async (email: string, password: string) => {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) return { error: error.message };
+      if (data.session) await fetchBusinessAccount(data.session.user.id);
+      return {};
+    },
+    [fetchBusinessAccount]
+  );
+
+  const signOutBusiness = useCallback(async () => {
+    await supabase.auth.signOut();
+    setBusinessAccount(null);
+  }, []);
+
   const addNotifySignup = useCallback((categoryId: string, contact: string) => {
     setNotifySignups((prev) => {
       const next: NotifySignup[] = [...prev, { categoryId, contact, createdAt: new Date().toISOString() }];
@@ -591,6 +677,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       signInCustomer,
       signOutCustomer,
       saveCustomerProfile,
+      businessAccount,
+      businessAuthLoading,
+      signUpBusiness,
+      signInBusiness,
+      signOutBusiness,
       notifySignups,
       addNotifySignup,
       businessApplication,
@@ -640,6 +731,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       signInCustomer,
       signOutCustomer,
       saveCustomerProfile,
+      businessAccount,
+      businessAuthLoading,
+      signUpBusiness,
+      signInBusiness,
+      signOutBusiness,
       notifySignups,
       addNotifySignup,
       businessApplication,

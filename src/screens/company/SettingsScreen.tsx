@@ -11,7 +11,7 @@ import { colors, radius, spacing } from '../../theme';
 import { confirmAction } from '../../utils/alert';
 
 export default function SettingsScreen() {
-  const { setMode, businessApplication } = useApp();
+  const { setMode, businessApplication, businessAccount, signOutBusiness } = useApp();
   const navigation = useNavigation<any>();
   const tierInfo = businessApplication.tier ? getTierInfo(businessApplication.tier) : null;
   const [showTerms, setShowTerms] = useState(false);
@@ -24,6 +24,10 @@ export default function SettingsScreen() {
       'Switch',
       () => setMode('customer')
     );
+  }
+
+  function handleLogOut() {
+    confirmAction('Log out', 'You will need to log in again to manage your business.', 'Log out', signOutBusiness);
   }
 
   return (
@@ -60,8 +64,10 @@ export default function SettingsScreen() {
               <Ionicons name="business-outline" size={18} color={colors.primary} />
             </View>
             <View style={{ flex: 1 }}>
-              <SectionLabel>Account type</SectionLabel>
-              <Text style={styles.text}>You're using Gib Trades as a business.</Text>
+              <SectionLabel>Account</SectionLabel>
+              <Text style={styles.text}>
+                {businessAccount ? `${businessAccount.name} · ${businessAccount.email}` : "You're using Gib Trades as a business."}
+              </Text>
             </View>
           </View>
         </Card>
@@ -90,8 +96,13 @@ export default function SettingsScreen() {
           </Pressable>
         </Card>
 
-        <View style={{ marginTop: spacing.lg }}>
-          <Button title="Switch to customer mode" onPress={handleSwitchToCustomer} variant="outline" />
+        <View style={styles.accountActions}>
+          <View style={{ flex: 1 }}>
+            <Button title="Switch to customer mode" onPress={handleSwitchToCustomer} variant="outline" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Button title="Log out" onPress={handleLogOut} variant="secondary" />
+          </View>
         </View>
       </View>
 
@@ -126,6 +137,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   text: { fontSize: 14, color: colors.text, marginTop: 6, lineHeight: 20 },
+  accountActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg },
   legalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6 },
   legalText: { fontSize: 14, fontWeight: '600', color: colors.text },
   legalDivider: { height: 1, backgroundColor: colors.border, marginVertical: 4 },

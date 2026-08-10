@@ -10,11 +10,25 @@ import ModeSelectScreen from '../screens/ModeSelectScreen';
 import LegalConsentScreen from '../screens/legal/LegalConsentScreen';
 import AdminLoginScreen from '../screens/admin/AdminLoginScreen';
 import CustomerSignUpScreen from '../screens/customer/CustomerSignUpScreen';
+import BusinessAuthScreen from '../screens/company/BusinessAuthScreen';
 
 export default function RootNavigator() {
-  const { isReady, hasAcceptedLegal, mode, isAdminAuthenticated, customerProfile, customerAuthLoading } = useApp();
+  const {
+    isReady,
+    hasAcceptedLegal,
+    mode,
+    isAdminAuthenticated,
+    customerProfile,
+    customerAuthLoading,
+    businessAccount,
+    businessAuthLoading,
+  } = useApp();
 
-  if (!isReady || (mode === 'customer' && customerAuthLoading)) {
+  if (
+    !isReady ||
+    (mode === 'customer' && customerAuthLoading) ||
+    (mode === 'company' && businessAuthLoading)
+  ) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background }}>
         <ActivityIndicator color={colors.accent} size="large" />
@@ -29,7 +43,7 @@ export default function RootNavigator() {
       ) : mode === 'customer' ? (
         customerProfile ? <CustomerNavigator /> : <CustomerSignUpScreen />
       ) : mode === 'company' ? (
-        <CompanyRootNavigator />
+        businessAccount ? <CompanyRootNavigator /> : <BusinessAuthScreen />
       ) : mode === 'admin' ? (
         isAdminAuthenticated ? <AdminNavigator /> : <AdminLoginScreen />
       ) : (
