@@ -35,28 +35,26 @@ export default function SettingsScreen() {
       <View style={{ padding: spacing.lg }}>
         <Text style={styles.title}>Settings</Text>
 
-        {tierInfo && (
-          <Card style={{ marginTop: spacing.lg }}>
-            <View style={styles.row}>
-              <View style={styles.iconWrap}>
-                <Ionicons name="ribbon-outline" size={18} color={colors.primary} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <SectionLabel>Subscription</SectionLabel>
-                <Text style={styles.text}>
-                  {tierInfo.name} plan · {tierInfo.price} {tierInfo.priceNote}
-                </Text>
-                <View style={{ marginTop: spacing.sm }}>
-                  <Button
-                    title="Change plan"
-                    variant="outline"
-                    onPress={() => navigation.navigate('TierSelection')}
-                  />
-                </View>
+        <Card style={{ marginTop: spacing.lg }}>
+          <View style={styles.row}>
+            <View style={styles.iconWrap}>
+              <Ionicons name="ribbon-outline" size={18} color={colors.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <SectionLabel>Subscription</SectionLabel>
+              <Text style={styles.text}>
+                {tierInfo ? `${tierInfo.name} plan · ${tierInfo.price} ${tierInfo.priceNote}` : 'No plan selected'}
+              </Text>
+              <View style={{ marginTop: spacing.sm }}>
+                <Button
+                  title={tierInfo ? 'Change plan' : 'Choose a plan'}
+                  variant="outline"
+                  onPress={() => navigation.navigate('TierSelection')}
+                />
               </View>
             </View>
-          </Card>
-        )}
+          </View>
+        </Card>
 
         <Card style={{ marginTop: spacing.md }}>
           <View style={styles.row}>

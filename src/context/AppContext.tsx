@@ -183,7 +183,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             AsyncStorage.getItem(STORAGE_KEYS.categories),
             AsyncStorage.getItem(STORAGE_KEYS.hasAcceptedLegal),
           ]);
-        if (storedMode) setModeState(JSON.parse(storedMode));
+        if (storedMode) {
+          const parsedMode = JSON.parse(storedMode);
+          setModeState(parsedMode === 'admin' ? null : parsedMode);
+        }
         if (storedSignups) setNotifySignups(JSON.parse(storedSignups));
         if (storedBusinessTier) setBusinessTier(JSON.parse(storedBusinessTier));
         if (storedCategories) setCategories(JSON.parse(storedCategories));
@@ -213,7 +216,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const fetchBusinessAccount = useCallback(async (userId: string) => {
     const { data, error } = await supabase
       .from('businesses')
-      .select('id, name, email, phone, category_ids, tagline, description, price_range, services, available_now, cover_photo_url')
+      .select('id, name, email, phone, category_ids, tagline, description, price_range, services, available_now, cover_photo_url, tier')
       .eq('id', userId)
       .maybeSingle();
     if (!error && data) {
@@ -229,6 +232,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         availableNow: !!data.available_now,
         coverPhotoUrl: data.cover_photo_url ?? undefined,
       });
+      setBusinessTier((data.tier ?? 'standard') as SubscriptionTier);
     } else {
       setBusinessAccount(null);
     }
@@ -375,6 +379,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const setMode = useCallback((next: UserMode | null) => {
     setModeState(next);
+    // Admin is deliberately not persisted — closing the app while in admin
+    // mode should land back on the mode-select screen next time, not
+    // straight into (or in front of) the admin dashboard.
+    if (next === 'admin') return;
     AsyncStorage.setItem(STORAGE_KEYS.mode, JSON.stringify(next));
   }, []);
 
