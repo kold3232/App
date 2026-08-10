@@ -1,5 +1,6 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import React from 'react';
+import ListingEditorScreen from '../screens/company/ListingEditorScreen';
 import TierSelectionScreen from '../screens/company/TierSelectionScreen';
 import { colors } from '../theme';
 import CompanyNavigator from './CompanyNavigator';
@@ -23,6 +24,11 @@ export default function CompanyRootNavigator() {
     >
       <Stack.Screen name="TierSelection" component={TierSelectionScreen} options={{ title: 'Change plan' }} />
       <Stack.Screen name="CompanyTabs" component={CompanyNavigator} options={{ headerShown: false }} />
+      <Stack.Screen
+        name="ListingEditor"
+        component={ListingEditorScreen}
+        options={({ route }) => ({ title: route.params?.listingId ? 'Edit listing' : 'New listing' })}
+      />
     </Stack.Navigator>
   );
 }

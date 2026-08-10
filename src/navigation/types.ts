@@ -24,6 +24,7 @@ export type CompanyTabParamList = {
 export type CompanyStackParamList = {
   TierSelection: undefined;
   CompanyTabs: undefined;
+  ListingEditor: { listingId?: string } | undefined;
 };
 
 export type AdminTabParamList = {

@@ -83,13 +83,17 @@ export default function CompanyDetailScreen({ route, navigation }: Props) {
       </Card>
 
       <Card style={{ marginTop: spacing.md }}>
-        <SectionLabel>Services</SectionLabel>
-        {company.services.map((s) => (
-          <View key={s} style={styles.listRow}>
-            <View style={styles.listDot} />
-            <Text style={styles.listItem}>{s}</Text>
-          </View>
-        ))}
+        <SectionLabel>Pricing</SectionLabel>
+        {company.services.length === 0 ? (
+          <Text style={styles.description}>No services listed yet.</Text>
+        ) : (
+          company.services.map((s, i) => (
+            <View key={`${s.name}-${i}`} style={styles.serviceRow}>
+              <Text style={styles.listItem}>{s.name}</Text>
+              <Text style={styles.servicePrice}>{s.priceFrom != null ? `from £${s.priceFrom}` : 'Price on request'}</Text>
+            </View>
+          ))
+        )}
       </Card>
 
       <Card style={{ marginTop: spacing.md }}>
@@ -193,9 +197,9 @@ const styles = StyleSheet.create({
   dot: { color: colors.textFaint },
   meta: { fontSize: 13, color: colors.textMuted, fontWeight: '600' },
   description: { fontSize: 14, color: colors.text, marginTop: spacing.sm, lineHeight: 20 },
-  listRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm },
-  listDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primary, marginRight: 10 },
-  listItem: { fontSize: 14, color: colors.text, lineHeight: 20 },
+  serviceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: spacing.sm },
+  listItem: { fontSize: 14, color: colors.text, lineHeight: 20, flex: 1, marginRight: spacing.sm },
+  servicePrice: { fontSize: 13.5, fontWeight: '700', color: colors.primary },
   galleryRow: { gap: spacing.sm, marginTop: spacing.xs },
   galleryImage: { width: 120, height: 120, borderRadius: radius.md, backgroundColor: colors.surfaceAlt },
   reviewRow: { paddingVertical: spacing.sm, borderTopWidth: 1, borderTopColor: colors.border, marginTop: spacing.sm },

@@ -18,7 +18,7 @@ const FILTERS: { id: RequestStatus | 'all'; label: string }[] = [
 ];
 
 export default function DashboardScreen() {
-  const { requests: allRequests, updateRequestStatus, completeRequest, rescheduleRequest, companyProfile, businessTier, businessAccount, refreshRequests } = useApp();
+  const { requests: allRequests, updateRequestStatus, completeRequest, rescheduleRequest, myListings, businessTier, businessAccount, refreshRequests } = useApp();
   const [filter, setFilter] = useState<RequestStatus | 'all'>('all');
 
   useFocusEffect(
@@ -32,10 +32,12 @@ export default function DashboardScreen() {
   const [chatRequestId, setChatRequestId] = useState<string | null>(null);
   const slots = useMemo(() => generateSlots(), []);
   const canReschedule = businessTier === 'pro';
-  // A single account can hold both roles — only show requests addressed to this business.
+  // A single account can hold both roles, and can now own several listings —
+  // only show requests addressed to one of this business's own listings.
+  const myListingIds = useMemo(() => new Set(myListings.map((l) => l.id)), [myListings]);
   const requests = useMemo(
-    () => allRequests.filter((r) => r.companyId === businessAccount?.id),
-    [allRequests, businessAccount?.id]
+    () => allRequests.filter((r) => myListingIds.has(r.companyId)),
+    [allRequests, myListingIds]
   );
   const chatRequest = requests.find((r) => r.id === chatRequestId) ?? null;
 
@@ -77,7 +79,7 @@ export default function DashboardScreen() {
           <View>
             <Text style={styles.title}>Incoming requests</Text>
             <Text style={styles.subtitle}>
-              Requests customers send in to {companyProfile.name || 'your business'}
+              Requests customers send in to {businessAccount?.name || 'your business'}
             </Text>
             <View style={styles.filterRow}>
               {FILTERS.map((f) => (

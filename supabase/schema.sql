@@ -286,3 +286,146 @@ create policy "Businesses can update their own media"
 create policy "Businesses can delete their own media"
   on storage.objects for delete
   using (bucket_id = 'business-media' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- Gib Trades — multi-listing slice
+-- A business account can now own several public listings (different trades,
+-- different shopfronts, etc). Listing-facing fields move off `businesses`
+-- (which becomes purely the login/account/subscription record) onto a new
+-- `business_listings` table. Every existing business gets exactly one
+-- migrated listing that reuses the business's own id as the listing id, so
+-- every existing service_request/review/gallery-image foreign key keeps
+-- pointing at the right row with no data rewrite needed.
+
+create table if not exists public.business_listings (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid not null references public.businesses (id) on delete cascade,
+  name text not null,
+  phone text not null default '',
+  category_ids text[] not null default '{}',
+  tagline text not null default '',
+  description text not null default '',
+  price_range text not null default '££',
+  services jsonb not null default '[]',
+  available_now boolean not null default false,
+  cover_photo_url text,
+  created_at timestamptz not null default now()
+);
+
+insert into public.business_listings
+  (id, business_id, name, phone, category_ids, tagline, description, price_range, services, available_now, cover_photo_url, created_at)
+select
+  id,
+  id,
+  name,
+  phone,
+  category_ids,
+  tagline,
+  description,
+  price_range,
+  (select coalesce(jsonb_agg(jsonb_build_object('name', s, 'priceFrom', null)), '[]'::jsonb) from unnest(services) as s),
+  available_now,
+  cover_photo_url,
+  created_at
+from public.businesses
+on conflict (id) do nothing;
+
+alter table public.businesses
+  drop column if exists category_ids,
+  drop column if exists tagline,
+  drop column if exists description,
+  drop column if exists price_range,
+  drop column if exists services,
+  drop column if exists available_now,
+  drop column if exists cover_photo_url;
+
+alter table public.business_listings enable row level security;
+
+create policy "Anyone can view listings of approved businesses"
+  on public.business_listings for select
+  using (
+    exists (
+      select 1 from public.businesses b
+      where b.id = business_listings.business_id
+        and b.is_approved = true
+        and b.business_status = 'active'
+    )
+  );
+
+create policy "Businesses can view their own listings"
+  on public.business_listings for select
+  using (auth.uid() = business_id);
+
+create policy "Businesses can create their own listings"
+  on public.business_listings for insert
+  with check (auth.uid() = business_id);
+
+create policy "Businesses can update their own listings"
+  on public.business_listings for update
+  using (auth.uid() = business_id);
+
+create policy "Businesses can delete their own listings"
+  on public.business_listings for delete
+  using (auth.uid() = business_id);
+
+create policy "Admins can view all listings"
+  on public.business_listings for select
+  using (exists (select 1 from public.admins a where a.id = auth.uid()));
+
+-- service_requests, reviews and gallery images now point at a specific
+-- listing rather than the business account directly.
+alter table public.service_requests rename column business_id to listing_id;
+alter table public.service_requests drop constraint if exists service_requests_business_id_fkey;
+alter table public.service_requests
+  add constraint service_requests_listing_id_fkey foreign key (listing_id) references public.business_listings (id) on delete cascade;
+
+drop policy if exists "Businesses can view requests addressed to them" on public.service_requests;
+create policy "Businesses can view requests addressed to them"
+  on public.service_requests for select
+  using (exists (select 1 from public.business_listings l where l.id = service_requests.listing_id and l.business_id = auth.uid()));
+
+drop policy if exists "Businesses can update requests addressed to them" on public.service_requests;
+create policy "Businesses can update requests addressed to them"
+  on public.service_requests for update
+  using (exists (select 1 from public.business_listings l where l.id = service_requests.listing_id and l.business_id = auth.uid()));
+
+alter table public.reviews rename column business_id to listing_id;
+alter table public.reviews drop constraint if exists reviews_business_id_fkey;
+alter table public.reviews
+  add constraint reviews_listing_id_fkey foreign key (listing_id) references public.business_listings (id) on delete cascade;
+
+alter table public.business_gallery_images rename column business_id to listing_id;
+alter table public.business_gallery_images drop constraint if exists business_gallery_images_business_id_fkey;
+alter table public.business_gallery_images
+  add constraint business_gallery_images_listing_id_fkey foreign key (listing_id) references public.business_listings (id) on delete cascade;
+
+drop policy if exists "Anyone can view gallery images of visible businesses" on public.business_gallery_images;
+create policy "Anyone can view gallery images of visible listings"
+  on public.business_gallery_images for select
+  using (
+    exists (
+      select 1 from public.business_listings l
+      join public.businesses b on b.id = l.business_id
+      where l.id = business_gallery_images.listing_id
+        and b.is_approved = true
+        and b.business_status = 'active'
+    )
+  );
+
+drop policy if exists "Businesses can view their own gallery images" on public.business_gallery_images;
+create policy "Businesses can view their own gallery images"
+  on public.business_gallery_images for select
+  using (exists (select 1 from public.business_listings l where l.id = business_gallery_images.listing_id and l.business_id = auth.uid()));
+
+drop policy if exists "Businesses can add their own gallery images" on public.business_gallery_images;
+create policy "Businesses can add their own gallery images"
+  on public.business_gallery_images for insert
+  with check (exists (select 1 from public.business_listings l where l.id = business_gallery_images.listing_id and l.business_id = auth.uid()));
+
+drop policy if exists "Businesses can delete their own gallery images" on public.business_gallery_images;
+create policy "Businesses can delete their own gallery images"
+  on public.business_gallery_images for delete
+  using (exists (select 1 from public.business_listings l where l.id = business_gallery_images.listing_id and l.business_id = auth.uid()));
+
+-- Storage paths for a listing's media are now {businessId}/{listingId}/...
+-- — the top-level folder is still the auth uid, so the existing per-business
+-- storage policies above keep working unchanged.

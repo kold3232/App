@@ -32,7 +32,7 @@ export default function CompanyListScreen({ route, navigation }: Props) {
           q.length === 0 ||
           c.name.toLowerCase().includes(q) ||
           c.tagline.toLowerCase().includes(q) ||
-          c.services.some((s) => s.toLowerCase().includes(q));
+          c.services.some((s) => s.name.toLowerCase().includes(q));
         const matchesPrice = priceFilter === 'any' || c.priceRange === priceFilter;
         return matchesQuery && matchesPrice;
       })

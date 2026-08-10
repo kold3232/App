@@ -23,8 +23,14 @@ export type Category = {
 
 export type SubscriptionTier = 'standard' | 'premium' | 'pro';
 
+export type ServiceLine = {
+  name: string;
+  priceFrom: number | null;
+};
+
 export type Company = {
   id: string;
+  businessId: string;
   name: string;
   categoryIds: string[];
   tagline: string;
@@ -34,7 +40,7 @@ export type Company = {
   priceRange: '£' | '££' | '£££';
   phone: string;
   yearsActive: number;
-  services: string[];
+  services: ServiceLine[];
   color: string;
   tier: SubscriptionTier;
   availableNow?: boolean;
@@ -100,13 +106,14 @@ export type ChatMessage = {
 };
 
 export type CompanyProfile = {
+  id?: string;
   name: string;
   categoryIds: string[];
   tagline: string;
   description: string;
   phone: string;
   priceRange: '£' | '££' | '£££';
-  services: string[];
+  services: ServiceLine[];
   availableNow?: boolean;
   coverPhotoUrl?: string;
 };

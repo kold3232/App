@@ -32,16 +32,6 @@ const STORAGE_KEYS = {
   hasAcceptedLegal: '@sortedforyou/hasAcceptedLegal',
 };
 
-const DEFAULT_COMPANY_PROFILE: CompanyProfile = {
-  name: 'My Business',
-  categoryIds: ['plumbers'],
-  tagline: 'Tell customers what you do best',
-  description: 'Add a description of your business so customers know what to expect.',
-  phone: '+350 200 00000',
-  priceRange: '££',
-  services: ['Add your first service'],
-};
-
 type AppContextValue = {
   isReady: boolean;
   hasAcceptedLegal: boolean;
@@ -64,11 +54,14 @@ type AppContextValue = {
   completeRequest: (id: string, jobValue: number) => Promise<void>;
   confirmCompletion: (id: string) => Promise<void>;
   rescheduleRequest: (id: string, newSlot: string) => Promise<void>;
-  companyProfile: CompanyProfile;
-  updateCompanyProfile: (profile: CompanyProfile) => Promise<{ error?: string }>;
-  uploadCoverPhoto: (localUri: string) => Promise<{ error?: string }>;
-  fetchGalleryImages: (businessId: string) => Promise<GalleryImage[]>;
-  addGalleryImage: (localUri: string) => Promise<{ error?: string }>;
+  myListings: CompanyProfile[];
+  refreshMyListings: () => Promise<void>;
+  createListing: (profile: Omit<CompanyProfile, 'id'>) => Promise<{ error?: string; id?: string }>;
+  updateListing: (id: string, profile: Omit<CompanyProfile, 'id'>) => Promise<{ error?: string }>;
+  deleteListing: (id: string) => Promise<{ error?: string }>;
+  uploadCoverPhoto: (listingId: string, localUri: string) => Promise<{ error?: string }>;
+  fetchGalleryImages: (listingId: string) => Promise<GalleryImage[]>;
+  addGalleryImage: (listingId: string, localUri: string) => Promise<{ error?: string }>;
   removeGalleryImage: (imageId: string) => Promise<void>;
   businessListings: Company[];
   refreshRequests: () => Promise<void>;
@@ -109,18 +102,21 @@ type AppContextValue = {
   markCommissionPaid: (id: string) => Promise<void>;
 };
 
+type ServiceLineRow = { name: string; priceFrom: number | null };
+
 type BusinessListingRow = {
   id: string;
+  business_id: string;
   name: string;
-  phone: string;
+  phone: string | null;
   category_ids: string[] | null;
   tagline: string | null;
   description: string | null;
   price_range: string | null;
-  services: string[] | null;
+  services: ServiceLineRow[] | null;
   available_now: boolean | null;
-  tier: string | null;
   cover_photo_url: string | null;
+  tier: string;
 };
 
 const AppContext = createContext<AppContextValue | undefined>(undefined);
@@ -138,7 +134,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [authLoading, setAuthLoading] = useState(isSupabaseConfigured);
   const [mode, setModeState] = useState<UserMode | null>(null);
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
-  const [companyProfile, setCompanyProfile] = useState<CompanyProfile>(DEFAULT_COMPANY_PROFILE);
+  const [myListings, setMyListings] = useState<CompanyProfile[]>([]);
   const [notifySignups, setNotifySignups] = useState<NotifySignup[]>([]);
   const [businessTier, setBusinessTier] = useState<SubscriptionTier | null>(null);
   const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
@@ -147,26 +143,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const businessListings = useMemo<Company[]>(
     () =>
-      rawBusinessListings.map((b) => {
-        const businessReviews = reviews.filter((r) => r.companyId === b.id);
-        const reviewCount = businessReviews.length;
-        const rating = reviewCount > 0 ? businessReviews.reduce((sum, r) => sum + r.rating, 0) / reviewCount : 0;
+      rawBusinessListings.map((l) => {
+        const listingReviews = reviews.filter((r) => r.companyId === l.id);
+        const reviewCount = listingReviews.length;
+        const rating = reviewCount > 0 ? listingReviews.reduce((sum, r) => sum + r.rating, 0) / reviewCount : 0;
         return {
-          id: b.id,
-          name: b.name,
-          categoryIds: b.category_ids ?? [],
-          tagline: b.tagline ?? '',
-          description: b.description ?? '',
+          id: l.id,
+          businessId: l.business_id,
+          name: l.name,
+          categoryIds: l.category_ids ?? [],
+          tagline: l.tagline ?? '',
+          description: l.description ?? '',
           rating,
           reviewCount,
-          priceRange: (b.price_range ?? '££') as Company['priceRange'],
-          phone: b.phone,
+          priceRange: (l.price_range ?? '££') as Company['priceRange'],
+          phone: l.phone ?? '',
           yearsActive: 0,
-          services: b.services ?? [],
-          color: colorFromId(b.id),
-          tier: (b.tier ?? 'standard') as SubscriptionTier,
-          availableNow: !!b.available_now,
-          coverPhotoUrl: b.cover_photo_url ?? undefined,
+          services: l.services ?? [],
+          color: colorFromId(l.business_id),
+          tier: (l.tier ?? 'standard') as SubscriptionTier,
+          availableNow: !!l.available_now,
+          coverPhotoUrl: l.cover_photo_url ?? undefined,
         };
       }),
     [rawBusinessListings, reviews]
@@ -216,34 +213,63 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const fetchBusinessAccount = useCallback(async (userId: string) => {
     const { data, error } = await supabase
       .from('businesses')
-      .select('id, name, email, phone, category_ids, tagline, description, price_range, services, available_now, cover_photo_url, tier')
+      .select('id, name, email, phone, tier')
       .eq('id', userId)
       .maybeSingle();
     if (!error && data) {
       setBusinessAccount({ id: data.id, name: data.name, email: data.email, phone: data.phone });
-      setCompanyProfile({
-        name: data.name,
-        categoryIds: data.category_ids ?? [],
-        tagline: data.tagline ?? '',
-        description: data.description ?? '',
-        phone: data.phone,
-        priceRange: (data.price_range ?? '££') as CompanyProfile['priceRange'],
-        services: data.services ?? [],
-        availableNow: !!data.available_now,
-        coverPhotoUrl: data.cover_photo_url ?? undefined,
-      });
       setBusinessTier((data.tier ?? 'standard') as SubscriptionTier);
     } else {
       setBusinessAccount(null);
     }
   }, []);
 
-  const refreshBusinessListings = useCallback(async () => {
+  const refreshMyListings = useCallback(async () => {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData.session?.user.id;
+    if (!userId) {
+      setMyListings([]);
+      return;
+    }
     const { data, error } = await supabase
-      .from('businesses')
-      .select('id, name, phone, category_ids, tagline, description, price_range, services, available_now, tier, cover_photo_url')
-      .eq('is_approved', true);
-    if (!error && data) setRawBusinessListings(data);
+      .from('business_listings')
+      .select('id, name, phone, category_ids, tagline, description, price_range, services, available_now, cover_photo_url')
+      .eq('business_id', userId)
+      .order('created_at', { ascending: true });
+    if (!error && data) {
+      setMyListings(
+        data.map((l) => ({
+          id: l.id,
+          name: l.name,
+          categoryIds: l.category_ids ?? [],
+          tagline: l.tagline ?? '',
+          description: l.description ?? '',
+          phone: l.phone ?? '',
+          priceRange: (l.price_range ?? '££') as CompanyProfile['priceRange'],
+          services: l.services ?? [],
+          availableNow: !!l.available_now,
+          coverPhotoUrl: l.cover_photo_url ?? undefined,
+        }))
+      );
+    }
+  }, []);
+
+  const refreshBusinessListings = useCallback(async () => {
+    const [{ data: listingRows, error: listingError }, { data: bizRows }] = await Promise.all([
+      supabase
+        .from('business_listings')
+        .select('id, business_id, name, phone, category_ids, tagline, description, price_range, services, available_now, cover_photo_url'),
+      supabase.from('businesses').select('id, tier, is_approved, business_status'),
+    ]);
+    if (listingError || !listingRows || !bizRows) return;
+    const bizById = new Map(bizRows.map((b) => [b.id, b]));
+    const visible = listingRows.filter((l) => {
+      const biz = bizById.get(l.business_id);
+      return !!biz && biz.is_approved && biz.business_status === 'active';
+    });
+    setRawBusinessListings(
+      visible.map((l) => ({ ...l, tier: bizById.get(l.business_id)?.tier ?? 'standard' }))
+    );
   }, []);
 
   const refreshReviews = useCallback(async () => {
@@ -253,7 +279,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         data.map((r) => ({
           id: r.id,
           requestId: r.request_id,
-          companyId: r.business_id,
+          companyId: r.listing_id,
           rating: r.rating,
           comment: r.comment ?? '',
           createdAt: r.created_at,
@@ -265,7 +291,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const mapRequestRow = useCallback(
     (row: any): ServiceRequest => ({
       id: row.id,
-      companyId: row.business_id,
+      companyId: row.listing_id,
       customerId: row.customer_id,
       companyName: row.company_name,
       categoryName: row.category_name,
@@ -372,6 +398,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [customerProfile, businessAccount, authLoading, refreshRequests, refreshMessages]);
 
+  useEffect(() => {
+    if (!isSupabaseConfigured || authLoading) return;
+    if (businessAccount) refreshMyListings();
+    else setMyListings([]);
+  }, [businessAccount, authLoading, refreshMyListings]);
+
   const acceptLegal = useCallback(() => {
     setHasAcceptedLegal(true);
     AsyncStorage.setItem(STORAGE_KEYS.hasAcceptedLegal, JSON.stringify(true));
@@ -410,7 +442,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const { data, error } = await supabase
         .from('service_requests')
         .insert({
-          business_id: input.companyId,
+          listing_id: input.companyId,
           customer_id: customerId,
           company_name: input.companyName,
           category_name: input.categoryName,
@@ -472,13 +504,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (!customerId) return;
     const { data, error } = await supabase
       .from('reviews')
-      .insert({ request_id: requestId, business_id: companyId, customer_id: customerId, rating, comment })
+      .insert({ request_id: requestId, listing_id: companyId, customer_id: customerId, rating, comment })
       .select()
       .single();
     if (!error && data) {
       setReviews((prev) => [
         ...prev,
-        { id: data.id, requestId: data.request_id, companyId: data.business_id, rating: data.rating, comment: data.comment ?? '', createdAt: data.created_at },
+        { id: data.id, requestId: data.request_id, companyId: data.listing_id, rating: data.rating, comment: data.comment ?? '', createdAt: data.created_at },
       ]);
     }
   }, []);
@@ -531,13 +563,38 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const updateCompanyProfile = useCallback(
-    async (profile: CompanyProfile) => {
+  const createListing = useCallback(
+    async (profile: Omit<CompanyProfile, 'id'>) => {
       const { data: sessionData } = await supabase.auth.getSession();
       const userId = sessionData.session?.user.id;
       if (!userId) return { error: 'Not signed in.' };
+      const { data, error } = await supabase
+        .from('business_listings')
+        .insert({
+          business_id: userId,
+          name: profile.name,
+          category_ids: profile.categoryIds,
+          tagline: profile.tagline,
+          description: profile.description,
+          phone: profile.phone,
+          price_range: profile.priceRange,
+          services: profile.services,
+          available_now: !!profile.availableNow,
+        })
+        .select()
+        .single();
+      if (error || !data) return { error: error?.message ?? 'Could not create listing.' };
+      await refreshMyListings();
+      refreshBusinessListings();
+      return { id: data.id as string };
+    },
+    [refreshMyListings, refreshBusinessListings]
+  );
+
+  const updateListing = useCallback(
+    async (id: string, profile: Omit<CompanyProfile, 'id'>) => {
       const { error } = await supabase
-        .from('businesses')
+        .from('business_listings')
         .update({
           name: profile.name,
           category_ids: profile.categoryIds,
@@ -548,55 +605,65 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           services: profile.services,
           available_now: !!profile.availableNow,
         })
-        .eq('id', userId);
+        .eq('id', id);
       if (error) return { error: error.message };
-      setCompanyProfile(profile);
-      setBusinessAccount((prev) => (prev ? { ...prev, name: profile.name, phone: profile.phone } : prev));
+      await refreshMyListings();
       refreshBusinessListings();
       return {};
     },
-    [refreshBusinessListings]
+    [refreshMyListings, refreshBusinessListings]
+  );
+
+  const deleteListing = useCallback(
+    async (id: string) => {
+      const { error } = await supabase.from('business_listings').delete().eq('id', id);
+      if (error) return { error: error.message };
+      await refreshMyListings();
+      refreshBusinessListings();
+      return {};
+    },
+    [refreshMyListings, refreshBusinessListings]
   );
 
   const uploadCoverPhoto = useCallback(
-    async (localUri: string) => {
+    async (listingId: string, localUri: string) => {
       const { data: sessionData } = await supabase.auth.getSession();
       const userId = sessionData.session?.user.id;
       if (!userId) return { error: 'Not signed in.' };
-      const { url, error } = await uploadBusinessMedia(userId, localUri, 'cover.jpg');
+      const { url, error } = await uploadBusinessMedia(userId, localUri, `${listingId}/cover.jpg`);
       if (error || !url) return { error: error ?? 'Upload failed.' };
       const { error: updateError } = await supabase
-        .from('businesses')
+        .from('business_listings')
         .update({ cover_photo_url: url })
-        .eq('id', userId);
+        .eq('id', listingId);
       if (updateError) return { error: updateError.message };
-      setCompanyProfile((prev) => ({ ...prev, coverPhotoUrl: url }));
+      await refreshMyListings();
       refreshBusinessListings();
       return {};
     },
-    [refreshBusinessListings]
+    [refreshMyListings, refreshBusinessListings]
   );
 
-  const fetchGalleryImages = useCallback(async (businessId: string): Promise<GalleryImage[]> => {
+  const fetchGalleryImages = useCallback(async (listingId: string): Promise<GalleryImage[]> => {
     const { data, error } = await supabase
       .from('business_gallery_images')
       .select('id, image_url')
-      .eq('business_id', businessId)
+      .eq('listing_id', listingId)
       .order('created_at', { ascending: false });
     if (error || !data) return [];
     return data.map((row) => ({ id: row.id, url: row.image_url }));
   }, []);
 
-  const addGalleryImage = useCallback(async (localUri: string) => {
+  const addGalleryImage = useCallback(async (listingId: string, localUri: string) => {
     const { data: sessionData } = await supabase.auth.getSession();
     const userId = sessionData.session?.user.id;
     if (!userId) return { error: 'Not signed in.' };
-    const path = `gallery/${Date.now()}-${Math.round(Math.random() * 10000)}.jpg`;
+    const path = `${listingId}/gallery/${Date.now()}-${Math.round(Math.random() * 10000)}.jpg`;
     const { url, error } = await uploadBusinessMedia(userId, localUri, path);
     if (error || !url) return { error: error ?? 'Upload failed.' };
     const { error: insertError } = await supabase
       .from('business_gallery_images')
-      .insert({ business_id: userId, image_url: url, storage_path: `${userId}/${path}` });
+      .insert({ listing_id: listingId, image_url: url, storage_path: `${userId}/${path}` });
     if (insertError) return { error: insertError.message };
     return {};
   }, []);
@@ -759,20 +826,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const refreshAdminBusinesses = useCallback(async () => {
-    const [{ data: bizRows, error: bizError }, { data: reqRows }, { data: flagRows }] = await Promise.all([
-      supabase
-        .from('businesses')
-        .select('id, name, email, phone, category_ids, tier, application_status, business_status, rejection_reason, created_at')
-        .order('created_at', { ascending: false }),
-      supabase.from('service_requests').select('business_id, status, commission, commission_paid'),
-      supabase.from('business_flags').select('id, business_id, note, created_at'),
-    ]);
+    const [{ data: bizRows, error: bizError }, { data: listingRows }, { data: reqRows }, { data: flagRows }] =
+      await Promise.all([
+        supabase
+          .from('businesses')
+          .select('id, name, email, phone, tier, application_status, business_status, rejection_reason, created_at')
+          .order('created_at', { ascending: false }),
+        supabase.from('business_listings').select('id, business_id, category_ids'),
+        supabase.from('service_requests').select('listing_id, status, commission, commission_paid'),
+        supabase.from('business_flags').select('id, business_id, note, created_at'),
+      ]);
     if (bizError || !bizRows) return;
-    const requestsByBusiness = reqRows ?? [];
+    const listings = listingRows ?? [];
+    const requestsByListing = reqRows ?? [];
     const flagsByBusiness = flagRows ?? [];
     setAdminBusinesses(
       bizRows.map((b) => {
-        const completed = requestsByBusiness.filter((r) => r.business_id === b.id && r.status === 'completed');
+        const theirListings = listings.filter((l) => l.business_id === b.id);
+        const theirListingIds = new Set(theirListings.map((l) => l.id));
+        const categoryIds = Array.from(new Set(theirListings.flatMap((l) => l.category_ids ?? [])));
+        const completed = requestsByListing.filter((r) => theirListingIds.has(r.listing_id) && r.status === 'completed');
         const jobsCompleted = completed.length;
         const commissionOwed = completed
           .filter((r) => !r.commission_paid)
@@ -785,7 +858,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           businessName: b.name,
           contactEmail: b.email,
           contactPhone: b.phone,
-          categoryIds: b.category_ids ?? [],
+          categoryIds,
           tier: (b.tier ?? 'standard') as SubscriptionTier,
           applicationStatus: b.application_status as ApplicationStatus,
           businessStatus: b.business_status as AdminBusinessStatus,
@@ -855,12 +928,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const markCommissionPaid = useCallback(
     async (id: string) => {
-      await supabase
-        .from('service_requests')
-        .update({ commission_paid: true })
-        .eq('business_id', id)
-        .eq('status', 'completed')
-        .eq('commission_paid', false);
+      const { data: listingRows } = await supabase.from('business_listings').select('id').eq('business_id', id);
+      const listingIds = (listingRows ?? []).map((l) => l.id);
+      if (listingIds.length > 0) {
+        await supabase
+          .from('service_requests')
+          .update({ commission_paid: true })
+          .in('listing_id', listingIds)
+          .eq('status', 'completed')
+          .eq('commission_paid', false);
+      }
       refreshAdminBusinesses();
     },
     [refreshAdminBusinesses]
@@ -889,8 +966,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       completeRequest,
       confirmCompletion,
       rescheduleRequest,
-      companyProfile,
-      updateCompanyProfile,
+      myListings,
+      refreshMyListings,
+      createListing,
+      updateListing,
+      deleteListing,
       uploadCoverPhoto,
       fetchGalleryImages,
       addGalleryImage,
@@ -947,8 +1027,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       completeRequest,
       confirmCompletion,
       rescheduleRequest,
-      companyProfile,
-      updateCompanyProfile,
+      myListings,
+      refreshMyListings,
+      createListing,
+      updateListing,
+      deleteListing,
       uploadCoverPhoto,
       fetchGalleryImages,
       addGalleryImage,
