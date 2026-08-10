@@ -1,21 +1,87 @@
-import React, { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+import React, { useEffect, useState } from 'react';
+import {
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { Button, Card, Chip, SectionLabel } from '../../components/ui';
 import { getTierInfo } from '../../data/tiers';
 import { useApp } from '../../context/AppContext';
-import { CompanyProfile } from '../../types';
+import { CompanyProfile, GalleryImage } from '../../types';
 import { colors, radius, shadow, spacing } from '../../theme';
 import { notify } from '../../utils/alert';
 
 const PRICE_OPTIONS: CompanyProfile['priceRange'][] = ['£', '££', '£££'];
 
+async function pickImage() {
+  if (Platform.OS !== 'web') {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      notify('Photo access needed', 'Please allow photo library access to upload a picture.');
+      return null;
+    }
+  }
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    quality: 0.6,
+    allowsEditing: true,
+  });
+  if (result.canceled || !result.assets?.[0]?.uri) return null;
+  return result.assets[0].uri;
+}
+
 export default function MyListingScreen() {
-  const { companyProfile, updateCompanyProfile, businessApplication, categories } = useApp();
+  const { companyProfile, updateCompanyProfile, businessApplication, categories, businessAccount, uploadCoverPhoto, fetchGalleryImages, addGalleryImage, removeGalleryImage } =
+    useApp();
   const [profile, setProfile] = useState<CompanyProfile>(companyProfile);
   const [newService, setNewService] = useState('');
   const [saving, setSaving] = useState(false);
+  const [coverUploading, setCoverUploading] = useState(false);
+  const [gallery, setGallery] = useState<GalleryImage[]>([]);
+  const [galleryUploading, setGalleryUploading] = useState(false);
   const tier = businessApplication.tier;
   const canShowAvailability = tier === 'premium' || tier === 'pro';
+
+  useEffect(() => {
+    if (!businessAccount) return;
+    fetchGalleryImages(businessAccount.id).then(setGallery);
+  }, [businessAccount, fetchGalleryImages]);
+
+  async function handleChangeCoverPhoto() {
+    const uri = await pickImage();
+    if (!uri) return;
+    setCoverUploading(true);
+    const { error } = await uploadCoverPhoto(uri);
+    setCoverUploading(false);
+    if (error) notify('Could not upload cover photo', error);
+  }
+
+  async function handleAddGalleryImage() {
+    const uri = await pickImage();
+    if (!uri) return;
+    setGalleryUploading(true);
+    const { error } = await addGalleryImage(uri);
+    setGalleryUploading(false);
+    if (error) {
+      notify('Could not upload photo', error);
+      return;
+    }
+    if (businessAccount) setGallery(await fetchGalleryImages(businessAccount.id));
+  }
+
+  async function handleRemoveGalleryImage(imageId: string) {
+    setGallery((prev) => prev.filter((g) => g.id !== imageId));
+    await removeGalleryImage(imageId);
+  }
 
   function toggleCategory(id: string) {
     setProfile((p) => ({
@@ -59,6 +125,26 @@ export default function MyListingScreen() {
             <Text style={styles.tierBadgeText}>{getTierInfo(tier).name} plan</Text>
           </View>
         )}
+
+        <SectionLabel>Cover photo / logo</SectionLabel>
+        <Pressable onPress={handleChangeCoverPhoto} disabled={coverUploading}>
+          {companyProfile.coverPhotoUrl ? (
+            <Image source={{ uri: companyProfile.coverPhotoUrl }} style={styles.coverPreview} resizeMode="cover" />
+          ) : (
+            <View style={[styles.coverPreview, styles.coverPlaceholder]}>
+              <Ionicons name="image-outline" size={28} color={colors.textFaint} />
+              <Text style={styles.coverPlaceholderText}>No cover photo yet</Text>
+            </View>
+          )}
+        </Pressable>
+        <View style={{ marginTop: spacing.sm, marginBottom: spacing.md }}>
+          <Button
+            title={companyProfile.coverPhotoUrl ? 'Change cover photo' : 'Upload cover photo'}
+            variant="outline"
+            onPress={handleChangeCoverPhoto}
+            loading={coverUploading}
+          />
+        </View>
 
         <SectionLabel>Business name</SectionLabel>
         <TextInput
@@ -161,6 +247,22 @@ export default function MyListingScreen() {
           </Pressable>
         </View>
 
+        <SectionLabel>Gallery</SectionLabel>
+        <Text style={styles.galleryHint}>Show off your past work — customers see these on your listing.</Text>
+        <View style={styles.galleryGrid}>
+          {gallery.map((image) => (
+            <View key={image.id} style={styles.galleryItem}>
+              <Image source={{ uri: image.url }} style={styles.galleryImage} resizeMode="cover" />
+              <Pressable style={styles.galleryRemove} onPress={() => handleRemoveGalleryImage(image.id)} hitSlop={8}>
+                <Ionicons name="close" size={14} color="#fff" />
+              </Pressable>
+            </View>
+          ))}
+          <Pressable style={styles.galleryAdd} onPress={handleAddGalleryImage} disabled={galleryUploading}>
+            <Ionicons name={galleryUploading ? 'hourglass-outline' : 'add'} size={22} color={colors.primary} />
+          </Pressable>
+        </View>
+
         <View style={{ height: spacing.lg }} />
         <Button title="Save listing" onPress={handleSave} loading={saving} />
       </ScrollView>
@@ -218,4 +320,45 @@ const styles = StyleSheet.create({
     ...shadow.card,
   },
   addButtonText: { color: colors.textInverse, fontWeight: '700' },
+  coverPreview: {
+    width: '100%',
+    height: 140,
+    borderRadius: radius.lg,
+    marginTop: spacing.xs,
+    backgroundColor: colors.surfaceAlt,
+  },
+  coverPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderStyle: 'dashed',
+  },
+  coverPlaceholderText: { fontSize: 12.5, color: colors.textFaint, marginTop: 6, fontWeight: '600' },
+  galleryHint: { fontSize: 12.5, color: colors.textMuted, marginTop: 2, marginBottom: spacing.sm },
+  galleryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  galleryItem: { width: 84, height: 84 },
+  galleryImage: { width: 84, height: 84, borderRadius: radius.md, backgroundColor: colors.surfaceAlt },
+  galleryRemove: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: colors.danger,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  galleryAdd: {
+    width: 84,
+    height: 84,
+    borderRadius: radius.md,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
+  },
 });

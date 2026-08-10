@@ -38,6 +38,12 @@ export type Company = {
   color: string;
   tier: SubscriptionTier;
   availableNow?: boolean;
+  coverPhotoUrl?: string;
+};
+
+export type GalleryImage = {
+  id: string;
+  url: string;
 };
 
 export type RequestStatus = 'pending' | 'accepted' | 'declined' | 'completed';
@@ -102,6 +108,7 @@ export type CompanyProfile = {
   priceRange: '£' | '££' | '£££';
   services: string[];
   availableNow?: boolean;
+  coverPhotoUrl?: string;
 };
 
 export type UserMode = 'customer' | 'company' | 'admin';

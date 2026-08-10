@@ -1,9 +1,10 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Button, Card, RatingBadge, SectionLabel } from '../../components/ui';
+import React, { useEffect, useState } from 'react';
+import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Button, Card, EmptyState, RatingBadge, SectionLabel } from '../../components/ui';
 import { useApp } from '../../context/AppContext';
 import { BrowseStackParamList } from '../../navigation/types';
+import { GalleryImage } from '../../types';
 import { colors, radius, shadow, spacing } from '../../theme';
 
 type Props = NativeStackScreenProps<BrowseStackParamList, 'CompanyDetail'>;
@@ -11,8 +12,15 @@ type Props = NativeStackScreenProps<BrowseStackParamList, 'CompanyDetail'>;
 const TIER_LABEL = { standard: 'Standard', premium: 'Premium', pro: 'Pro' } as const;
 
 export default function CompanyDetailScreen({ route, navigation }: Props) {
-  const { businessListings } = useApp();
+  const { businessListings, fetchGalleryImages } = useApp();
   const company = businessListings.find((c) => c.id === route.params.companyId);
+  const [gallery, setGallery] = useState<GalleryImage[]>([]);
+
+  useEffect(() => {
+    if (!company) return;
+    fetchGalleryImages(company.id).then(setGallery);
+  }, [company, fetchGalleryImages]);
+
   if (!company) return null;
 
   const showAvailability = company.tier !== 'standard';
@@ -22,11 +30,15 @@ export default function CompanyDetailScreen({ route, navigation }: Props) {
       style={styles.container}
       contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xl * 2 }}
     >
-      <View style={[styles.banner, { backgroundColor: company.color }]}>
-        <View style={styles.bannerAvatar}>
-          <Text style={styles.bannerInitial}>{company.name.charAt(0)}</Text>
+      {company.coverPhotoUrl ? (
+        <Image source={{ uri: company.coverPhotoUrl }} style={styles.banner} resizeMode="cover" />
+      ) : (
+        <View style={[styles.banner, styles.bannerFallback, { backgroundColor: company.color }]}>
+          <View style={styles.bannerAvatar}>
+            <Text style={styles.bannerInitial}>{company.name.charAt(0)}</Text>
+          </View>
         </View>
-      </View>
+      )}
 
       <View style={styles.badgeRow}>
         <View style={styles.tierBadge}>
@@ -67,8 +79,16 @@ export default function CompanyDetailScreen({ route, navigation }: Props) {
       </Card>
 
       <Card style={{ marginTop: spacing.md, marginBottom: spacing.lg }}>
-        <SectionLabel>Contact</SectionLabel>
-        <Text style={styles.description}>{company.phone}</Text>
+        <SectionLabel>Gallery</SectionLabel>
+        {gallery.length === 0 ? (
+          <EmptyState icon="images-outline" title="No photos yet" subtitle="This business hasn't added any portfolio photos." />
+        ) : (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.galleryRow}>
+            {gallery.map((image) => (
+              <Image key={image.id} source={{ uri: image.url }} style={styles.galleryImage} resizeMode="cover" />
+            ))}
+          </ScrollView>
+        )}
       </Card>
 
       <Button
@@ -82,12 +102,12 @@ export default function CompanyDetailScreen({ route, navigation }: Props) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.surfaceAlt },
   banner: {
-    height: 104,
+    height: 140,
     borderRadius: radius.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: colors.surfaceAlt,
     ...shadow.raised,
   },
+  bannerFallback: { alignItems: 'center', justifyContent: 'center' },
   bannerAvatar: {
     width: 68,
     height: 68,
@@ -119,4 +139,6 @@ const styles = StyleSheet.create({
   listRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm },
   listDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primary, marginRight: 10 },
   listItem: { fontSize: 14, color: colors.text, lineHeight: 20 },
+  galleryRow: { gap: spacing.sm, marginTop: spacing.xs },
+  galleryImage: { width: 120, height: 120, borderRadius: radius.md, backgroundColor: colors.surfaceAlt },
 });

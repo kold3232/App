@@ -4,6 +4,7 @@ import { ADMIN_PASSCODE } from '../data/adminAuth';
 import { DEFAULT_CATEGORIES } from '../data/categories';
 import { getTierInfo } from '../data/tiers';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
+import { uploadBusinessMedia } from '../lib/mediaUpload';
 import { colorFromId } from '../utils/color';
 import {
   AdminBusiness,
@@ -17,6 +18,7 @@ import {
   Company,
   CompanyProfile,
   CustomerProfile,
+  GalleryImage,
   NotifySignup,
   Review,
   ServiceRequest,
@@ -87,6 +89,10 @@ type AppContextValue = {
   rescheduleRequest: (id: string, newSlot: string) => Promise<void>;
   companyProfile: CompanyProfile;
   updateCompanyProfile: (profile: CompanyProfile) => Promise<{ error?: string }>;
+  uploadCoverPhoto: (localUri: string) => Promise<{ error?: string }>;
+  fetchGalleryImages: (businessId: string) => Promise<GalleryImage[]>;
+  addGalleryImage: (localUri: string) => Promise<{ error?: string }>;
+  removeGalleryImage: (imageId: string) => Promise<void>;
   businessListings: Company[];
   refreshRequests: () => Promise<void>;
   refreshMessages: () => Promise<void>;
@@ -140,6 +146,7 @@ type BusinessListingRow = {
   services: string[] | null;
   available_now: boolean | null;
   tier: string | null;
+  cover_photo_url: string | null;
 };
 
 const AppContext = createContext<AppContextValue | undefined>(undefined);
@@ -186,6 +193,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           color: colorFromId(b.id),
           tier: (b.tier ?? 'standard') as SubscriptionTier,
           availableNow: !!b.available_now,
+          coverPhotoUrl: b.cover_photo_url ?? undefined,
         };
       }),
     [rawBusinessListings, reviews]
@@ -240,7 +248,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const fetchBusinessAccount = useCallback(async (userId: string) => {
     const { data, error } = await supabase
       .from('businesses')
-      .select('id, name, email, phone, category_ids, tagline, description, price_range, services, available_now')
+      .select('id, name, email, phone, category_ids, tagline, description, price_range, services, available_now, cover_photo_url')
       .eq('id', userId)
       .maybeSingle();
     if (!error && data) {
@@ -254,6 +262,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         priceRange: (data.price_range ?? '££') as CompanyProfile['priceRange'],
         services: data.services ?? [],
         availableNow: !!data.available_now,
+        coverPhotoUrl: data.cover_photo_url ?? undefined,
       });
     } else {
       setBusinessAccount(null);
@@ -263,7 +272,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const refreshBusinessListings = useCallback(async () => {
     const { data, error } = await supabase
       .from('businesses')
-      .select('id, name, phone, category_ids, tagline, description, price_range, services, available_now, tier')
+      .select('id, name, phone, category_ids, tagline, description, price_range, services, available_now, tier, cover_photo_url')
       .eq('is_approved', true);
     if (!error && data) setRawBusinessListings(data);
   }, []);
@@ -587,6 +596,61 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [refreshBusinessListings]
   );
 
+  const uploadCoverPhoto = useCallback(
+    async (localUri: string) => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const userId = sessionData.session?.user.id;
+      if (!userId) return { error: 'Not signed in.' };
+      const { url, error } = await uploadBusinessMedia(userId, localUri, 'cover.jpg');
+      if (error || !url) return { error: error ?? 'Upload failed.' };
+      const { error: updateError } = await supabase
+        .from('businesses')
+        .update({ cover_photo_url: url })
+        .eq('id', userId);
+      if (updateError) return { error: updateError.message };
+      setCompanyProfile((prev) => ({ ...prev, coverPhotoUrl: url }));
+      refreshBusinessListings();
+      return {};
+    },
+    [refreshBusinessListings]
+  );
+
+  const fetchGalleryImages = useCallback(async (businessId: string): Promise<GalleryImage[]> => {
+    const { data, error } = await supabase
+      .from('business_gallery_images')
+      .select('id, image_url')
+      .eq('business_id', businessId)
+      .order('created_at', { ascending: false });
+    if (error || !data) return [];
+    return data.map((row) => ({ id: row.id, url: row.image_url }));
+  }, []);
+
+  const addGalleryImage = useCallback(async (localUri: string) => {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData.session?.user.id;
+    if (!userId) return { error: 'Not signed in.' };
+    const path = `gallery/${Date.now()}-${Math.round(Math.random() * 10000)}.jpg`;
+    const { url, error } = await uploadBusinessMedia(userId, localUri, path);
+    if (error || !url) return { error: error ?? 'Upload failed.' };
+    const { error: insertError } = await supabase
+      .from('business_gallery_images')
+      .insert({ business_id: userId, image_url: url, storage_path: `${userId}/${path}` });
+    if (insertError) return { error: insertError.message };
+    return {};
+  }, []);
+
+  const removeGalleryImage = useCallback(async (imageId: string) => {
+    const { data: row } = await supabase
+      .from('business_gallery_images')
+      .select('storage_path')
+      .eq('id', imageId)
+      .maybeSingle();
+    await supabase.from('business_gallery_images').delete().eq('id', imageId);
+    if (row?.storage_path) {
+      await supabase.storage.from('business-media').remove([row.storage_path]);
+    }
+  }, []);
+
   const signUpCustomer = useCallback(
     async (email: string, password: string, profile: Omit<CustomerProfile, 'id' | 'email'>) => {
       const { data: existing } = await supabase.auth.getSession();
@@ -907,6 +971,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       rescheduleRequest,
       companyProfile,
       updateCompanyProfile,
+      uploadCoverPhoto,
+      fetchGalleryImages,
+      addGalleryImage,
+      removeGalleryImage,
       businessListings,
       refreshRequests,
       refreshMessages,
@@ -966,6 +1034,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       rescheduleRequest,
       companyProfile,
       updateCompanyProfile,
+      uploadCoverPhoto,
+      fetchGalleryImages,
+      addGalleryImage,
+      removeGalleryImage,
       businessListings,
       refreshRequests,
       refreshMessages,

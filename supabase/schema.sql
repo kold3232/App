@@ -225,3 +225,64 @@ create policy "Admins can view flags"
 create policy "Admins can create flags"
   on public.business_flags for insert
   with check (exists (select 1 from public.admins a where a.id = auth.uid()));
+
+-- Gib Trades — cover photo + portfolio gallery slice
+
+alter table public.businesses
+  add column if not exists cover_photo_url text;
+
+create table if not exists public.business_gallery_images (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid not null references public.businesses (id) on delete cascade,
+  image_url text not null,
+  storage_path text not null,
+  created_at timestamptz not null default now()
+);
+
+alter table public.business_gallery_images enable row level security;
+
+create policy "Anyone can view gallery images of visible businesses"
+  on public.business_gallery_images for select
+  using (
+    exists (
+      select 1 from public.businesses b
+      where b.id = business_gallery_images.business_id
+        and b.is_approved = true
+        and b.business_status = 'active'
+    )
+  );
+
+create policy "Businesses can view their own gallery images"
+  on public.business_gallery_images for select
+  using (auth.uid() = business_id);
+
+create policy "Businesses can add their own gallery images"
+  on public.business_gallery_images for insert
+  with check (auth.uid() = business_id);
+
+create policy "Businesses can delete their own gallery images"
+  on public.business_gallery_images for delete
+  using (auth.uid() = business_id);
+
+-- Storage bucket for cover photos + gallery images. Files are stored under
+-- {businessId}/... so the folder name itself enforces per-business write
+-- access — a business can only ever write inside its own folder.
+insert into storage.buckets (id, name, public)
+values ('business-media', 'business-media', true)
+on conflict (id) do nothing;
+
+create policy "Business media is publicly readable"
+  on storage.objects for select
+  using (bucket_id = 'business-media');
+
+create policy "Businesses can upload their own media"
+  on storage.objects for insert
+  with check (bucket_id = 'business-media' and (storage.foldername(name))[1] = auth.uid()::text);
+
+create policy "Businesses can update their own media"
+  on storage.objects for update
+  using (bucket_id = 'business-media' and (storage.foldername(name))[1] = auth.uid()::text);
+
+create policy "Businesses can delete their own media"
+  on storage.objects for delete
+  using (bucket_id = 'business-media' and (storage.foldername(name))[1] = auth.uid()::text);

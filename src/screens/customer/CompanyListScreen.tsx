@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useMemo, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Card, Chip, EmptyState, RatingBadge, SectionLabel } from '../../components/ui';
 import { useApp } from '../../context/AppContext';
 import { BrowseStackParamList } from '../../navigation/types';
@@ -100,9 +100,13 @@ export default function CompanyListScreen({ route, navigation }: Props) {
             {({ pressed }) => (
               <Card style={pressed && styles.cardPressed}>
                 <View style={styles.row}>
-                  <View style={[styles.avatar, { backgroundColor: item.color }]}>
-                    <Text style={styles.avatarText}>{item.name.charAt(0)}</Text>
-                  </View>
+                  {item.coverPhotoUrl ? (
+                    <Image source={{ uri: item.coverPhotoUrl }} style={styles.avatar} resizeMode="cover" />
+                  ) : (
+                    <View style={[styles.avatar, styles.avatarFallback, { backgroundColor: item.color }]}>
+                      <Text style={styles.avatarText}>{item.name.charAt(0)}</Text>
+                    </View>
+                  )}
                   <View style={{ flex: 1 }}>
                     <Text style={styles.companyName}>{item.name}</Text>
                     <Text style={styles.tagline} numberOfLines={1}>
@@ -154,7 +158,8 @@ const styles = StyleSheet.create({
   resultCount: { fontSize: 12, color: colors.textMuted, fontWeight: '600', marginTop: spacing.xs },
   row: { flexDirection: 'row', gap: spacing.md },
   cardPressed: { opacity: 0.85 },
-  avatar: { width: 50, height: 50, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
+  avatar: { width: 50, height: 50, borderRadius: radius.md, backgroundColor: colors.surfaceAlt },
+  avatarFallback: { alignItems: 'center', justifyContent: 'center' },
   avatarText: { color: '#fff', fontWeight: '800', fontSize: 18 },
   companyName: { fontSize: 16, fontWeight: '700', color: colors.text },
   tagline: { fontSize: 13, color: colors.textMuted, marginTop: 2 },
