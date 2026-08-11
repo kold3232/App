@@ -1,9 +1,3 @@
-import { SubscriptionTier } from '../types';
-
-export function canInstantBook(tier: SubscriptionTier) {
-  return tier === 'pro';
-}
-
 export type TimeSlot = {
   id: string;
   dayLabel: string;

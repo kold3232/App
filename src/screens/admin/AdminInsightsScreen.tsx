@@ -14,11 +14,6 @@ export default function AdminInsightsScreen() {
 
   const stats = useMemo(() => {
     const approved = adminBusinesses.filter((b) => b.applicationStatus === 'approved');
-    const active = approved.filter((b) => b.businessStatus === 'active');
-    const byTier = { standard: 0, premium: 0, pro: 0 };
-    active.forEach((b) => {
-      byTier[b.tier] += 1;
-    });
     const jobsCompleted = approved.reduce((sum, b) => sum + b.jobsCompleted, 0);
     const commissionCollected = approved.reduce((sum, b) => sum + b.commissionPaid, 0);
     const commissionOwed = approved.reduce((sum, b) => sum + b.commissionOwed, 0);
@@ -31,7 +26,7 @@ export default function AdminInsightsScreen() {
       .filter((c) => c.count > 0)
       .sort((a, b) => b.count - a.count);
 
-    return { onboarded: approved.length, byTier, jobsCompleted, commissionCollected, commissionOwed, categoryBreakdown };
+    return { onboarded: approved.length, jobsCompleted, commissionCollected, commissionOwed, categoryBreakdown };
   }, [adminBusinesses, categories]);
 
   const waitlistByCategory = useMemo(() => {
@@ -84,16 +79,6 @@ export default function AdminInsightsScreen() {
           <Text style={styles.statLabel}>Commission owed</Text>
         </Card>
       </View>
-
-      <SectionLabel>Active subscriptions by tier</SectionLabel>
-      <Card style={{ marginTop: spacing.xs, marginBottom: spacing.md }}>
-        {(['standard', 'premium', 'pro'] as const).map((t) => (
-          <View key={t} style={styles.tierRow}>
-            <Text style={styles.tierLabel}>{t}</Text>
-            <Text style={styles.tierValue}>{stats.byTier[t]}</Text>
-          </View>
-        ))}
-      </Card>
 
       <SectionLabel>Businesses by category</SectionLabel>
       <Card style={{ marginTop: spacing.xs, marginBottom: spacing.md }}>

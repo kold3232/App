@@ -11,7 +11,6 @@ import { colors, radius, shadow, spacing } from '../../theme';
 
 type Props = NativeStackScreenProps<BrowseStackParamList, 'CompanyDetail'>;
 
-const TIER_LABEL = { standard: 'Standard', premium: 'Premium', pro: 'Pro' } as const;
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
 export default function CompanyDetailScreen({ route, navigation }: Props) {
@@ -37,8 +36,6 @@ export default function CompanyDetailScreen({ route, navigation }: Props) {
 
   if (!company) return null;
 
-  const showAvailability = company.tier !== 'standard';
-
   return (
     <ScrollView
       style={styles.container}
@@ -55,15 +52,10 @@ export default function CompanyDetailScreen({ route, navigation }: Props) {
       )}
 
       <View style={styles.badgeRow}>
-        <View style={styles.tierBadge}>
-          <Text style={styles.tierBadgeText}>{TIER_LABEL[company.tier]}</Text>
+        <View style={styles.availabilityRow}>
+          <View style={[styles.availabilityDot, { backgroundColor: company.availableNow ? colors.success : colors.textFaint }]} />
+          <Text style={styles.availabilityText}>{company.availableNow ? 'Available now' : 'Unavailable right now'}</Text>
         </View>
-        {showAvailability && (
-          <View style={styles.availabilityRow}>
-            <View style={[styles.availabilityDot, { backgroundColor: company.availableNow ? colors.success : colors.textFaint }]} />
-            <Text style={styles.availabilityText}>{company.availableNow ? 'Available now' : 'Unavailable right now'}</Text>
-          </View>
-        )}
       </View>
 
       <Text style={styles.name}>{company.name}</Text>
@@ -181,13 +173,6 @@ const styles = StyleSheet.create({
   },
   bannerInitial: { color: '#fff', fontSize: 30, fontWeight: '800' },
   badgeRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.md, gap: 10 },
-  tierBadge: {
-    backgroundColor: colors.infoBg,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: radius.pill,
-  },
-  tierBadgeText: { fontSize: 11.5, fontWeight: '700', color: colors.info },
   availabilityRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   availabilityDot: { width: 7, height: 7, borderRadius: 4 },
   availabilityText: { fontSize: 12, color: colors.textMuted, fontWeight: '600' },

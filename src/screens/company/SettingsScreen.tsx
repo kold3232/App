@@ -1,19 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
 import React, { useState } from 'react';
 import { Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import { LegalTextModal } from '../../components/LegalTextModal';
 import { Button, Card, SectionLabel } from '../../components/ui';
-import { getTierInfo } from '../../data/tiers';
 import { LEGAL_LAST_UPDATED, PRIVACY_SECTIONS, TERMS_SECTIONS } from '../../data/legalContent';
 import { useApp } from '../../context/AppContext';
 import { colors, radius, spacing } from '../../theme';
 import { confirmAction } from '../../utils/alert';
 
 export default function SettingsScreen() {
-  const { setMode, businessTier, businessAccount, signOutBusiness } = useApp();
-  const navigation = useNavigation<any>();
-  const tierInfo = businessTier ? getTierInfo(businessTier) : null;
+  const { setMode, businessAccount, signOutBusiness } = useApp();
   const [showTerms, setShowTerms] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
 
@@ -36,27 +32,6 @@ export default function SettingsScreen() {
         <Text style={styles.title}>Settings</Text>
 
         <Card style={{ marginTop: spacing.lg }}>
-          <View style={styles.row}>
-            <View style={styles.iconWrap}>
-              <Ionicons name="ribbon-outline" size={18} color={colors.primary} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <SectionLabel>Subscription</SectionLabel>
-              <Text style={styles.text}>
-                {tierInfo ? `${tierInfo.name} plan · ${tierInfo.price} ${tierInfo.priceNote}` : 'No plan selected'}
-              </Text>
-              <View style={{ marginTop: spacing.sm }}>
-                <Button
-                  title={tierInfo ? 'Change plan' : 'Choose a plan'}
-                  variant="outline"
-                  onPress={() => navigation.navigate('TierSelection')}
-                />
-              </View>
-            </View>
-          </View>
-        </Card>
-
-        <Card style={{ marginTop: spacing.md }}>
           <View style={styles.row}>
             <View style={styles.iconWrap}>
               <Ionicons name="business-outline" size={18} color={colors.primary} />

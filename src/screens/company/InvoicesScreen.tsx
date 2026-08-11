@@ -2,12 +2,10 @@ import React, { useMemo } from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { Card, EmptyState } from '../../components/ui';
 import { useApp } from '../../context/AppContext';
-import { getTierInfo } from '../../data/tiers';
 import { colors, spacing } from '../../theme';
 
 export default function InvoicesScreen() {
-  const { requests, businessTier } = useApp();
-  const tierInfo = businessTier ? getTierInfo(businessTier) : null;
+  const { requests } = useApp();
 
   const invoices = useMemo(
     () =>
@@ -35,8 +33,7 @@ export default function InvoicesScreen() {
           <View>
             <Text style={styles.title}>Invoices</Text>
             <Text style={styles.subtitle}>
-              Commission is calculated at {tierInfo ? `${(tierInfo.commissionRate * 100).toFixed(0)}%` : '—'} on
-              completed jobs, based on your {tierInfo?.name ?? '—'} plan.
+              Commission is 10% on completed jobs of £500 or less, and 5% on jobs above £500.
             </Text>
             <View style={styles.statRow}>
               <Card style={styles.statCard}>

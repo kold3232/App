@@ -16,8 +16,8 @@ export const TERMS_SECTIONS: LegalSection[] = [
     body: 'You must provide accurate information when requesting a service or creating a booking. You are responsible for being available at the address and time you provide, and for paying for work you have agreed to.',
   },
   {
-    heading: '4. Business accounts and subscriptions',
-    body: 'Businesses that list on RockServ must hold any licences, insurance, and qualifications required to legally carry out their trade in Gibraltar, and must keep the documents on their profile up to date. Listing is subject to a subscription plan (Standard, Premium, or Pro) and, where applicable, a commission on completed jobs booked through the app, as set out at sign-up.',
+    heading: '4. Business accounts',
+    body: 'Businesses that list on RockServ must hold any licences, insurance, and qualifications required to legally carry out their trade in Gibraltar, and must keep the documents on their profile up to date. Listing is free; RockServ takes a commission on completed jobs booked through the app (10% on jobs of £500 or less, 5% above £500), deducted as set out at sign-up.',
   },
   {
     heading: '5. Bookings, quotes and payments',
@@ -52,7 +52,7 @@ export const PRIVACY_SECTIONS: LegalSection[] = [
   },
   {
     heading: '3. How we use your information',
-    body: 'We use your information to connect you with businesses, process bookings, manage business applications and subscriptions, keep the platform safe (for example, checking insurance is current), and communicate with you about your account.',
+    body: 'We use your information to connect you with businesses, process bookings, manage business applications, keep the platform safe (for example, checking insurance is current), and communicate with you about your account.',
   },
   {
     heading: '4. Sharing your information',

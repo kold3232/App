@@ -49,11 +49,6 @@ export default function AdminQueueScreen() {
             <Card>
               <Text style={styles.businessName}>{item.businessName}</Text>
               <Text style={styles.meta}>{categoryNames(item.categoryIds)}</Text>
-              <View style={styles.badgeRow}>
-                <View style={styles.tierBadge}>
-                  <Text style={styles.tierBadgeText}>{item.tier}</Text>
-                </View>
-              </View>
               <Text style={styles.submitted}>Submitted {new Date(item.submittedAt).toLocaleDateString()}</Text>
               <Text style={styles.contact}>{item.contactEmail} · {item.contactPhone}</Text>
               <Text style={styles.docNote}>
@@ -107,14 +102,6 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 13, color: colors.textMuted, marginTop: 2 },
   businessName: { fontSize: 16, fontWeight: '700', color: colors.text },
   meta: { fontSize: 12.5, color: colors.primary, fontWeight: '600', marginTop: 2 },
-  badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: spacing.sm },
-  tierBadge: {
-    backgroundColor: colors.infoBg,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: radius.pill,
-  },
-  tierBadgeText: { fontSize: 10.5, fontWeight: '700', color: colors.info, textTransform: 'capitalize' },
   docNote: { fontSize: 11.5, color: colors.textMuted, marginTop: spacing.sm, fontStyle: 'italic' },
   submitted: { fontSize: 11.5, color: colors.textMuted, marginTop: spacing.sm },
   contact: { fontSize: 12, color: colors.text, marginTop: 4 },

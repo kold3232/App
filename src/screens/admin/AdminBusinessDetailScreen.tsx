@@ -52,8 +52,7 @@ export default function AdminBusinessDetailScreen({ route }: Props) {
       </Card>
 
       <Card style={{ marginTop: spacing.md }}>
-        <SectionLabel>Subscription</SectionLabel>
-        <Text style={styles.line}>Tier: {business.tier}</Text>
+        <SectionLabel>Commission</SectionLabel>
         <Text style={styles.line}>Jobs completed: {business.jobsCompleted}</Text>
         <Text style={styles.line}>Commission owed: £{business.commissionOwed.toFixed(2)}</Text>
         <Text style={styles.line}>Commission paid to date: £{business.commissionPaid.toFixed(2)}</Text>

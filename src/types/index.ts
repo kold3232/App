@@ -21,8 +21,6 @@ export type Category = {
   groupId: CategoryGroupId;
 };
 
-export type SubscriptionTier = 'standard' | 'premium' | 'pro';
-
 export type ServiceLine = {
   name: string;
   priceFrom: number | null;
@@ -42,7 +40,6 @@ export type Company = {
   yearsActive: number;
   services: ServiceLine[];
   color: string;
-  tier: SubscriptionTier;
   availableNow?: boolean;
   coverPhotoUrl?: string;
 };
@@ -151,7 +148,6 @@ export type AdminBusiness = {
   contactEmail: string;
   contactPhone: string;
   categoryIds: string[];
-  tier: SubscriptionTier;
   applicationStatus: ApplicationStatus;
   businessStatus: AdminBusinessStatus;
   submittedAt: string;

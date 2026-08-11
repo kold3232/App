@@ -429,3 +429,29 @@ create policy "Businesses can delete their own gallery images"
 -- Storage paths for a listing's media are now {businessId}/{listingId}/...
 -- — the top-level folder is still the auth uid, so the existing per-business
 -- storage policies above keep working unchanged.
+
+-- Gib Trades — remove subscription tiers, flat commission, live listing updates
+-- Subscriptions are gone: every business is on equal footing, no more
+-- tier-gated features (availability indicator, rescheduling) and no more
+-- per-tier commission rate. Commission is now computed in the app at
+-- completion time (10% up to £500, 5% above), so the column simply goes away.
+alter table public.businesses drop column if exists tier;
+
+-- Realtime: a saved/edited listing, or a newly-approved business, now pushes
+-- straight to browsing customers' apps instead of waiting for their next
+-- manual refresh.
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'business_listings'
+  ) then
+    alter publication supabase_realtime add table public.business_listings;
+  end if;
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'businesses'
+  ) then
+    alter publication supabase_realtime add table public.businesses;
+  end if;
+end $$;

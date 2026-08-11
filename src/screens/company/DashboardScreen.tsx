@@ -18,7 +18,7 @@ const FILTERS: { id: RequestStatus | 'all'; label: string }[] = [
 ];
 
 export default function DashboardScreen() {
-  const { requests: allRequests, updateRequestStatus, completeRequest, rescheduleRequest, myListings, businessTier, businessAccount, refreshRequests } = useApp();
+  const { requests: allRequests, updateRequestStatus, completeRequest, rescheduleRequest, myListings, businessAccount, refreshRequests } = useApp();
   const [filter, setFilter] = useState<RequestStatus | 'all'>('all');
 
   useFocusEffect(
@@ -31,7 +31,6 @@ export default function DashboardScreen() {
   const [reschedulingId, setReschedulingId] = useState<string | null>(null);
   const [chatRequestId, setChatRequestId] = useState<string | null>(null);
   const slots = useMemo(() => generateSlots(), []);
-  const canReschedule = businessTier === 'pro';
   // A single account can hold both roles, and can now own several listings —
   // only show requests addressed to one of this business's own listings.
   const myListingIds = useMemo(() => new Set(myListings.map((l) => l.id)), [myListings]);
@@ -156,7 +155,7 @@ export default function DashboardScreen() {
                 <Button title="Chat with customer" variant="outline" onPress={() => setChatRequestId(item.id)} />
               </View>
             )}
-            {item.status === 'accepted' && item.type === 'instant' && canReschedule && completingId !== item.id && (
+            {item.status === 'accepted' && item.type === 'instant' && completingId !== item.id && (
               reschedulingId === item.id ? (
                 <View style={styles.completeForm}>
                   <Text style={styles.completeLabel}>Pick a new slot</Text>

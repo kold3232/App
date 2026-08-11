@@ -1,7 +1,6 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import React from 'react';
 import ListingEditorScreen from '../screens/company/ListingEditorScreen';
-import TierSelectionScreen from '../screens/company/TierSelectionScreen';
 import { colors } from '../theme';
 import CompanyNavigator from './CompanyNavigator';
 import { HeaderBackButton } from './HeaderBackButton';
@@ -12,8 +11,7 @@ const Stack = createNativeStackNavigator<CompanyStackParamList>();
 export default function CompanyRootNavigator() {
   // Real visibility to customers is gated by Supabase admin approval
   // (see the businesses.is_approved column) — any authenticated business
-  // account goes straight to their dashboard. TierSelection stays reachable
-  // from Settings > Change plan.
+  // account goes straight to their dashboard.
   return (
     <Stack.Navigator
       initialRouteName="CompanyTabs"
@@ -25,7 +23,6 @@ export default function CompanyRootNavigator() {
         headerLeft: () => <HeaderBackButton />,
       }}
     >
-      <Stack.Screen name="TierSelection" component={TierSelectionScreen} options={{ title: 'Change plan' }} />
       <Stack.Screen name="CompanyTabs" component={CompanyNavigator} options={{ headerShown: false }} />
       <Stack.Screen
         name="ListingEditor"

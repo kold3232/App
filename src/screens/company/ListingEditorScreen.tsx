@@ -15,7 +15,6 @@ import {
   View,
 } from 'react-native';
 import { Button, Card, Chip, SectionLabel } from '../../components/ui';
-import { getTierInfo } from '../../data/tiers';
 import { useApp } from '../../context/AppContext';
 import { CompanyProfile, GalleryImage } from '../../types';
 import { CompanyStackParamList } from '../../navigation/types';
@@ -62,7 +61,6 @@ export default function ListingEditorScreen({ route, navigation }: Props) {
     createListing,
     updateListing,
     deleteListing,
-    businessTier,
     categories,
     businessAccount,
     uploadCoverPhoto,
@@ -81,8 +79,6 @@ export default function ListingEditorScreen({ route, navigation }: Props) {
   const [coverUploading, setCoverUploading] = useState(false);
   const [gallery, setGallery] = useState<GalleryImage[]>([]);
   const [galleryUploading, setGalleryUploading] = useState(false);
-  const tier = businessTier;
-  const canShowAvailability = tier === 'premium' || tier === 'pro';
 
   useEffect(() => {
     if (existing) setProfile(existing);
@@ -196,11 +192,6 @@ export default function ListingEditorScreen({ route, navigation }: Props) {
       >
         <Text style={styles.title}>{listingId ? 'Edit listing' : 'New listing'}</Text>
         <Text style={styles.subtitle}>This is what customers see when they view this listing.</Text>
-        {tier && (
-          <View style={styles.tierBadge}>
-            <Text style={styles.tierBadgeText}>{getTierInfo(tier).name} plan</Text>
-          </View>
-        )}
 
         {listingId ? (
           <>
@@ -278,24 +269,16 @@ export default function ListingEditorScreen({ route, navigation }: Props) {
         </View>
 
         <SectionLabel>Availability indicator</SectionLabel>
-        {canShowAvailability ? (
-          <Card style={styles.availabilityCard}>
-            <View style={styles.availabilityRow}>
-              <Text style={styles.availabilityLabel}>Show "Available now" to customers</Text>
-              <Switch
-                value={!!profile.availableNow}
-                onValueChange={(v) => setProfile((p) => ({ ...p, availableNow: v }))}
-                trackColor={{ false: colors.border, true: colors.primary }}
-              />
-            </View>
-          </Card>
-        ) : (
-          <Card style={styles.availabilityCard}>
-            <Text style={styles.upsellText}>
-              Available on Premium and Pro plans. Upgrade in Settings to show real-time availability to customers.
-            </Text>
-          </Card>
-        )}
+        <Card style={styles.availabilityCard}>
+          <View style={styles.availabilityRow}>
+            <Text style={styles.availabilityLabel}>Show "Available now" to customers</Text>
+            <Switch
+              value={!!profile.availableNow}
+              onValueChange={(v) => setProfile((p) => ({ ...p, availableNow: v }))}
+              trackColor={{ false: colors.border, true: colors.primary }}
+            />
+          </View>
+        </Card>
 
         <SectionLabel>Phone</SectionLabel>
         <TextInput
@@ -381,15 +364,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.surfaceAlt },
   title: { fontSize: 22, fontWeight: '800', color: colors.text, letterSpacing: 0.1 },
   subtitle: { fontSize: 13, color: colors.textMuted, marginTop: 4, marginBottom: spacing.md },
-  tierBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: colors.infoBg,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: radius.pill,
-    marginBottom: spacing.md,
-  },
-  tierBadgeText: { fontSize: 11.5, fontWeight: '700', color: colors.info },
   availabilityCard: { marginTop: spacing.xs, marginBottom: spacing.md },
   availabilityRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   availabilityLabel: { fontSize: 14, color: colors.text, flex: 1, marginRight: spacing.sm },

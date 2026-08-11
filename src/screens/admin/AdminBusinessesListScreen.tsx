@@ -92,8 +92,6 @@ export default function AdminBusinessesListScreen({ navigation }: Props) {
                     </View>
                   </View>
                   <View style={styles.metaRow}>
-                    <Text style={styles.tier}>{item.tier}</Text>
-                    <Text style={styles.dot}>·</Text>
                     <Text style={styles.jobs}>{item.jobsCompleted} jobs</Text>
                     {item.commissionOwed > 0 && (
                       <>
@@ -147,7 +145,6 @@ const styles = StyleSheet.create({
   statusBadgeTextGood: { color: colors.success },
   statusBadgeTextBad: { color: colors.danger },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 7 },
-  tier: { fontSize: 12.5, color: colors.textMuted, fontWeight: '700', textTransform: 'capitalize' },
   dot: { color: colors.textFaint },
   jobs: { fontSize: 12, color: colors.textMuted },
   commission: { fontSize: 12, color: colors.primary, fontWeight: '600' },

@@ -1,7 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { DEFAULT_CATEGORIES } from '../data/categories';
-import { getTierInfo } from '../data/tiers';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { uploadBusinessMedia } from '../lib/mediaUpload';
 import { colorFromId } from '../utils/color';
@@ -20,17 +19,18 @@ import {
   NotifySignup,
   Review,
   ServiceRequest,
-  SubscriptionTier,
   UserMode,
 } from '../types';
 
 const STORAGE_KEYS = {
   mode: '@sortedforyou/mode',
   notifySignups: '@sortedforyou/notifySignups',
-  businessTier: '@sortedforyou/businessTier',
   categories: '@sortedforyou/categories',
   hasAcceptedLegal: '@sortedforyou/hasAcceptedLegal',
 };
+
+// Flat commission structure: 10% on jobs of £500 or less, 5% above £500.
+export const COMMISSION_RATE = (jobValue: number) => (jobValue > 500 ? 0.05 : 0.1);
 
 type AppContextValue = {
   isReady: boolean;
@@ -87,8 +87,6 @@ type AppContextValue = {
   signOutBusiness: () => Promise<void>;
   notifySignups: NotifySignup[];
   addNotifySignup: (categoryId: string, contact: string) => void;
-  businessTier: SubscriptionTier | null;
-  changeTier: (tier: SubscriptionTier) => Promise<void>;
   categories: Category[];
   toggleCategoryStatus: (id: string) => void;
   addCategory: (category: Category) => void;
@@ -116,7 +114,6 @@ type BusinessListingRow = {
   services: ServiceLineRow[] | null;
   available_now: boolean | null;
   cover_photo_url: string | null;
-  tier: string;
 };
 
 const AppContext = createContext<AppContextValue | undefined>(undefined);
@@ -136,7 +133,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
   const [myListings, setMyListings] = useState<CompanyProfile[]>([]);
   const [notifySignups, setNotifySignups] = useState<NotifySignup[]>([]);
-  const [businessTier, setBusinessTier] = useState<SubscriptionTier | null>(null);
   const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
   const [adminBusinesses, setAdminBusinesses] = useState<AdminBusiness[]>([]);
   const [rawBusinessListings, setRawBusinessListings] = useState<BusinessListingRow[]>([]);
@@ -161,7 +157,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           yearsActive: 0,
           services: l.services ?? [],
           color: colorFromId(l.business_id),
-          tier: (l.tier ?? 'standard') as SubscriptionTier,
           availableNow: !!l.available_now,
           coverPhotoUrl: l.cover_photo_url ?? undefined,
         };
@@ -172,11 +167,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     (async () => {
       try {
-        const [storedMode, storedSignups, storedBusinessTier, storedCategories, storedHasAcceptedLegal] =
+        const [storedMode, storedSignups, storedCategories, storedHasAcceptedLegal] =
           await Promise.all([
             AsyncStorage.getItem(STORAGE_KEYS.mode),
             AsyncStorage.getItem(STORAGE_KEYS.notifySignups),
-            AsyncStorage.getItem(STORAGE_KEYS.businessTier),
             AsyncStorage.getItem(STORAGE_KEYS.categories),
             AsyncStorage.getItem(STORAGE_KEYS.hasAcceptedLegal),
           ]);
@@ -185,7 +179,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           setModeState(parsedMode === 'admin' ? null : parsedMode);
         }
         if (storedSignups) setNotifySignups(JSON.parse(storedSignups));
-        if (storedBusinessTier) setBusinessTier(JSON.parse(storedBusinessTier));
         if (storedCategories) setCategories(JSON.parse(storedCategories));
         if (storedHasAcceptedLegal) setHasAcceptedLegal(JSON.parse(storedHasAcceptedLegal));
       } finally {
@@ -213,12 +206,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const fetchBusinessAccount = useCallback(async (userId: string) => {
     const { data, error } = await supabase
       .from('businesses')
-      .select('id, name, email, phone, tier')
+      .select('id, name, email, phone')
       .eq('id', userId)
       .maybeSingle();
     if (!error && data) {
       setBusinessAccount({ id: data.id, name: data.name, email: data.email, phone: data.phone });
-      setBusinessTier((data.tier ?? 'standard') as SubscriptionTier);
     } else {
       setBusinessAccount(null);
     }
@@ -259,7 +251,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       supabase
         .from('business_listings')
         .select('id, business_id, name, phone, category_ids, tagline, description, price_range, services, available_now, cover_photo_url'),
-      supabase.from('businesses').select('id, tier, is_approved, business_status'),
+      supabase.from('businesses').select('id, is_approved, business_status'),
     ]);
     if (listingError || !listingRows || !bizRows) return;
     const bizById = new Map(bizRows.map((b) => [b.id, b]));
@@ -267,9 +259,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const biz = bizById.get(l.business_id);
       return !!biz && biz.is_approved && biz.business_status === 'active';
     });
-    setRawBusinessListings(
-      visible.map((l) => ({ ...l, tier: bizById.get(l.business_id)?.tier ?? 'standard' }))
-    );
+    setRawBusinessListings(visible);
   }, []);
 
   const refreshReviews = useCallback(async () => {
@@ -388,6 +378,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     refreshReviews();
   }, [refreshBusinessListings, refreshReviews]);
 
+  // Live updates: a saved/edited listing, or a newly-approved business, shows up
+  // for browsing customers immediately without needing to reopen the app.
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    const channel = supabase
+      .channel('public-listings-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'business_listings' }, () => {
+        refreshBusinessListings();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'businesses' }, () => {
+        refreshBusinessListings();
+      })
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [refreshBusinessListings]);
+
   // Requests/messages are only visible to their two participants (enforced by RLS),
   // so fetch them once we know who's logged in.
   useEffect(() => {
@@ -469,24 +477,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (!error) setRequests((prev) => prev.map((r) => (r.id === id ? { ...r, status } : r)));
   }, []);
 
-  const completeRequest = useCallback(
-    async (id: string, jobValue: number) => {
-      const rate = getTierInfo(businessTier ?? 'standard').commissionRate;
-      const commission = Math.round(jobValue * rate * 100) / 100;
-      const { error } = await supabase
-        .from('service_requests')
-        .update({ status: 'completed', job_value: jobValue, commission, customer_confirmed: false })
-        .eq('id', id);
-      if (!error) {
-        setRequests((prev) =>
-          prev.map((r) =>
-            r.id === id ? { ...r, status: 'completed' as const, jobValue, commission, customerConfirmed: false } : r
-          )
-        );
-      }
-    },
-    [businessTier]
-  );
+  const completeRequest = useCallback(async (id: string, jobValue: number) => {
+    const commission = Math.round(jobValue * COMMISSION_RATE(jobValue) * 100) / 100;
+    const { error } = await supabase
+      .from('service_requests')
+      .update({ status: 'completed', job_value: jobValue, commission, customer_confirmed: false })
+      .eq('id', id);
+    if (!error) {
+      setRequests((prev) =>
+        prev.map((r) =>
+          r.id === id ? { ...r, status: 'completed' as const, jobValue, commission, customerConfirmed: false } : r
+        )
+      );
+    }
+  }, []);
 
   const confirmCompletion = useCallback(async (id: string) => {
     const { error } = await supabase.from('service_requests').update({ customer_confirmed: true }).eq('id', id);
@@ -793,20 +797,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const changeTier = useCallback(
-    async (tier: SubscriptionTier) => {
-      setBusinessTier(tier);
-      AsyncStorage.setItem(STORAGE_KEYS.businessTier, JSON.stringify(tier));
-      const { data: sessionData } = await supabase.auth.getSession();
-      const userId = sessionData.session?.user.id;
-      if (userId) {
-        await supabase.from('businesses').update({ tier }).eq('id', userId);
-        refreshBusinessListings();
-      }
-    },
-    [refreshBusinessListings]
-  );
-
   const toggleCategoryStatus = useCallback((id: string) => {
     setCategories((prev) => {
       const next = prev.map((c) =>
@@ -830,7 +820,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       await Promise.all([
         supabase
           .from('businesses')
-          .select('id, name, email, phone, tier, application_status, business_status, rejection_reason, created_at')
+          .select('id, name, email, phone, application_status, business_status, rejection_reason, created_at')
           .order('created_at', { ascending: false }),
         supabase.from('business_listings').select('id, business_id, category_ids'),
         supabase.from('service_requests').select('listing_id, status, commission, commission_paid'),
@@ -859,7 +849,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           contactEmail: b.email,
           contactPhone: b.phone,
           categoryIds,
-          tier: (b.tier ?? 'standard') as SubscriptionTier,
           applicationStatus: b.application_status as ApplicationStatus,
           businessStatus: b.business_status as AdminBusinessStatus,
           rejectionReason: b.rejection_reason ?? '',
@@ -991,8 +980,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       signOutBusiness,
       notifySignups,
       addNotifySignup,
-      businessTier,
-      changeTier,
       categories,
       toggleCategoryStatus,
       addCategory,
@@ -1052,8 +1039,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       signOutBusiness,
       notifySignups,
       addNotifySignup,
-      businessTier,
-      changeTier,
       categories,
       toggleCategoryStatus,
       addCategory,
