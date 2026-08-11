@@ -1,6 +1,6 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import React from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet } from 'react-native';
 import { CATEGORY_GROUPS } from '../data/categoryGroups';
 import { useApp } from '../context/AppContext';
 import CategoryGroupScreen from '../screens/customer/CategoryGroupScreen';
@@ -10,34 +10,17 @@ import CompanyDetailScreen from '../screens/customer/CompanyDetailScreen';
 import CompanyListScreen from '../screens/customer/CompanyListScreen';
 import InstantBookScreen from '../screens/customer/InstantBookScreen';
 import RequestQuoteScreen from '../screens/customer/RequestQuoteScreen';
-import { colors, radius } from '../theme';
+import { colors } from '../theme';
 import { BrowseStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<BrowseStackParamList>();
 
 function BrandTitle() {
-  return (
-    <View style={brandStyles.row}>
-      <View style={brandStyles.badge}>
-        <Image source={require('../../assets/logo-glyph-white.png')} style={brandStyles.logo} resizeMode="contain" />
-      </View>
-      <Text style={brandStyles.title}>Gib Trades</Text>
-    </View>
-  );
+  return <Image source={require('../../assets/logo-transparent.png')} style={brandStyles.logo} resizeMode="contain" />;
 }
 
 const brandStyles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  badge: {
-    width: 26,
-    height: 26,
-    borderRadius: radius.sm,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logo: { width: 20, height: 20 },
-  title: { fontSize: 17, fontWeight: '700', color: colors.text },
+  logo: { width: 106, height: 28 },
 });
 
 export default function BrowseNavigator() {

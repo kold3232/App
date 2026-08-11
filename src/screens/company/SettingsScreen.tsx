@@ -64,7 +64,7 @@ export default function SettingsScreen() {
             <View style={{ flex: 1 }}>
               <SectionLabel>Account</SectionLabel>
               <Text style={styles.text}>
-                {businessAccount ? `${businessAccount.name} · ${businessAccount.email}` : "You're using Gib Trades as a business."}
+                {businessAccount ? `${businessAccount.name} · ${businessAccount.email}` : "You're using RockServ as a business."}
               </Text>
             </View>
           </View>

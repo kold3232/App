@@ -25,7 +25,7 @@ export default function MyListingScreen() {
         ListHeaderComponent={
           <View>
             <Text style={styles.title}>My listings</Text>
-            <Text style={styles.subtitle}>This is what customers see when they browse Gib Trades.</Text>
+            <Text style={styles.subtitle}>This is what customers see when they browse RockServ.</Text>
           </View>
         }
         ListEmptyComponent={

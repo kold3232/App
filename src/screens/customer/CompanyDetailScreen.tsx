@@ -74,7 +74,7 @@ export default function CompanyDetailScreen({ route, navigation }: Props) {
         <Text style={styles.dot}>·</Text>
         <Text style={styles.meta}>{company.priceRange}</Text>
         <Text style={styles.dot}>·</Text>
-        <Text style={styles.meta}>{company.yearsActive > 0 ? `${company.yearsActive} years in Gibraltar` : 'New to Gib Trades'}</Text>
+        <Text style={styles.meta}>{company.yearsActive > 0 ? `${company.yearsActive} years in Gibraltar` : 'New to RockServ'}</Text>
       </View>
 
       <Card style={{ marginTop: spacing.lg }}>

@@ -1,5 +1,5 @@
 {
-  "name": "gib-trades",
+  "name": "rockserv",
   "version": "1.0.0",
   "main": "index.ts",
   "dependencies": {

@@ -1,8 +1,9 @@
+import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
 import { Image, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import { Button } from '../components/ui';
 import { useApp } from '../context/AppContext';
-import { colors, radius, shadow, spacing } from '../theme';
+import { colors, spacing } from '../theme';
 
 export default function ModeSelectScreen() {
   const { setMode } = useApp();
@@ -10,10 +11,11 @@ export default function ModeSelectScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.hero}>
-        <View style={styles.boltBadge}>
-          <Image source={require('../../assets/logo-glyph-white.png')} style={styles.logo} resizeMode="contain" />
+        <View style={styles.logoGlow}>
+          <LinearGradient colors={['#F4F5F8', '#DDE1EA']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.logoCard}>
+            <Image source={require('../../assets/logo-transparent.png')} style={styles.logo} resizeMode="contain" />
+          </LinearGradient>
         </View>
-        <Text style={styles.title}>Gib Trades</Text>
         <Text style={styles.subtitle}>Find trusted local tradespeople in Gibraltar, fast.</Text>
       </View>
 
@@ -29,7 +31,7 @@ export default function ModeSelectScreen() {
         <Text style={styles.footer}>Currently serving Gibraltar only</Text>
       </View>
       <Pressable onPress={() => setMode('admin')} hitSlop={12}>
-        <Text style={styles.adminLink}>Gib Trades team? Admin sign-in</Text>
+        <Text style={styles.adminLink}>RockServ team? Admin sign-in</Text>
       </Pressable>
     </SafeAreaView>
   );
@@ -38,21 +40,24 @@ export default function ModeSelectScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, justifyContent: 'space-between', padding: spacing.lg },
   hero: { alignItems: 'center', marginTop: spacing.xl * 2 },
-  boltBadge: {
-    width: 76,
-    height: 76,
-    borderRadius: radius.lg,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...shadow.raised,
+  logoGlow: {
+    borderRadius: 32,
+    shadowColor: '#DDE1EA',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.35,
+    shadowRadius: 28,
+    elevation: 8,
   },
-  logo: { width: 54, height: 54 },
-  title: { fontSize: 30, fontWeight: '800', color: colors.textInverse, marginTop: spacing.lg, letterSpacing: 0.2 },
+  logoCard: {
+    borderRadius: 32,
+    paddingHorizontal: spacing.xl * 1.4,
+    paddingVertical: spacing.xl,
+  },
+  logo: { width: 230, height: 61 },
   subtitle: {
     fontSize: 15,
     color: '#A9B8D6',
-    marginTop: spacing.sm,
+    marginTop: spacing.lg,
     textAlign: 'center',
     paddingHorizontal: spacing.lg,
     lineHeight: 21,
