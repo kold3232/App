@@ -125,6 +125,11 @@ Deno.serve(async (req) => {
       success_url: `${appUrl}/commission-paid?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${appUrl}/commission-cancelled`,
       metadata: { payment_id: paymentRow.id, business_id: businessId },
+      // Managed Payments (on by default on newer Stripe accounts) wants a
+      // product tax code we have no use for on a platform-fee line item —
+      // opt this session out of it instead.
+      // @ts-ignore — newer than this SDK version's bundled types
+      managed_payments: { enabled: false },
     });
 
     if (!session.url) {
