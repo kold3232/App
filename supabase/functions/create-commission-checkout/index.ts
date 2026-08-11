@@ -111,7 +111,6 @@ Deno.serve(async (req) => {
     const appUrl = Deno.env.get('APP_PUBLIC_URL') ?? 'https://example.com';
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
-      payment_method_types: ['card'],
       customer_email: business.email ?? undefined,
       line_items: [
         {
