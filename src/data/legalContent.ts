@@ -5,11 +5,11 @@ export const LEGAL_LAST_UPDATED = '6 August 2026';
 export const TERMS_SECTIONS: LegalSection[] = [
   {
     heading: '1. Acceptance of these terms',
-    body: 'By creating an account or using Gib Trades, you agree to these Terms of Service. If you do not agree, please do not use the app.',
+    body: 'By creating an account or using RockServ, you agree to these Terms of Service. If you do not agree, please do not use the app.',
   },
   {
-    heading: '2. What Gib Trades is',
-    body: 'Gib Trades is a marketplace app that connects customers in Gibraltar with independent local tradespeople and service businesses. We are not ourselves a plumber, electrician, or other tradesperson — each listed business is a separate, independent company responsible for the work it carries out.',
+    heading: '2. What RockServ is',
+    body: 'RockServ is a marketplace app that connects customers in Gibraltar with independent local tradespeople and service businesses. We are not ourselves a plumber, electrician, or other tradesperson — each listed business is a separate, independent company responsible for the work it carries out.',
   },
   {
     heading: '3. Customer accounts',
@@ -17,7 +17,7 @@ export const TERMS_SECTIONS: LegalSection[] = [
   },
   {
     heading: '4. Business accounts and subscriptions',
-    body: 'Businesses that list on Gib Trades must hold any licences, insurance, and qualifications required to legally carry out their trade in Gibraltar, and must keep the documents on their profile up to date. Listing is subject to a subscription plan (Standard, Premium, or Pro) and, where applicable, a commission on completed jobs booked through the app, as set out at sign-up.',
+    body: 'Businesses that list on RockServ must hold any licences, insurance, and qualifications required to legally carry out their trade in Gibraltar, and must keep the documents on their profile up to date. Listing is subject to a subscription plan (Standard, Premium, or Pro) and, where applicable, a commission on completed jobs booked through the app, as set out at sign-up.',
   },
   {
     heading: '5. Bookings, quotes and payments',
@@ -25,11 +25,11 @@ export const TERMS_SECTIONS: LegalSection[] = [
   },
   {
     heading: '6. Cancellations and disputes',
-    body: 'Either party may cancel a booking in accordance with the notice terms shown at booking. If you have a complaint about work carried out by a business, you can raise it with Gib Trades support and with the business directly; we may review complaints as part of keeping businesses in good standing on the platform.',
+    body: 'Either party may cancel a booking in accordance with the notice terms shown at booking. If you have a complaint about work carried out by a business, you can raise it with RockServ support and with the business directly; we may review complaints as part of keeping businesses in good standing on the platform.',
   },
   {
     heading: '7. Limitation of liability',
-    body: 'Gib Trades facilitates introductions between customers and independent businesses. We are not liable for the quality, safety, or legality of work carried out by a business, except to the extent required by Gibraltar law.',
+    body: 'RockServ facilitates introductions between customers and independent businesses. We are not liable for the quality, safety, or legality of work carried out by a business, except to the extent required by Gibraltar law.',
   },
   {
     heading: '8. Changes to these terms',
@@ -37,14 +37,14 @@ export const TERMS_SECTIONS: LegalSection[] = [
   },
   {
     heading: '9. Contact us',
-    body: 'Questions about these terms can be sent to support@gibtrades.gi.',
+    body: 'Questions about these terms can be sent to support@rockserv.gi.',
   },
 ];
 
 export const PRIVACY_SECTIONS: LegalSection[] = [
   {
     heading: '1. Introduction',
-    body: 'This policy explains what personal information Gib Trades collects, how we use it, and the choices you have. Gib Trades acts as the data controller for the information described below.',
+    body: 'This policy explains what personal information RockServ collects, how we use it, and the choices you have. RockServ acts as the data controller for the information described below.',
   },
   {
     heading: '2. Information we collect',
@@ -64,7 +64,7 @@ export const PRIVACY_SECTIONS: LegalSection[] = [
   },
   {
     heading: '6. Your rights',
-    body: 'You can ask to see, correct, or delete the personal information we hold about you at any time by contacting support@gibtrades.gi. You may also withdraw consent for optional communications, such as marketing.',
+    body: 'You can ask to see, correct, or delete the personal information we hold about you at any time by contacting support@rockserv.gi. You may also withdraw consent for optional communications, such as marketing.',
   },
   {
     heading: '7. Cookies and similar technology',
@@ -72,6 +72,6 @@ export const PRIVACY_SECTIONS: LegalSection[] = [
   },
   {
     heading: '8. Contact us',
-    body: 'For any privacy questions or requests, contact support@gibtrades.gi.',
+    body: 'For any privacy questions or requests, contact support@rockserv.gi.',
   },
 ];
