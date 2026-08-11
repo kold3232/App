@@ -69,6 +69,7 @@ export type ServiceRequest = {
   createdAt: string;
   jobValue?: number;
   commission?: number;
+  commissionPaid?: boolean;
   customerConfirmed?: boolean;
   quotedAmount?: number;
   quoteAccepted?: boolean;

@@ -1,11 +1,20 @@
-import React, { useMemo } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import React, { useCallback, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
-import { Card, EmptyState } from '../../components/ui';
+import { Button, Card, EmptyState } from '../../components/ui';
 import { useApp } from '../../context/AppContext';
 import { colors, spacing } from '../../theme';
+import { notify } from '../../utils/alert';
 
 export default function InvoicesScreen() {
-  const { requests } = useApp();
+  const { requests, payCommission, refreshRequests } = useApp();
+  const [paying, setPaying] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshRequests();
+    }, [refreshRequests])
+  );
 
   const invoices = useMemo(
     () =>
@@ -18,10 +27,18 @@ export default function InvoicesScreen() {
   const totals = useMemo(
     () => ({
       jobValue: invoices.reduce((sum, r) => sum + (r.jobValue ?? 0), 0),
-      commission: invoices.reduce((sum, r) => sum + (r.commission ?? 0), 0),
+      owed: invoices.filter((r) => !r.commissionPaid).reduce((sum, r) => sum + (r.commission ?? 0), 0),
+      paid: invoices.filter((r) => r.commissionPaid).reduce((sum, r) => sum + (r.commission ?? 0), 0),
     }),
     [invoices]
   );
+
+  async function handlePayCommission() {
+    setPaying(true);
+    const { error } = await payCommission();
+    setPaying(false);
+    if (error) notify('Could not start checkout', error);
+  }
 
   return (
     <View style={styles.container}>
@@ -33,7 +50,8 @@ export default function InvoicesScreen() {
           <View>
             <Text style={styles.title}>Invoices</Text>
             <Text style={styles.subtitle}>
-              Commission is 10% on completed jobs of £500 or less, and 5% on jobs above £500.
+              Commission is 10% on completed jobs of £500 or less, and 5% on jobs above £500. Customers still pay
+              you directly for the job — this is only the platform's cut.
             </Text>
             <View style={styles.statRow}>
               <Card style={styles.statCard}>
@@ -41,10 +59,15 @@ export default function InvoicesScreen() {
                 <Text style={styles.statLabel}>Total invoiced</Text>
               </Card>
               <Card style={styles.statCard}>
-                <Text style={styles.statValue}>£{totals.commission.toFixed(2)}</Text>
+                <Text style={styles.statValue}>£{totals.owed.toFixed(2)}</Text>
                 <Text style={styles.statLabel}>Commission owed</Text>
               </Card>
             </View>
+            {totals.owed > 0 && (
+              <View style={{ marginBottom: spacing.md }}>
+                <Button title={`Pay £${totals.owed.toFixed(2)} commission`} onPress={handlePayCommission} loading={paying} />
+              </View>
+            )}
           </View>
         }
         ListEmptyComponent={
@@ -70,6 +93,12 @@ export default function InvoicesScreen() {
               <View>
                 <Text style={styles.amountLabel}>Commission</Text>
                 <Text style={styles.amountValue}>£{(item.commission ?? 0).toFixed(2)}</Text>
+              </View>
+              <View>
+                <Text style={styles.amountLabel}>Status</Text>
+                <Text style={[styles.amountValue, { color: item.commissionPaid ? colors.success : colors.textMuted }]}>
+                  {item.commissionPaid ? 'Paid' : 'Owed'}
+                </Text>
               </View>
             </View>
           </Card>

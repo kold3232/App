@@ -17,7 +17,7 @@ export const TERMS_SECTIONS: LegalSection[] = [
   },
   {
     heading: '4. Business accounts',
-    body: 'Businesses that list on RockServ must hold any licences, insurance, and qualifications required to legally carry out their trade in Gibraltar, and must keep the documents on their profile up to date. Listing is free; RockServ takes a commission on completed jobs booked through the app (10% on jobs of £500 or less, 5% above £500), deducted as set out at sign-up.',
+    body: 'Businesses that list on RockServ must hold any licences, insurance, and qualifications required to legally carry out their trade in Gibraltar, and must keep the documents on their profile up to date. Listing is free. Customers pay businesses directly for completed work; RockServ takes a commission on completed jobs booked through the app (10% on jobs of £500 or less, 5% above £500), which businesses settle through the app by card.',
   },
   {
     heading: '5. Bookings, quotes and payments',
@@ -56,7 +56,7 @@ export const PRIVACY_SECTIONS: LegalSection[] = [
   },
   {
     heading: '4. Sharing your information',
-    body: 'When you request a quote or make a booking, we share the details needed to carry out that job (such as your name, address, and contact details) with the relevant business. We do not sell your personal information to third parties.',
+    body: 'When you request a quote or make a booking, we share the details needed to carry out that job (such as your name, address, and contact details) with the relevant business. When a business settles its commission with us, payment is processed by Stripe, our payment processor; we do not store card details ourselves. We do not sell your personal information to third parties.',
   },
   {
     heading: '5. Data retention',

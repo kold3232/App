@@ -455,3 +455,39 @@ begin
     alter publication supabase_realtime add table public.businesses;
   end if;
 end $$;
+
+-- Gib Trades — commission payments (Stripe)
+-- Businesses still get paid directly by customers for the job itself; this
+-- only covers the platform's cut. A payment is created (status 'pending')
+-- with a snapshot of exactly which completed jobs it covers, so a job that
+-- completes mid-checkout can't accidentally get swept into someone else's
+-- payment. Only the create-commission-checkout and stripe-webhook edge
+-- functions (service role) ever write to these tables — app clients get
+-- read-only access to their own rows via RLS.
+
+create table if not exists public.commission_payments (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid not null references public.businesses (id) on delete cascade,
+  amount numeric(10, 2) not null,
+  stripe_checkout_session_id text unique,
+  status text not null default 'pending' check (status in ('pending', 'paid', 'failed', 'expired')),
+  created_at timestamptz not null default now(),
+  paid_at timestamptz
+);
+
+create table if not exists public.commission_payment_items (
+  payment_id uuid not null references public.commission_payments (id) on delete cascade,
+  request_id uuid not null references public.service_requests (id) on delete cascade,
+  primary key (payment_id, request_id)
+);
+
+alter table public.commission_payments enable row level security;
+alter table public.commission_payment_items enable row level security;
+
+create policy "Businesses can view their own commission payments"
+  on public.commission_payments for select
+  using (auth.uid() = business_id);
+
+create policy "Admins can view all commission payments"
+  on public.commission_payments for select
+  using (exists (select 1 from public.admins a where a.id = auth.uid()));

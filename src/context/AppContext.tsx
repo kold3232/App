@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { Linking } from 'react-native';
 import { DEFAULT_CATEGORIES } from '../data/categories';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { uploadBusinessMedia } from '../lib/mediaUpload';
@@ -53,6 +54,7 @@ type AppContextValue = {
   updateRequestStatus: (id: string, status: ServiceRequest['status']) => Promise<void>;
   completeRequest: (id: string, jobValue: number) => Promise<void>;
   confirmCompletion: (id: string) => Promise<void>;
+  payCommission: () => Promise<{ error?: string }>;
   rescheduleRequest: (id: string, newSlot: string) => Promise<void>;
   myListings: CompanyProfile[];
   refreshMyListings: () => Promise<void>;
@@ -296,6 +298,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       createdAt: row.created_at,
       jobValue: row.job_value ?? undefined,
       commission: row.commission ?? undefined,
+      commissionPaid: !!row.commission_paid,
       customerConfirmed: !!row.customer_confirmed,
       quotedAmount: row.quoted_amount ?? undefined,
       quoteAccepted: !!row.quote_accepted,
@@ -495,6 +498,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const confirmCompletion = useCallback(async (id: string) => {
     const { error } = await supabase.from('service_requests').update({ customer_confirmed: true }).eq('id', id);
     if (!error) setRequests((prev) => prev.map((r) => (r.id === id ? { ...r, customerConfirmed: true } : r)));
+  }, []);
+
+  // Opens a Stripe Checkout page for the business's currently-owed commission.
+  // The edge function snapshots which jobs the payment covers; the webhook
+  // (not this call) is what actually marks them paid once Stripe confirms it.
+  const payCommission = useCallback(async (): Promise<{ error?: string }> => {
+    const { data, error } = await supabase.functions.invoke<{ url: string }>('create-commission-checkout');
+    if (error) {
+      let message = 'Could not start checkout.';
+      const context = (error as { context?: Response }).context;
+      if (context) {
+        try {
+          const body = await context.json();
+          if (body?.error) message = body.error;
+        } catch {
+          // context wasn't JSON — fall back to the generic message
+        }
+      }
+      return { error: message };
+    }
+    if (!data?.url) return { error: 'Could not start checkout.' };
+    await Linking.openURL(data.url);
+    return {};
   }, []);
 
   const rescheduleRequest = useCallback(async (id: string, newSlot: string) => {
@@ -954,6 +980,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       updateRequestStatus,
       completeRequest,
       confirmCompletion,
+      payCommission,
       rescheduleRequest,
       myListings,
       refreshMyListings,
@@ -1013,6 +1040,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       updateRequestStatus,
       completeRequest,
       confirmCompletion,
+      payCommission,
       rescheduleRequest,
       myListings,
       refreshMyListings,
