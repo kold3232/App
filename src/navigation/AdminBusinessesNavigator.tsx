@@ -4,6 +4,7 @@ import { useApp } from '../context/AppContext';
 import AdminBusinessDetailScreen from '../screens/admin/AdminBusinessDetailScreen';
 import AdminBusinessesListScreen from '../screens/admin/AdminBusinessesListScreen';
 import { colors } from '../theme';
+import { HeaderBackButton } from './HeaderBackButton';
 import { AdminBusinessesStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<AdminBusinessesStackParamList>();
@@ -17,6 +18,8 @@ export default function AdminBusinessesNavigator() {
         headerStyle: { backgroundColor: colors.surface },
         headerTintColor: colors.text,
         headerTitleStyle: { fontWeight: '700' },
+        headerBackButtonDisplayMode: 'minimal',
+        headerLeft: () => <HeaderBackButton />,
       }}
     >
       <Stack.Screen name="BusinessesList" component={AdminBusinessesListScreen} options={{ headerShown: false }} />

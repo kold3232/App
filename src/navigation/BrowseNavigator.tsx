@@ -11,6 +11,7 @@ import CompanyListScreen from '../screens/customer/CompanyListScreen';
 import InstantBookScreen from '../screens/customer/InstantBookScreen';
 import RequestQuoteScreen from '../screens/customer/RequestQuoteScreen';
 import { colors } from '../theme';
+import { HeaderBackButton } from './HeaderBackButton';
 import { BrowseStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<BrowseStackParamList>();
@@ -32,6 +33,8 @@ export default function BrowseNavigator() {
         headerStyle: { backgroundColor: colors.surface },
         headerTintColor: colors.text,
         headerTitleStyle: { fontWeight: '700' },
+        headerBackButtonDisplayMode: 'minimal',
+        headerLeft: () => <HeaderBackButton />,
       }}
     >
       <Stack.Screen

@@ -4,6 +4,7 @@ import ListingEditorScreen from '../screens/company/ListingEditorScreen';
 import TierSelectionScreen from '../screens/company/TierSelectionScreen';
 import { colors } from '../theme';
 import CompanyNavigator from './CompanyNavigator';
+import { HeaderBackButton } from './HeaderBackButton';
 import { CompanyStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<CompanyStackParamList>();
@@ -20,6 +21,8 @@ export default function CompanyRootNavigator() {
         headerStyle: { backgroundColor: colors.surface },
         headerTintColor: colors.text,
         headerTitleStyle: { fontWeight: '700' },
+        headerBackButtonDisplayMode: 'minimal',
+        headerLeft: () => <HeaderBackButton />,
       }}
     >
       <Stack.Screen name="TierSelection" component={TierSelectionScreen} options={{ title: 'Change plan' }} />
