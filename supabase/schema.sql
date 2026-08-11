@@ -491,3 +491,35 @@ create policy "Businesses can view their own commission payments"
 create policy "Admins can view all commission payments"
   on public.commission_payments for select
   using (exists (select 1 from public.admins a where a.id = auth.uid()));
+
+-- Gib Trades — fix chat_messages RLS for multi-listing businesses
+-- These two policies still checked service_requests.business_id, which was
+-- renamed to listing_id when business_listings was introduced (so it now
+-- points at a business_listings.id, not the business's own auth uid). Every
+-- business's first/migrated listing was backfilled to reuse the business's
+-- own id, so that one listing's threads happened to still pass this check —
+-- but any listing created since then has its own random id, so the business
+-- could never see or send chat messages on those threads.
+drop policy if exists "Participants can view chat messages" on public.chat_messages;
+create policy "Participants can view chat messages"
+  on public.chat_messages for select
+  using (
+    exists (
+      select 1 from public.service_requests r
+      join public.business_listings l on l.id = r.listing_id
+      where r.id = chat_messages.request_id
+        and (r.customer_id = auth.uid() or l.business_id = auth.uid())
+    )
+  );
+
+drop policy if exists "Participants can send chat messages" on public.chat_messages;
+create policy "Participants can send chat messages"
+  on public.chat_messages for insert
+  with check (
+    exists (
+      select 1 from public.service_requests r
+      join public.business_listings l on l.id = r.listing_id
+      where r.id = chat_messages.request_id
+        and (r.customer_id = auth.uid() or l.business_id = auth.uid())
+    )
+  );
