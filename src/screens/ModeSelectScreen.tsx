@@ -62,7 +62,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     lineHeight: 21,
   },
-  actions: { paddingBottom: spacing.lg },
+  actions: { paddingBottom: spacing.lg, alignSelf: 'center', width: '100%', maxWidth: 340 },
   hint: { color: '#7C8BAE', fontSize: 12, textAlign: 'center', marginTop: spacing.md },
   footerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: spacing.sm, gap: 6 },
   footerDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.accent },
