@@ -54,6 +54,7 @@ export type BookingType = 'quote' | 'instant';
 
 export type ServiceRequest = {
   id: string;
+  caseNumber: number;
   companyId: string;
   customerId: string;
   companyName: string;

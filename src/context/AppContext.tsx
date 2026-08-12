@@ -50,7 +50,7 @@ type AppContextValue = {
   sendImageMessage: (requestId: string, sender: ChatMessageSender, imageUri: string) => Promise<void>;
   acceptQuote: (requestId: string, amount: number) => Promise<void>;
   requests: ServiceRequest[];
-  addRequest: (input: Omit<ServiceRequest, 'id' | 'createdAt' | 'customerId'>) => Promise<string>;
+  addRequest: (input: Omit<ServiceRequest, 'id' | 'caseNumber' | 'createdAt' | 'customerId'>) => Promise<string>;
   updateRequestStatus: (id: string, status: ServiceRequest['status']) => Promise<void>;
   completeRequest: (id: string, jobValue: number) => Promise<void>;
   confirmCompletion: (id: string) => Promise<void>;
@@ -283,6 +283,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const mapRequestRow = useCallback(
     (row: any): ServiceRequest => ({
       id: row.id,
+      caseNumber: row.case_number,
       companyId: row.listing_id,
       customerId: row.customer_id,
       companyName: row.company_name,
@@ -399,15 +400,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
   }, [refreshBusinessListings]);
 
-  // Requests/messages are only visible to their two participants (enforced by RLS),
-  // so fetch them once we know who's logged in.
+  // Requests/messages are only visible to their two participants, plus admins
+  // (enforced by RLS) — fetch them once we know who's logged in. Admins get
+  // every request/thread back, not just their own, which is what powers the
+  // admin case/chat viewer.
   useEffect(() => {
     if (!isSupabaseConfigured || authLoading) return;
-    if (customerProfile || businessAccount) {
+    if (customerProfile || businessAccount || isAdminUser) {
       refreshRequests();
       refreshMessages();
     }
-  }, [customerProfile, businessAccount, authLoading, refreshRequests, refreshMessages]);
+  }, [customerProfile, businessAccount, isAdminUser, authLoading, refreshRequests, refreshMessages]);
 
   useEffect(() => {
     if (!isSupabaseConfigured || authLoading) return;
@@ -446,7 +449,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const addRequest = useCallback(
-    async (input: Omit<ServiceRequest, 'id' | 'createdAt' | 'customerId'>) => {
+    async (input: Omit<ServiceRequest, 'id' | 'caseNumber' | 'createdAt' | 'customerId'>) => {
       const { data: sessionData } = await supabase.auth.getSession();
       const customerId = sessionData.session?.user.id;
       if (!customerId) return '';

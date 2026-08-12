@@ -523,3 +523,19 @@ create policy "Participants can send chat messages"
         and (r.customer_id = auth.uid() or l.business_id = auth.uid())
     )
   );
+
+-- Gib Trades — admin chat oversight + human-friendly case numbers
+-- Admins already have full read access to service_requests (see "Admins can
+-- view all requests"); chat_messages was still participants-only, so admins
+-- couldn't see either side of a dispute. Also adds a short sequential case
+-- number so a customer/business has something readable to quote to support
+-- instead of a UUID.
+alter table public.service_requests
+  add column if not exists case_number bigint generated always as identity;
+
+create unique index if not exists service_requests_case_number_idx on public.service_requests (case_number);
+
+drop policy if exists "Admins can view all chat messages" on public.chat_messages;
+create policy "Admins can view all chat messages"
+  on public.chat_messages for select
+  using (exists (select 1 from public.admins a where a.id = auth.uid()));

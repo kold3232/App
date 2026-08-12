@@ -76,7 +76,7 @@ export default function MyRequestsScreen() {
                 <StatusBadge status={item.status} />
               </View>
               <Text style={styles.category}>
-                {item.categoryName} · {item.type === 'instant' ? 'Instant booking' : 'Quote request'}
+                Case #{item.caseNumber} · {item.categoryName} · {item.type === 'instant' ? 'Instant booking' : 'Quote request'}
               </Text>
               {item.jobDetails ? <Text style={styles.detail}>{item.jobDetails}</Text> : null}
               <Text style={styles.meta} numberOfLines={1}>

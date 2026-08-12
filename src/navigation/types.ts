@@ -29,6 +29,7 @@ export type CompanyStackParamList = {
 export type AdminTabParamList = {
   Queue: undefined;
   Businesses: undefined;
+  Cases: undefined;
   Categories: undefined;
   Insights: undefined;
 };

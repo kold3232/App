@@ -25,11 +25,13 @@ export function ChatModal({
   onClose,
   request,
   perspective,
+  readOnly = false,
 }: {
   visible: boolean;
   onClose: () => void;
   request: ServiceRequest;
   perspective: ChatMessageSender;
+  readOnly?: boolean;
 }) {
   const { messages, sendMessage, sendQuote, sendImageMessage, acceptQuote, refreshMessages, refreshRequests } = useApp();
   const [text, setText] = useState('');
@@ -91,7 +93,11 @@ export function ChatModal({
     }
   }
 
-  const otherPartyName = perspective === 'customer' ? request.companyName : request.customerName;
+  const otherPartyName = readOnly
+    ? `${request.customerName} · ${request.companyName}`
+    : perspective === 'customer'
+    ? request.companyName
+    : request.customerName;
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
@@ -99,7 +105,10 @@ export function ChatModal({
         <View style={styles.header}>
           <View style={{ flex: 1 }}>
             <Text style={styles.title}>{otherPartyName}</Text>
-            <Text style={styles.subtitle}>{request.categoryName} · {request.jobDetails || 'Job enquiry'}</Text>
+            <Text style={styles.subtitle}>
+              Case #{request.caseNumber} · {request.categoryName} · {request.jobDetails || 'Job enquiry'}
+            </Text>
+            {readOnly && <Text style={styles.readOnlyBadge}>Admin view — read only</Text>}
           </View>
           <Pressable onPress={onClose} hitSlop={12} style={styles.closeButton}>
             <Ionicons name="close" size={22} color={colors.text} />
@@ -113,42 +122,52 @@ export function ChatModal({
             )}
             {thread.map((m) => {
               const isMine = m.sender === perspective;
+              const senderLabel = m.sender === 'customer' ? 'Customer' : 'Business';
               if (m.kind === 'quote') {
                 const isAccepted = request.quoteAccepted && request.quotedAmount === m.amount;
                 const isLatest = latestQuote?.id === m.id;
                 return (
-                  <View key={m.id} style={[styles.quoteCard, isMine ? styles.bubbleMine : styles.bubbleTheirs]}>
-                    <Text style={styles.quoteLabel}>Quote</Text>
-                    <Text style={styles.quoteAmount}>£{m.amount?.toFixed(2)}</Text>
-                    {isAccepted ? (
-                      <View style={styles.acceptedPill}>
-                        <Ionicons name="checkmark-circle" size={14} color={colors.success} />
-                        <Text style={styles.acceptedText}>Accepted</Text>
-                      </View>
-                    ) : perspective === 'customer' && isLatest && !request.quoteAccepted ? (
-                      <View style={{ marginTop: spacing.sm }}>
-                        <Button title="Accept quote" onPress={() => handleAcceptQuote(m.amount ?? 0)} />
-                      </View>
-                    ) : null}
+                  <View key={m.id} style={isMine ? styles.bubbleWrapMine : styles.bubbleWrapTheirs}>
+                    {readOnly && <Text style={styles.senderLabel}>{senderLabel}</Text>}
+                    <View style={[styles.quoteCard, isMine ? styles.bubbleMine : styles.bubbleTheirs]}>
+                      <Text style={styles.quoteLabel}>Quote</Text>
+                      <Text style={styles.quoteAmount}>£{m.amount?.toFixed(2)}</Text>
+                      {isAccepted ? (
+                        <View style={styles.acceptedPill}>
+                          <Ionicons name="checkmark-circle" size={14} color={colors.success} />
+                          <Text style={styles.acceptedText}>Accepted</Text>
+                        </View>
+                      ) : !readOnly && perspective === 'customer' && isLatest && !request.quoteAccepted ? (
+                        <View style={{ marginTop: spacing.sm }}>
+                          <Button title="Accept quote" onPress={() => handleAcceptQuote(m.amount ?? 0)} />
+                        </View>
+                      ) : null}
+                    </View>
                   </View>
                 );
               }
               if (m.kind === 'image') {
                 return (
-                  <View key={m.id} style={[styles.imageBubble, isMine ? styles.bubbleMine : styles.bubbleTheirs]}>
-                    <Image source={{ uri: m.imageUri }} style={styles.chatImage} resizeMode="cover" />
+                  <View key={m.id} style={isMine ? styles.bubbleWrapMine : styles.bubbleWrapTheirs}>
+                    {readOnly && <Text style={styles.senderLabel}>{senderLabel}</Text>}
+                    <View style={[styles.imageBubble, isMine ? styles.bubbleMine : styles.bubbleTheirs]}>
+                      <Image source={{ uri: m.imageUri }} style={styles.chatImage} resizeMode="cover" />
+                    </View>
                   </View>
                 );
               }
               return (
-                <View key={m.id} style={[styles.bubble, isMine ? styles.bubbleMine : styles.bubbleTheirs]}>
-                  <Text style={[styles.bubbleText, isMine && styles.bubbleTextMine]}>{m.text}</Text>
+                <View key={m.id} style={isMine ? styles.bubbleWrapMine : styles.bubbleWrapTheirs}>
+                  {readOnly && <Text style={styles.senderLabel}>{senderLabel}</Text>}
+                  <View style={[styles.bubble, isMine ? styles.bubbleMine : styles.bubbleTheirs]}>
+                    <Text style={[styles.bubbleText, isMine && styles.bubbleTextMine]}>{m.text}</Text>
+                  </View>
                 </View>
               );
             })}
           </ScrollView>
 
-          {perspective === 'business' &&
+          {!readOnly && perspective === 'business' &&
             (showQuoteForm ? (
               <View style={styles.quoteForm}>
                 <TextInput
@@ -176,23 +195,25 @@ export function ChatModal({
               </Pressable>
             ))}
 
-          <View style={styles.inputRow}>
-            <Pressable style={styles.attachButton} onPress={handlePickImage}>
-              <Ionicons name="image-outline" size={20} color={colors.primary} />
-            </Pressable>
-            <TextInput
-              style={styles.textInput}
-              value={text}
-              onChangeText={setText}
-              placeholder="Type a message..."
-              placeholderTextColor={colors.textFaint}
-              selectionColor={colors.primary}
-              multiline
-            />
-            <Pressable style={styles.sendButton} onPress={handleSend} disabled={!text.trim()}>
-              <Ionicons name="send" size={18} color={colors.textInverse} />
-            </Pressable>
-          </View>
+          {!readOnly && (
+            <View style={styles.inputRow}>
+              <Pressable style={styles.attachButton} onPress={handlePickImage}>
+                <Ionicons name="image-outline" size={20} color={colors.primary} />
+              </Pressable>
+              <TextInput
+                style={styles.textInput}
+                value={text}
+                onChangeText={setText}
+                placeholder="Type a message..."
+                placeholderTextColor={colors.textFaint}
+                selectionColor={colors.primary}
+                multiline
+              />
+              <Pressable style={styles.sendButton} onPress={handleSend} disabled={!text.trim()}>
+                <Ionicons name="send" size={18} color={colors.textInverse} />
+              </Pressable>
+            </View>
+          )}
         </KeyboardAvoidingView>
       </SafeAreaView>
     </Modal>
@@ -212,6 +233,10 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 17, fontWeight: '800', color: colors.text },
   subtitle: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
+  readOnlyBadge: { fontSize: 11, fontWeight: '700', color: colors.primary, marginTop: 4, textTransform: 'uppercase', letterSpacing: 0.4 },
+  bubbleWrapMine: { alignItems: 'flex-end' },
+  bubbleWrapTheirs: { alignItems: 'flex-start' },
+  senderLabel: { fontSize: 10.5, fontWeight: '700', color: colors.textMuted, marginBottom: 3, textTransform: 'uppercase', letterSpacing: 0.4 },
   closeButton: {
     width: 34,
     height: 34,
