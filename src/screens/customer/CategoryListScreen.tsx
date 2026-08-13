@@ -5,7 +5,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { CATEGORY_GROUPS } from '../../data/categoryGroups';
 import { useApp } from '../../context/AppContext';
 import { BrowseStackParamList } from '../../navigation/types';
-import { colors, radius, shadow, spacing } from '../../theme';
+import { colors, radius, spacing } from '../../theme';
 
 type Props = NativeStackScreenProps<BrowseStackParamList, 'CategoryList'>;
 
@@ -63,7 +63,14 @@ const styles = StyleSheet.create({
   eyebrow: { color: colors.primary, fontWeight: '700', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.6 },
   title: { fontSize: 25, fontWeight: '800', color: colors.text, marginTop: 4, letterSpacing: 0.1 },
   list: { flex: 1, flexDirection: 'column', paddingHorizontal: spacing.lg, paddingBottom: spacing.lg },
-  shadowWrap: { borderRadius: radius.xl, ...shadow.card },
+  shadowWrap: {
+    borderRadius: radius.xl,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 14,
+    elevation: 5,
+  },
   row: {
     flexDirection: 'row',
     alignItems: 'stretch',

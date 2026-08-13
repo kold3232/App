@@ -27,7 +27,7 @@ export default function AdminNavigator() {
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textFaint,
-        tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border, borderTopWidth: 1 },
+        tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border, borderTopWidth: 1.5 },
         tabBarLabelStyle: { fontSize: 11.5, fontWeight: '600' },
         tabBarIcon: ({ focused, color }) => {
           const icons = ICONS[route.name as keyof AdminTabParamList];
