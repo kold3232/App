@@ -15,9 +15,10 @@ export default function AdminBusinessesNavigator() {
   return (
     <Stack.Navigator
       screenOptions={{
-        headerStyle: { backgroundColor: colors.surface },
-        headerTintColor: colors.text,
+        headerStyle: { backgroundColor: colors.background },
+        headerTintColor: colors.textInverse,
         headerTitleStyle: { fontWeight: '700' },
+        headerShadowVisible: false,
         headerBackButtonDisplayMode: 'minimal',
         headerLeft: () => <HeaderBackButton />,
       }}

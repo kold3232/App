@@ -16,9 +16,10 @@ export default function CompanyRootNavigator() {
     <Stack.Navigator
       initialRouteName="CompanyTabs"
       screenOptions={{
-        headerStyle: { backgroundColor: colors.surface },
-        headerTintColor: colors.text,
+        headerStyle: { backgroundColor: colors.background },
+        headerTintColor: colors.textInverse,
         headerTitleStyle: { fontWeight: '700' },
+        headerShadowVisible: false,
         headerBackButtonDisplayMode: 'minimal',
         headerLeft: () => <HeaderBackButton />,
       }}

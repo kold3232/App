@@ -20,9 +20,9 @@ export default function CustomerNavigator() {
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textFaint,
-        tabBarStyle: { borderTopColor: colors.border, borderTopWidth: 1 },
+        tabBarActiveTintColor: colors.accent,
+        tabBarInactiveTintColor: 'rgba(255,255,255,0.4)',
+        tabBarStyle: { backgroundColor: colors.background, borderTopColor: 'rgba(255,255,255,0.08)', borderTopWidth: 1 },
         tabBarLabelStyle: { fontSize: 11.5, fontWeight: '600' },
         tabBarIcon: ({ focused, color }) => {
           const icons = ICONS[route.name as keyof CustomerTabParamList];
