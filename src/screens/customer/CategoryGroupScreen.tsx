@@ -91,7 +91,7 @@ const styles = StyleSheet.create({
   },
   iconWrapMuted: { backgroundColor: colors.surfaceAlt },
   rowText: { flex: 1, justifyContent: 'center', paddingVertical: spacing.lg, paddingLeft: spacing.md },
-  chevron: { marginRight: spacing.lg },
+  chevron: { alignSelf: 'center', marginRight: spacing.lg },
   rowTitleLine: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   rowTitle: { fontSize: 18, fontWeight: '800', color: colors.text, letterSpacing: 0.1 },
   rowTitleMuted: { color: colors.textMuted },
