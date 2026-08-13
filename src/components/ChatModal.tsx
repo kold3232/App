@@ -40,10 +40,10 @@ export function ChatModal({
 
   useEffect(() => {
     if (visible) {
-      refreshMessages();
+      refreshMessages(request.id);
       refreshRequests();
     }
-  }, [visible, refreshMessages, refreshRequests]);
+  }, [visible, request.id, refreshMessages, refreshRequests]);
 
   const thread = useMemo(
     () =>

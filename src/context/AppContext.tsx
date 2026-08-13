@@ -67,7 +67,7 @@ type AppContextValue = {
   removeGalleryImage: (imageId: string) => Promise<void>;
   businessListings: Company[];
   refreshRequests: () => Promise<void>;
-  refreshMessages: () => Promise<void>;
+  refreshMessages: (requestId: string) => Promise<void>;
   customerProfile: CustomerProfile | null;
   businessAccount: BusinessAccount | null;
   authEmail: string | null;
@@ -307,11 +307,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
+  // Customer/business rows are already bounded by RLS to just their own
+  // requests; the 1000-row cap is really a stopgap for admins, who get every
+  // request in the table back (see "Admins can view all requests"). It's not
+  // a substitute for real pagination/search once admin case volume outgrows
+  // this — just a floor against an unbounded fetch until that's built.
   const refreshRequests = useCallback(async () => {
     const { data, error } = await supabase
       .from('service_requests')
       .select('*')
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(1000);
     if (!error && data) setRequests(data.map(mapRequestRow));
   }, [mapRequestRow]);
 
@@ -329,10 +335,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
-  const refreshMessages = useCallback(async () => {
+  // Scoped to one job's thread rather than the account's entire message
+  // history — a chat only ever needs to show its own conversation, and
+  // fetching everything the account can see would grow unbounded as job
+  // history piles up (this used to re-run on every single chat open).
+  const refreshMessages = useCallback(async (requestId: string) => {
     const { data, error } = await supabase
       .from('chat_messages')
       .select('*')
+      .eq('request_id', requestId)
       .order('created_at', { ascending: true });
     if (!error && data) setMessages(data.map(mapMessageRow));
   }, [mapMessageRow]);
@@ -400,17 +411,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
   }, [refreshBusinessListings]);
 
-  // Requests/messages are only visible to their two participants, plus admins
+  // Requests are only visible to their two participants, plus admins
   // (enforced by RLS) — fetch them once we know who's logged in. Admins get
-  // every request/thread back, not just their own, which is what powers the
-  // admin case/chat viewer.
+  // every request back, not just their own, which is what powers the admin
+  // case/chat viewer. Chat messages are fetched separately, per-thread, only
+  // when a specific chat is opened (see refreshMessages).
   useEffect(() => {
     if (!isSupabaseConfigured || authLoading) return;
     if (customerProfile || businessAccount || isAdminUser) {
       refreshRequests();
-      refreshMessages();
     }
-  }, [customerProfile, businessAccount, isAdminUser, authLoading, refreshRequests, refreshMessages]);
+  }, [customerProfile, businessAccount, isAdminUser, authLoading, refreshRequests]);
 
   useEffect(() => {
     if (!isSupabaseConfigured || authLoading) return;

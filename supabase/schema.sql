@@ -539,3 +539,29 @@ drop policy if exists "Admins can view all chat messages" on public.chat_message
 create policy "Admins can view all chat messages"
   on public.chat_messages for select
   using (exists (select 1 from public.admins a where a.id = auth.uid()));
+
+-- Gib Trades — indexes for foreign-key lookups
+-- Every RLS policy and every app query filters/joins on these columns
+-- (auth.uid() = customer_id, request_id = ..., listing_id in (...), etc).
+-- Without an index Postgres sequentially scans the whole table to answer
+-- them, and every one of those scans also runs once per row as part of RLS
+-- policy evaluation. Cheap now, load-bearing once the tables have real rows.
+create index if not exists service_requests_customer_id_idx on public.service_requests (customer_id);
+create index if not exists service_requests_listing_id_idx on public.service_requests (listing_id);
+create index if not exists service_requests_created_at_idx on public.service_requests (created_at desc);
+
+create index if not exists chat_messages_request_id_idx on public.chat_messages (request_id);
+create index if not exists chat_messages_created_at_idx on public.chat_messages (request_id, created_at);
+
+create index if not exists reviews_request_id_idx on public.reviews (request_id);
+create index if not exists reviews_listing_id_idx on public.reviews (listing_id);
+create index if not exists reviews_customer_id_idx on public.reviews (customer_id);
+
+create index if not exists business_listings_business_id_idx on public.business_listings (business_id);
+
+create index if not exists business_gallery_images_listing_id_idx on public.business_gallery_images (listing_id);
+
+create index if not exists business_flags_business_id_idx on public.business_flags (business_id);
+
+create index if not exists commission_payments_business_id_idx on public.commission_payments (business_id);
+create index if not exists commission_payment_items_request_id_idx on public.commission_payment_items (request_id);

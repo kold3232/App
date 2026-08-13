@@ -7,9 +7,11 @@
     "icon": "./assets/splash-icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.rockserv.app"
     },
     "android": {
+      "package": "com.rockserv.app",
       "adaptiveIcon": {
         "backgroundColor": "#0F1E46",
         "foregroundImage": "./assets/splash-icon.png",
@@ -20,6 +22,14 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "RockServ needs access to your photos so you can attach job photos and set your listing's cover photo and gallery."
+        }
+      ]
+    ]
   }
 }
