@@ -33,8 +33,8 @@ export default function CategoryListScreen({ navigation }: Props) {
               onPress={() => navigation.navigate('CategoryGroup', { groupId: item.id })}
             >
               <View style={[styles.row, isComingSoon && styles.rowComingSoon]}>
-                <View style={[styles.iconWrap, isComingSoon && styles.iconWrapMuted]}>
-                  <Ionicons name={item.icon} size={34} color={isComingSoon ? colors.textFaint : colors.textInverse} />
+                <View style={styles.iconWrap}>
+                  <Ionicons name={item.icon} size={34} color={isComingSoon ? colors.textFaint : colors.primary} />
                 </View>
                 <View style={styles.rowText}>
                   <View style={styles.rowTitleLine}>
@@ -80,11 +80,9 @@ const styles = StyleSheet.create({
   iconWrap: {
     width: 92,
     alignSelf: 'stretch',
-    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  iconWrapMuted: { backgroundColor: colors.surfaceAlt },
   rowText: { flex: 1, justifyContent: 'center', paddingVertical: spacing.lg, paddingLeft: spacing.md },
   chevron: { alignSelf: 'center', marginRight: spacing.lg },
   rowTitleLine: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
