@@ -64,19 +64,17 @@ export default function CategoryGroupScreen({ route, navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1, backgroundColor: colors.surfaceAlt },
   header: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.md },
-  eyebrow: { color: colors.accent, fontWeight: '700', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.6 },
-  title: { fontSize: 25, fontWeight: '800', color: colors.textInverse, marginTop: 4, letterSpacing: 0.1 },
+  eyebrow: { color: colors.primary, fontWeight: '700', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.6 },
+  title: { fontSize: 25, fontWeight: '800', color: colors.text, marginTop: 4, letterSpacing: 0.1 },
   list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
-  shadowWrap: { borderRadius: radius.lg, ...shadow.card },
+  shadowWrap: { borderRadius: radius.xl, ...shadow.card },
   row: {
     flexDirection: 'row',
     alignItems: 'stretch',
     backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1.5,
-    borderColor: colors.surface,
+    borderRadius: radius.xl,
     overflow: 'hidden',
     minHeight: 96,
   },

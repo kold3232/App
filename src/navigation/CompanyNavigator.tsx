@@ -6,6 +6,7 @@ import InvoicesScreen from '../screens/company/InvoicesScreen';
 import MyListingScreen from '../screens/company/MyListingScreen';
 import SettingsScreen from '../screens/company/SettingsScreen';
 import { colors } from '../theme';
+import { TabIcon } from './TabIcon';
 import { CompanyTabParamList } from './types';
 
 const Tab = createBottomTabNavigator<CompanyTabParamList>();
@@ -22,13 +23,13 @@ export default function CompanyNavigator() {
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarActiveTintColor: colors.accent,
-        tabBarInactiveTintColor: 'rgba(255,255,255,0.4)',
-        tabBarStyle: { backgroundColor: colors.background, borderTopColor: 'rgba(255,255,255,0.08)', borderTopWidth: 1 },
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.textFaint,
+        tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border, borderTopWidth: 1 },
         tabBarLabelStyle: { fontSize: 11.5, fontWeight: '600' },
         tabBarIcon: ({ focused, color }) => {
           const icons = ICONS[route.name as keyof CompanyTabParamList];
-          return <Ionicons name={focused ? icons.active : icons.inactive} size={22} color={color} />;
+          return <TabIcon name={focused ? icons.active : icons.inactive} focused={focused} color={color} />;
         },
       })}
     >

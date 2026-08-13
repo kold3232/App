@@ -111,7 +111,7 @@ export function CustomerSignUpModal({ visible, onClose }: { visible: boolean; on
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1, backgroundColor: colors.surfaceAlt },
   header: {
     flexDirection: 'row',
     alignItems: 'center',

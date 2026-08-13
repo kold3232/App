@@ -75,7 +75,7 @@ export default function AdminLoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, padding: spacing.lg, justifyContent: 'center' },
+  container: { flex: 1, backgroundColor: colors.surfaceAlt, padding: spacing.lg, justifyContent: 'center' },
   hero: { alignItems: 'center' },
   iconBadge: {
     width: 64,
@@ -86,7 +86,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     ...shadow.raised,
   },
-  title: { fontSize: 22, fontWeight: '800', color: colors.textInverse, marginTop: spacing.lg, textAlign: 'center' },
+  title: { fontSize: 22, fontWeight: '800', color: colors.text, marginTop: spacing.lg, textAlign: 'center' },
   subtitle: {
     fontSize: 14,
     color: colors.textMuted,

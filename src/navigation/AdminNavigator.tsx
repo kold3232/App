@@ -7,6 +7,7 @@ import AdminInsightsScreen from '../screens/admin/AdminInsightsScreen';
 import AdminQueueScreen from '../screens/admin/AdminQueueScreen';
 import { colors } from '../theme';
 import AdminBusinessesNavigator from './AdminBusinessesNavigator';
+import { TabIcon } from './TabIcon';
 import { AdminTabParamList } from './types';
 
 const Tab = createBottomTabNavigator<AdminTabParamList>();
@@ -24,13 +25,13 @@ export default function AdminNavigator() {
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarActiveTintColor: colors.accent,
-        tabBarInactiveTintColor: 'rgba(255,255,255,0.4)',
-        tabBarStyle: { backgroundColor: colors.background, borderTopColor: 'rgba(255,255,255,0.08)', borderTopWidth: 1 },
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.textFaint,
+        tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border, borderTopWidth: 1 },
         tabBarLabelStyle: { fontSize: 11.5, fontWeight: '600' },
         tabBarIcon: ({ focused, color }) => {
           const icons = ICONS[route.name as keyof AdminTabParamList];
-          return <Ionicons name={focused ? icons.active : icons.inactive} size={22} color={color} />;
+          return <TabIcon name={focused ? icons.active : icons.inactive} focused={focused} color={color} />;
         },
       })}
     >

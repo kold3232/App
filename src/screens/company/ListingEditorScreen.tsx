@@ -361,8 +361,8 @@ export default function ListingEditorScreen({ route, navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  title: { fontSize: 22, fontWeight: '800', color: colors.textInverse, letterSpacing: 0.1 },
+  container: { flex: 1, backgroundColor: colors.surfaceAlt },
+  title: { fontSize: 22, fontWeight: '800', color: colors.text, letterSpacing: 0.1 },
   subtitle: { fontSize: 13, color: colors.textMuted, marginTop: 4, marginBottom: spacing.md },
   availabilityCard: { marginTop: spacing.xs, marginBottom: spacing.md },
   availabilityRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },

@@ -109,9 +109,9 @@ export default function AdminBusinessDetailScreen({ route }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  title: { fontSize: 22, fontWeight: '800', color: colors.textInverse, letterSpacing: 0.1 },
-  subtitle: { fontSize: 13, color: colors.accent, fontWeight: '600', marginTop: 4 },
+  container: { flex: 1, backgroundColor: colors.surfaceAlt },
+  title: { fontSize: 22, fontWeight: '800', color: colors.text, letterSpacing: 0.1 },
+  subtitle: { fontSize: 13, color: colors.primary, fontWeight: '600', marginTop: 4 },
   line: { fontSize: 14, color: colors.text, marginTop: spacing.sm },
   docRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: spacing.sm },
   docLabel: { fontSize: 13.5, color: colors.text, flex: 1 },

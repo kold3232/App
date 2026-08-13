@@ -153,7 +153,7 @@ export default function CompanyDetailScreen({ route, navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1, backgroundColor: colors.surfaceAlt },
   banner: {
     height: 140,
     borderRadius: radius.lg,

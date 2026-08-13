@@ -221,7 +221,7 @@ export function ChatModal({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1, backgroundColor: colors.surfaceAlt },
   header: {
     flexDirection: 'row',
     alignItems: 'center',

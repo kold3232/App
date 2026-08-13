@@ -1,6 +1,6 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import React from 'react';
-import { Image, StyleSheet, View } from 'react-native';
+import { Image, StyleSheet } from 'react-native';
 import { CATEGORY_GROUPS } from '../data/categoryGroups';
 import { useApp } from '../context/AppContext';
 import CategoryGroupScreen from '../screens/customer/CategoryGroupScreen';
@@ -17,21 +17,11 @@ import { BrowseStackParamList } from './types';
 const Stack = createNativeStackNavigator<BrowseStackParamList>();
 
 function BrandTitle() {
-  return (
-    <View style={brandStyles.badge}>
-      <Image source={require('../../assets/logo-transparent.png')} style={brandStyles.logo} resizeMode="contain" />
-    </View>
-  );
+  return <Image source={require('../../assets/logo-transparent.png')} style={brandStyles.logo} resizeMode="contain" />;
 }
 
 const brandStyles = StyleSheet.create({
-  badge: {
-    backgroundColor: colors.surface,
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  logo: { width: 96, height: 24 },
+  logo: { width: 106, height: 28 },
 });
 
 export default function BrowseNavigator() {
@@ -40,8 +30,8 @@ export default function BrowseNavigator() {
   return (
     <Stack.Navigator
       screenOptions={{
-        headerStyle: { backgroundColor: colors.background },
-        headerTintColor: colors.textInverse,
+        headerStyle: { backgroundColor: colors.surface },
+        headerTintColor: colors.text,
         headerTitleStyle: { fontWeight: '700' },
         headerShadowVisible: false,
         headerBackButtonDisplayMode: 'minimal',

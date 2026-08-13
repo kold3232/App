@@ -178,7 +178,7 @@ export default function CustomerSignUpScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1, backgroundColor: colors.surfaceAlt },
   hero: { alignItems: 'center', marginBottom: spacing.md },
   iconBadge: {
     width: 64,
@@ -189,7 +189,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     ...shadow.raised,
   },
-  title: { fontSize: 22, fontWeight: '800', color: colors.textInverse, marginTop: spacing.md, textAlign: 'center' },
+  title: { fontSize: 22, fontWeight: '800', color: colors.text, marginTop: spacing.md, textAlign: 'center' },
   subtitle: {
     fontSize: 13.5,
     color: colors.textMuted,

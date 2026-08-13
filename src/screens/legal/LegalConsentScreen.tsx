@@ -62,7 +62,7 @@ export default function LegalConsentScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, justifyContent: 'space-between', padding: spacing.lg },
+  container: { flex: 1, backgroundColor: colors.surfaceAlt, justifyContent: 'space-between', padding: spacing.lg },
   hero: { alignItems: 'center', marginTop: spacing.xl },
   iconBadge: {
     width: 64,
@@ -73,7 +73,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     ...shadow.raised,
   },
-  title: { fontSize: 22, fontWeight: '800', color: colors.textInverse, marginTop: spacing.lg, textAlign: 'center' },
+  title: { fontSize: 22, fontWeight: '800', color: colors.text, marginTop: spacing.lg, textAlign: 'center' },
   subtitle: {
     fontSize: 14,
     color: colors.textMuted,
