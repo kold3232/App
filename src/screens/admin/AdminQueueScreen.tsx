@@ -95,10 +95,10 @@ export default function AdminQueueScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.surfaceAlt },
+  container: { flex: 1, backgroundColor: colors.background },
   list: { padding: spacing.lg, paddingBottom: spacing.xl * 2, flexGrow: 1 },
   header: { marginBottom: spacing.md },
-  title: { fontSize: 22, fontWeight: '800', color: colors.text, letterSpacing: 0.1 },
+  title: { fontSize: 22, fontWeight: '800', color: colors.textInverse, letterSpacing: 0.1 },
   subtitle: { fontSize: 13, color: colors.textMuted, marginTop: 2 },
   businessName: { fontSize: 16, fontWeight: '700', color: colors.text },
   meta: { fontSize: 12.5, color: colors.primary, fontWeight: '600', marginTop: 2 },

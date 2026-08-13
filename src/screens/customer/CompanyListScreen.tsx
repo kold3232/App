@@ -131,11 +131,11 @@ export default function CompanyListScreen({ route, navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.surfaceAlt },
+  container: { flex: 1, backgroundColor: colors.background },
   list: { padding: spacing.lg, paddingBottom: spacing.xl * 2 },
   header: { marginBottom: spacing.md },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  title: { fontSize: 22, fontWeight: '800', color: colors.text },
+  title: { fontSize: 22, fontWeight: '800', color: colors.textInverse },
   subtitle: { fontSize: 13, color: colors.textMuted, marginTop: 2 },
   search: {
     backgroundColor: colors.surface,

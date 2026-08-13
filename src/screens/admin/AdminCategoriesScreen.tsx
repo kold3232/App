@@ -132,8 +132,8 @@ export default function AdminCategoriesScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.surfaceAlt },
-  title: { fontSize: 22, fontWeight: '800', color: colors.text, letterSpacing: 0.1 },
+  container: { flex: 1, backgroundColor: colors.background },
+  title: { fontSize: 22, fontWeight: '800', color: colors.textInverse, letterSpacing: 0.1 },
   subtitle: { fontSize: 13, color: colors.textMuted, marginTop: 4, marginBottom: spacing.md },
   categoryCard: { marginTop: spacing.xs, marginBottom: spacing.sm },
   categoryRow: { flexDirection: 'row', alignItems: 'center' },

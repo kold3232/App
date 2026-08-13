@@ -74,9 +74,9 @@ export default function MyListingScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.surfaceAlt },
+  container: { flex: 1, backgroundColor: colors.background },
   list: { padding: spacing.lg, paddingBottom: spacing.xl * 2, flexGrow: 1 },
-  title: { fontSize: 22, fontWeight: '800', color: colors.text, letterSpacing: 0.1 },
+  title: { fontSize: 22, fontWeight: '800', color: colors.textInverse, letterSpacing: 0.1 },
   subtitle: { fontSize: 12, color: colors.textMuted, marginTop: 4, marginBottom: spacing.md },
   cardPressed: { opacity: 0.85 },
   row: { flexDirection: 'row', gap: spacing.md, alignItems: 'center' },

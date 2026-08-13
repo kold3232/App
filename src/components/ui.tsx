@@ -21,11 +21,11 @@ export function Button({
     primary: shadow.card,
     secondary: { backgroundColor: colors.surfaceAlt, borderWidth: 1.5, borderColor: colors.borderStrong },
     danger: { backgroundColor: colors.danger, ...shadow.card },
-    outline: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: colors.primary },
+    outline: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: colors.accent },
     accent: shadow.card,
   }[variant];
   const textColor =
-    variant === 'outline' ? colors.primary : variant === 'secondary' ? colors.slate700 : colors.textInverse;
+    variant === 'outline' ? colors.accent : variant === 'secondary' ? colors.slate700 : colors.textInverse;
 
   const content = loading ? (
     <ActivityIndicator color={textColor} />
@@ -191,7 +191,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: spacing.md,
   },
-  emptyTitle: { fontSize: 16, fontWeight: '700', color: colors.text, textAlign: 'center' },
+  emptyTitle: { fontSize: 16, fontWeight: '700', color: colors.textInverse, textAlign: 'center' },
   emptySubtitle: { fontSize: 13, color: colors.textMuted, textAlign: 'center', marginTop: 4, lineHeight: 19 },
   sectionLabel: {
     fontSize: 12,

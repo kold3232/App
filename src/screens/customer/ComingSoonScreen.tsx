@@ -81,7 +81,7 @@ export default function ComingSoonScreen({ route, navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.surfaceAlt },
+  container: { flex: 1, backgroundColor: colors.background },
   iconWrap: {
     width: 64,
     height: 64,
@@ -102,7 +102,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   badgeText: { fontSize: 11.5, fontWeight: '700', color: colors.pending, letterSpacing: 0.2 },
-  title: { fontSize: 24, fontWeight: '800', color: colors.text, marginTop: spacing.sm, letterSpacing: 0.1 },
+  title: { fontSize: 24, fontWeight: '800', color: colors.textInverse, marginTop: spacing.sm, letterSpacing: 0.1 },
   subtitle: { fontSize: 14, color: colors.textMuted, marginTop: 4 },
   description: { fontSize: 14, color: colors.text, marginTop: spacing.sm, lineHeight: 20 },
   input: {
