@@ -30,29 +30,31 @@ export default function CategoryGroupScreen({ route, navigation }: Props) {
           const count = isComingSoon ? 0 : businessListings.filter((c) => c.categoryIds.includes(item.id)).length;
           return (
             <Pressable
-              style={({ pressed }) => [styles.row, isComingSoon && styles.rowComingSoon, pressed && styles.rowPressed]}
+              style={({ pressed }) => [styles.shadowWrap, pressed && styles.rowPressed]}
               onPress={() =>
                 isComingSoon
                   ? navigation.navigate('ComingSoon', { categoryId: item.id })
                   : navigation.navigate('CompanyList', { categoryId: item.id })
               }
             >
-              <View style={[styles.iconWrap, isComingSoon && styles.iconWrapMuted]}>
-                <Ionicons name={item.icon} size={26} color={isComingSoon ? colors.textFaint : colors.textInverse} />
-              </View>
-              <View style={styles.rowText}>
-                <View style={styles.rowTitleLine}>
-                  <Text style={[styles.rowTitle, isComingSoon && styles.rowTitleMuted]}>{item.name}</Text>
-                  {isComingSoon && (
-                    <View style={styles.comingSoonBadge}>
-                      <Text style={styles.comingSoonBadgeText}>Coming soon</Text>
-                    </View>
-                  )}
+              <View style={[styles.row, isComingSoon && styles.rowComingSoon]}>
+                <View style={[styles.iconWrap, isComingSoon && styles.iconWrapMuted]}>
+                  <Ionicons name={item.icon} size={34} color={isComingSoon ? colors.textFaint : colors.textInverse} />
                 </View>
-                <Text style={styles.rowDescription}>{item.description}</Text>
-                {!isComingSoon && <Text style={styles.rowCount}>{count} companies</Text>}
+                <View style={styles.rowText}>
+                  <View style={styles.rowTitleLine}>
+                    <Text style={[styles.rowTitle, isComingSoon && styles.rowTitleMuted]}>{item.name}</Text>
+                    {isComingSoon && (
+                      <View style={styles.comingSoonBadge}>
+                        <Text style={styles.comingSoonBadgeText}>Coming soon</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.rowDescription}>{item.description}</Text>
+                  {!isComingSoon && <Text style={styles.rowCount}>{count} companies</Text>}
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={colors.textFaint} style={styles.chevron} />
               </View>
-              <Ionicons name="chevron-forward" size={20} color={colors.textFaint} />
             </Pressable>
           );
         }}
@@ -67,29 +69,29 @@ const styles = StyleSheet.create({
   eyebrow: { color: colors.primary, fontWeight: '700', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.6 },
   title: { fontSize: 25, fontWeight: '800', color: colors.text, marginTop: 4, letterSpacing: 0.1 },
   list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
+  shadowWrap: { borderRadius: radius.lg, ...shadow.card },
   row: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'stretch',
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
-    padding: spacing.lg,
     borderWidth: 1,
     borderColor: colors.border,
-    gap: spacing.md,
-    ...shadow.card,
+    overflow: 'hidden',
+    minHeight: 96,
   },
   rowComingSoon: { backgroundColor: colors.surfaceAlt, opacity: 0.85 },
   rowPressed: { opacity: 0.9 },
   iconWrap: {
-    width: 56,
-    height: 56,
-    borderRadius: radius.md,
+    width: 92,
+    alignSelf: 'stretch',
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   iconWrapMuted: { backgroundColor: colors.surfaceAlt },
-  rowText: { flex: 1 },
+  rowText: { flex: 1, justifyContent: 'center', paddingVertical: spacing.lg, paddingLeft: spacing.md },
+  chevron: { marginRight: spacing.lg },
   rowTitleLine: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   rowTitle: { fontSize: 18, fontWeight: '800', color: colors.text, letterSpacing: 0.1 },
   rowTitleMuted: { color: colors.textMuted },
