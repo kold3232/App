@@ -90,7 +90,7 @@ export default function InstantBookScreen({ route, navigation }: Props) {
               style={styles.input}
               value={customerName}
               onChangeText={setCustomerName}
-              placeholder="e.g. Maria Chipolina"
+              placeholder="e.g. John Smith"
               placeholderTextColor={colors.textFaint}
               selectionColor={colors.primary}
             />

@@ -67,7 +67,7 @@ export function CustomerSignUpModal({ visible, onClose }: { visible: boolean; on
                   style={styles.input}
                   value={name}
                   onChangeText={setName}
-                  placeholder="e.g. Maria Chipolina"
+                  placeholder="e.g. John Smith"
                   placeholderTextColor={colors.textFaint}
                   selectionColor={colors.primary}
                 />
