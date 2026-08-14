@@ -41,9 +41,6 @@ supabase/.temp/
 # typescript
 *.tsbuildinfo
 
-# lockfile (regenerate with `npm install`)
-package-lock.json
-
 # generated native folders
 /ios
 /android
