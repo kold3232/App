@@ -373,10 +373,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setMessages([]);
       }
     };
-    supabase.auth.getSession().then(async ({ data }) => {
-      await syncSession(data.session);
-      if (isMounted) setAuthLoading(false);
-    });
+    supabase.auth
+      .getSession()
+      .then(async ({ data }) => {
+        await syncSession(data.session);
+      })
+      .catch((err) => {
+        console.error('Failed to restore auth session', err);
+      })
+      .finally(() => {
+        if (isMounted) setAuthLoading(false);
+      });
     const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
       syncSession(session);
     });
