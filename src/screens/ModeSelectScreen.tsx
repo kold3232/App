@@ -3,11 +3,18 @@ import React from 'react';
 import { Image, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import { Button } from '../components/ui';
 import { useApp } from '../context/AppContext';
-import { debugEnvInfo } from '../lib/supabase';
+import { debugEnvInfo, runConnectionTest } from '../lib/supabase';
 import { colors, spacing } from '../theme';
+import { notify } from '../utils/alert';
 
 export default function ModeSelectScreen() {
   const { setMode } = useApp();
+
+  async function handleConnectionTest() {
+    notify('Testing…', 'Sending one request to Supabase.');
+    const result = await runConnectionTest();
+    notify('Connection test', result);
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -34,10 +41,12 @@ export default function ModeSelectScreen() {
       <Pressable onPress={() => setMode('admin')} hitSlop={12}>
         <Text style={styles.adminLink}>RockServ team? Admin sign-in</Text>
       </Pressable>
-      <Text style={styles.debug}>
-        URL: {debugEnvInfo.urlPresent ? debugEnvInfo.urlPreview : 'MISSING'} · Key:{' '}
-        {debugEnvInfo.anonKeyPresent ? `present (${debugEnvInfo.anonKeyLength} chars)` : 'MISSING'}
-      </Text>
+      <Pressable onPress={handleConnectionTest} hitSlop={12}>
+        <Text style={styles.debug}>
+          URL {debugEnvInfo.urlLength} chars · Key{' '}
+          {debugEnvInfo.anonKeyPresent ? `${debugEnvInfo.anonKeyLength} chars` : 'MISSING'} · tap to run connection test
+        </Text>
+      </Pressable>
     </SafeAreaView>
   );
 }
