@@ -36,7 +36,8 @@
         {
           "photosPermission": "RockServ needs access to your photos so you can attach job photos and set your listing's cover photo and gallery."
         }
-      ]
+      ],
+      "expo-font"
     ],
     "extra": {
       "eas": {
