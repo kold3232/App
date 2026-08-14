@@ -9,7 +9,10 @@
     "newArchEnabled": false,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.rockserv.app"
+      "bundleIdentifier": "com.rockserv.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.rockserv.app",
@@ -19,7 +22,10 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -31,6 +37,11 @@
           "photosPermission": "RockServ needs access to your photos so you can attach job photos and set your listing's cover photo and gallery."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "5561858e-9c74-4ba5-8773-ffe3efcfe31f"
+      }
+    }
   }
 }
