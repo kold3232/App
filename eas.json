@@ -8,6 +8,7 @@
       "developmentClient": true,
       "distribution": "internal",
       "node": "22.11.0",
+      "environment": "development",
       "android": {
         "buildType": "apk"
       }
@@ -15,12 +16,14 @@
     "preview": {
       "distribution": "internal",
       "node": "22.11.0",
+      "environment": "preview",
       "android": {
         "buildType": "apk"
       }
     },
     "production": {
       "node": "22.11.0",
+      "environment": "production",
       "android": {
         "buildType": "app-bundle"
       },
