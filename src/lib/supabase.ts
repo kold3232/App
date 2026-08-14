@@ -53,6 +53,30 @@ function hasHeader(headers: Record<string, string>, name: string) {
   return Object.keys(headers).some((key) => key.toLowerCase() === name);
 }
 
+/**
+ * Appends `apikey` to the query string as well as sending it as a header.
+ *
+ * On-device testing proved the header alone is not enough: a hand-written
+ * fetch, with apikey set explicitly and supabase-js bypassed entirely, still
+ * came back "No API key found in request" — while the identical request from
+ * a desktop curl succeeded. The header is being dropped below the JS layer,
+ * so no amount of setting it correctly in JS can fix it. Supabase's own
+ * gateway accepts the key as a URL parameter instead ("No `apikey` request
+ * header or url param was found"), which doesn't depend on header transport.
+ *
+ * The key is the public anon key — designed to be embedded in clients and
+ * safe in a URL. Row Level Security, not key secrecy, is what protects data.
+ */
+function withApiKeyParam(input: RequestInfo | URL): RequestInfo | URL {
+  if (!supabaseAnonKey) return input;
+  const asString = typeof input === 'string' ? input : input instanceof URL ? input.toString() : null;
+  // Request objects carry their own URL; leaving them untouched is safer than
+  // rebuilding one, and supabase-js passes plain strings in practice.
+  if (asString === null) return input;
+  if (asString.includes('apikey=')) return asString;
+  return `${asString}${asString.includes('?') ? '&' : '?'}apikey=${encodeURIComponent(supabaseAnonKey)}`;
+}
+
 const fetchWithApiKey: typeof fetch = (input, init) => {
   const headers = toPlainHeaders(init?.headers);
   // `apikey` is always the anon key, even once a user is signed in — it
@@ -64,31 +88,64 @@ const fetchWithApiKey: typeof fetch = (input, init) => {
   if (supabaseAnonKey && !hasHeader(headers, 'authorization')) {
     headers.Authorization = `Bearer ${supabaseAnonKey}`;
   }
-  return fetch(input, { ...init, headers });
+  return fetch(withApiKeyParam(input), { ...init, headers });
 };
 
 /**
- * Fires one hand-rolled login request with the apikey header attached
- * explicitly, bypassing supabase-js entirely, and reports the raw response.
- * Distinguishes "the client is dropping the header" from "the server is
- * rejecting the key" — the fork that can't be resolved from off-device.
+ * Runs the same login request three ways to isolate exactly which parts of a
+ * request survive the trip off this device.
+ *
+ * A (header only) already came back "No API key found" on-device while
+ * succeeding from desktop curl — that's what proved headers are being lost
+ * below the JS layer. B checks the URL-parameter route now used as the fix.
+ * C is the consequence worth knowing: if Authorization is dropped too, then
+ * a signed-in user's token never reaches the server either, so every request
+ * would silently act as anonymous and RLS would hide their own data.
  */
 export async function runConnectionTest(): Promise<string> {
   if (!supabaseUrl || !supabaseAnonKey) {
     return `URL present: ${!!supabaseUrl}\nKey present: ${!!supabaseAnonKey}\n\nEnv vars missing from this build.`;
   }
-  const target = `${supabaseUrl.replace(/\/+$/, '')}/auth/v1/token?grant_type=password`;
-  try {
-    const response = await fetch(target, {
-      method: 'POST',
-      headers: { apikey: supabaseAnonKey, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'connection-test@example.com', password: 'deliberately-wrong' }),
-    });
-    const text = await response.text();
-    return `URL (${debugEnvInfo.urlLength} chars):\n${supabaseUrl}\n\nRaw POST status: ${response.status}\n${text.slice(0, 300)}\n\n"invalid_credentials" here = the key and server are fine, so the header loss is inside supabase-js.\n"No API key found" here = the header is being stripped below the client (network/URL level).`;
-  } catch (error) {
-    return `URL (${debugEnvInfo.urlLength} chars):\n${supabaseUrl}\n\nRequest threw before a response:\n${String(error)}`;
+  const base = supabaseUrl.replace(/\/+$/, '');
+  const tokenUrl = `${base}/auth/v1/token?grant_type=password`;
+  const body = JSON.stringify({ email: 'connection-test@example.com', password: 'deliberately-wrong' });
+  const lines: string[] = [`URL (${debugEnvInfo.urlLength} chars):`, supabaseUrl, ''];
+
+  async function attempt(label: string, url: string, headers: Record<string, string>) {
+    try {
+      const response = await fetch(url, { method: 'POST', headers, body });
+      const text = await response.text();
+      lines.push(`${label}: ${response.status} ${text.slice(0, 120)}`, '');
+    } catch (error) {
+      lines.push(`${label}: threw ${String(error).slice(0, 120)}`, '');
+    }
   }
+
+  await attempt('A header only', tokenUrl, {
+    apikey: supabaseAnonKey,
+    'Content-Type': 'application/json',
+  });
+  await attempt('B url param only', `${tokenUrl}&apikey=${encodeURIComponent(supabaseAnonKey)}`, {
+    'Content-Type': 'application/json',
+  });
+  // Deliberately bogus bearer against a REST read that anon is allowed to do.
+  // Verified against this project: if the Authorization header arrives the
+  // server rejects the malformed JWT ("Expected 3 parts in JWT", 401); if the
+  // header is dropped the same request succeeds as anon and returns rows.
+  // So this distinguishes the two outcomes unambiguously.
+  try {
+    const url = `${base}/rest/v1/business_listings?select=id&limit=1&apikey=${encodeURIComponent(supabaseAnonKey)}`;
+    const response = await fetch(url, { headers: { Authorization: 'Bearer deliberately-invalid-token' } });
+    const text = await response.text();
+    lines.push(`C auth header: ${response.status} ${text.slice(0, 120)}`, '');
+  } catch (error) {
+    lines.push(`C auth header: threw ${String(error).slice(0, 120)}`, '');
+  }
+
+  lines.push('B ok + A failing = headers dropped, url param is the fix.');
+  lines.push('C 401 "Expected 3 parts in JWT" = Authorization arrives, logins will hold.');
+  lines.push('C 200 with rows = Authorization dropped too, sessions need more work.');
+  return lines.join('\n');
 }
 
 export const supabase = createClient(supabaseUrl ?? 'https://placeholder.supabase.co', supabaseAnonKey ?? 'placeholder-anon-key', {
