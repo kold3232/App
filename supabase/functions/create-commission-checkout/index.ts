@@ -122,8 +122,8 @@ Deno.serve(async (req) => {
           quantity: 1,
         },
       ],
-      success_url: `${appUrl}/commission-paid?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${appUrl}/commission-cancelled`,
+      success_url: `${appUrl}/commission-paid.html?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${appUrl}/commission-cancelled.html`,
       metadata: { payment_id: paymentRow.id, business_id: businessId },
       // Managed Payments (on by default on newer Stripe accounts) wants a
       // product tax code we have no use for on a platform-fee line item —

@@ -1,15 +1,9 @@
-// Where Stripe Checkout redirects a business after a successful commission
-// payment (see APP_PUBLIC_URL in create-commission-checkout). Purely a
-// confirmation screen — the payment itself is already recorded by the
-// stripe-webhook function independently of whether this page ever loads.
-// Public by design (see supabase/config.toml): Stripe's redirect is a plain
-// browser visit with no auth token attached.
-const PAGE = `<!doctype html>
+<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Payment received — RockServ</title>
+<title>Payment cancelled — RockServ</title>
 <style>
   :root { color-scheme: light; }
   * { box-sizing: border-box; }
@@ -36,7 +30,7 @@ const PAGE = `<!doctype html>
     width: 64px;
     height: 64px;
     border-radius: 999px;
-    background: #16A34A;
+    background: #94A3B8;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -59,14 +53,12 @@ const PAGE = `<!doctype html>
 <body>
   <div class="card">
     <div class="icon">
-      <svg width="30" height="30" viewBox="0 0 24 24" fill="none">
-        <path d="M5 13l4 4L19 7" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+        <path d="M6 6l12 12M18 6L6 18" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
     </div>
-    <h1>Payment received</h1>
-    <p>Your commission payment went through. You can close this tab and return to the RockServ app — your account will update automatically.</p>
+    <h1>Payment cancelled</h1>
+    <p>No payment was made. You can close this tab and return to the RockServ app to try again whenever you're ready.</p>
   </div>
 </body>
-</html>`;
-
-Deno.serve(() => new Response(PAGE, { headers: { 'Content-Type': 'text/html; charset=utf-8' } }));
+</html>
