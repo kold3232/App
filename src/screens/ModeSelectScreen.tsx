@@ -3,6 +3,7 @@ import React from 'react';
 import { Image, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import { Button } from '../components/ui';
 import { useApp } from '../context/AppContext';
+import { debugEnvInfo } from '../lib/supabase';
 import { colors, spacing } from '../theme';
 
 export default function ModeSelectScreen() {
@@ -33,6 +34,10 @@ export default function ModeSelectScreen() {
       <Pressable onPress={() => setMode('admin')} hitSlop={12}>
         <Text style={styles.adminLink}>RockServ team? Admin sign-in</Text>
       </Pressable>
+      <Text style={styles.debug}>
+        URL: {debugEnvInfo.urlPresent ? debugEnvInfo.urlPreview : 'MISSING'} · Key:{' '}
+        {debugEnvInfo.anonKeyPresent ? `present (${debugEnvInfo.anonKeyLength} chars)` : 'MISSING'}
+      </Text>
     </SafeAreaView>
   );
 }
@@ -68,4 +73,5 @@ const styles = StyleSheet.create({
   footerDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.accent },
   footer: { textAlign: 'center', color: '#64749B', fontSize: 12, fontWeight: '600' },
   adminLink: { textAlign: 'center', color: '#4A5A85', fontSize: 11.5, marginTop: spacing.md, textDecorationLine: 'underline' },
+  debug: { textAlign: 'center', color: '#5B6B94', fontSize: 10, marginTop: spacing.lg },
 });
