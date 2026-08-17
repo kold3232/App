@@ -15,14 +15,16 @@ export default function CompanyRootNavigator() {
   return (
     <Stack.Navigator
       initialRouteName="CompanyTabs"
-      screenOptions={{
+      screenOptions={({ navigation }) => ({
         headerStyle: { backgroundColor: colors.surface },
         headerTintColor: colors.text,
         headerTitleStyle: { fontWeight: '700' },
         headerShadowVisible: false,
         headerBackButtonDisplayMode: 'minimal',
-        headerLeft: () => <HeaderBackButton />,
-      }}
+        // See BrowseNavigator: a headerLeft that renders null still allocates
+        // an empty native bar button, which iOS 26+ draws as a dead circle.
+        headerLeft: navigation.canGoBack() ? () => <HeaderBackButton /> : undefined,
+      })}
     >
       <Stack.Screen name="CompanyTabs" component={CompanyNavigator} options={{ headerShown: false }} />
       <Stack.Screen

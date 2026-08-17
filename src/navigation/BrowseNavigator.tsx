@@ -29,14 +29,18 @@ export default function BrowseNavigator() {
 
   return (
     <Stack.Navigator
-      screenOptions={{
+      screenOptions={({ navigation }) => ({
         headerStyle: { backgroundColor: colors.surface },
         headerTintColor: colors.text,
         headerTitleStyle: { fontWeight: '700' },
         headerShadowVisible: false,
         headerBackButtonDisplayMode: 'minimal',
-        headerLeft: () => <HeaderBackButton />,
-      }}
+        // Only hand over a headerLeft when there is somewhere to go back to.
+        // Supplying one that renders null still allocates a native bar button
+        // with no content, which iOS 26+ draws as an empty circular glass
+        // pill — a dead button sitting on the stack's root screen.
+        headerLeft: navigation.canGoBack() ? () => <HeaderBackButton /> : undefined,
+      })}
     >
       <Stack.Screen
         name="CategoryList"
