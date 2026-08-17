@@ -7,7 +7,7 @@ import { colors, spacing } from '../../theme';
 import { notify } from '../../utils/alert';
 
 export default function InvoicesScreen() {
-  const { requests, payCommission, refreshRequests } = useApp();
+  const { requests: allRequests, myListings, payCommission, refreshRequests } = useApp();
   const [paying, setPaying] = useState(false);
 
   useFocusEffect(
@@ -16,12 +16,19 @@ export default function InvoicesScreen() {
     }, [refreshRequests])
   );
 
+  // One account can be both a customer and a business, so `requests` also
+  // contains jobs this account booked *as a customer* from other businesses.
+  // Billing those back as commission owed is wrong, and it disagreed with the
+  // checkout function — which counts only jobs on this business's own
+  // listings, and so reported "no commission owed" against a non-zero total.
+  const myListingIds = useMemo(() => new Set(myListings.map((l) => l.id)), [myListings]);
+
   const invoices = useMemo(
     () =>
-      requests
-        .filter((r) => r.status === 'completed' && r.jobValue != null)
+      allRequests
+        .filter((r) => myListingIds.has(r.companyId) && r.status === 'completed' && r.jobValue != null)
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
-    [requests]
+    [allRequests, myListingIds]
   );
 
   const totals = useMemo(
