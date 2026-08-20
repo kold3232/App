@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Linking } from 'react-native';
 import { DEFAULT_CATEGORIES } from '../data/categories';
+import { DEMO_MODE, buildDemoCompanies } from '../data/demoBusinesses';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { uploadBusinessMedia } from '../lib/mediaUpload';
 import { colorFromId } from '../utils/color';
@@ -139,9 +140,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [adminBusinesses, setAdminBusinesses] = useState<AdminBusiness[]>([]);
   const [rawBusinessListings, setRawBusinessListings] = useState<BusinessListingRow[]>([]);
 
-  const businessListings = useMemo<Company[]>(
-    () =>
-      rawBusinessListings.map((l) => {
+  const businessListings = useMemo<Company[]>(() => {
+    const real = rawBusinessListings.map((l) => {
         const listingReviews = reviews.filter((r) => r.companyId === l.id);
         const reviewCount = listingReviews.length;
         const rating = reviewCount > 0 ? listingReviews.reduce((sum, r) => sum + r.rating, 0) / reviewCount : 0;
@@ -162,9 +162,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           availableNow: !!l.available_now,
           coverPhotoUrl: l.cover_photo_url ?? undefined,
         };
-      }),
-    [rawBusinessListings, reviews]
-  );
+      });
+    // Real listings first, so a genuine business always outranks demo seed
+    // data in any list. See DEMO_MODE in data/demoBusinesses.
+    return DEMO_MODE ? [...real, ...buildDemoCompanies()] : real;
+  }, [rawBusinessListings, reviews]);
 
   useEffect(() => {
     (async () => {
