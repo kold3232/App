@@ -620,3 +620,59 @@ begin
     alter publication supabase_realtime add table public.proposed_categories;
   end if;
 end $$;
+
+-- Gib Trades — admin curation: listing order and category placement
+-- Both of these have to live server-side for the same reason proposed
+-- categories do: an admin reordering or re-grouping on their own device
+-- would otherwise change nothing for anyone else.
+
+-- Higher priority sorts first, ties fall back to rating. Default 0 leaves
+-- every existing listing where it was until an admin actually intervenes.
+alter table public.business_listings
+  add column if not exists display_priority int not null default 0;
+
+create index if not exists business_listings_display_priority_idx
+  on public.business_listings (display_priority desc);
+
+-- Admins could read every listing but not touch one, so reordering needs a
+-- new policy rather than reusing the business-owns-its-listing rule.
+create policy "Admins can update any listing"
+  on public.business_listings for update
+  using (exists (select 1 from public.admins a where a.id = auth.uid()));
+
+-- Categories ship inside the app (data/categories.ts). This table records
+-- admin changes to them — which group a category sits in, and whether it is
+-- live — keyed by the category slug. A null column means "leave as shipped",
+-- so a row can override placement without touching status or vice versa.
+create table if not exists public.category_overrides (
+  slug text primary key,
+  group_id text check (group_id in ('home', 'other', 'vehicle', 'events')),
+  status text check (status in ('live', 'coming-soon')),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.category_overrides enable row level security;
+
+-- Customers must see these to browse the categories in the right place, so
+-- reads are open rather than restricted to signed-in users.
+create policy "Anyone can view category overrides"
+  on public.category_overrides for select
+  using (true);
+
+create policy "Admins can insert category overrides"
+  on public.category_overrides for insert
+  with check (exists (select 1 from public.admins a where a.id = auth.uid()));
+
+create policy "Admins can update category overrides"
+  on public.category_overrides for update
+  using (exists (select 1 from public.admins a where a.id = auth.uid()));
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'category_overrides'
+  ) then
+    alter publication supabase_realtime add table public.category_overrides;
+  end if;
+end $$;

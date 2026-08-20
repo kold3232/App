@@ -12,6 +12,7 @@ import {
   ApplicationStatus,
   BusinessAccount,
   Category,
+  CategoryGroupId,
   ChatMessage,
   ChatMessageSender,
   Company,
@@ -99,6 +100,8 @@ type AppContextValue = {
   pendingCategories: ProposedCategory[];
   approveProposedCategory: (id: string) => Promise<void>;
   rejectProposedCategory: (id: string) => Promise<void>;
+  setCategoryGroup: (slug: string, groupId: CategoryGroupId) => Promise<void>;
+  moveListingInCategory: (listingId: string, categoryId: string, direction: 'up' | 'down' | 'top') => Promise<void>;
   adminBusinesses: AdminBusiness[];
   refreshAdminBusinesses: () => Promise<void>;
   approveAdminApplication: (id: string) => Promise<void>;
@@ -123,6 +126,7 @@ type BusinessListingRow = {
   services: ServiceLineRow[] | null;
   available_now: boolean | null;
   cover_photo_url: string | null;
+  display_priority: number | null;
 };
 
 const AppContext = createContext<AppContextValue | undefined>(undefined);
@@ -146,6 +150,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [proposedCategories, setProposedCategories] = useState<ProposedCategory[]>([]);
   const [adminBusinesses, setAdminBusinesses] = useState<AdminBusiness[]>([]);
   const [rawBusinessListings, setRawBusinessListings] = useState<BusinessListingRow[]>([]);
+  const [categoryOverrides, setCategoryOverrides] = useState<Record<string, { groupId?: CategoryGroupId; status?: Category['status'] }>>({});
 
   // Built-in categories ship with the app; approved business proposals are
   // merged on top as live entries in the "Other" group. A proposal is only
@@ -163,8 +168,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         status: 'live',
         groupId: 'other',
       }));
-    return [...baseCategories, ...approved];
-  }, [baseCategories, proposedCategories]);
+    // Admin moves (group, live/coming-soon) are stored server-side and
+    // applied last, so they win over whatever shipped in the app bundle.
+    return [...baseCategories, ...approved].map((c) => {
+      const override = categoryOverrides[c.id];
+      if (!override) return c;
+      return {
+        ...c,
+        groupId: override.groupId ?? c.groupId,
+        status: override.status ?? c.status,
+      };
+    });
+  }, [baseCategories, proposedCategories, categoryOverrides]);
 
   const myProposedCategories = useMemo(
     () => proposedCategories.filter((p) => p.proposedBy && p.proposedBy === businessAccount?.id),
@@ -197,11 +212,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           color: colorFromId(l.business_id),
           availableNow: !!l.available_now,
           coverPhotoUrl: l.cover_photo_url ?? undefined,
+          displayPriority: l.display_priority ?? 0,
         };
       });
     // Real listings first, so a genuine business always outranks demo seed
     // data in any list. See DEMO_MODE in data/demoBusinesses.
-    return DEMO_MODE ? [...real, ...buildDemoCompanies()] : real;
+    const all = DEMO_MODE ? [...real, ...buildDemoCompanies()] : real;
+    // Admin-set priority wins; everything else falls back to rating, so an
+    // untouched marketplace still surfaces well-reviewed businesses first.
+    return all.sort((a, b) => b.displayPriority - a.displayPriority || b.rating - a.rating);
   }, [rawBusinessListings, reviews]);
 
   useEffect(() => {
@@ -290,7 +309,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const [{ data: listingRows, error: listingError }, { data: bizRows }] = await Promise.all([
       supabase
         .from('business_listings')
-        .select('id, business_id, name, phone, category_ids, tagline, description, price_range, services, available_now, cover_photo_url'),
+        .select('id, business_id, name, phone, category_ids, tagline, description, price_range, services, available_now, cover_photo_url, display_priority'),
       supabase.from('businesses').select('id, is_approved, business_status'),
     ]);
     if (listingError || !listingRows || !bizRows) return;
@@ -333,6 +352,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // RLS decides what comes back: the public sees approved rows, a business
   // additionally sees its own, an admin sees everything. One query covers
   // all three cases rather than branching on role here.
+  const refreshCategoryOverrides = useCallback(async () => {
+    const { data, error } = await supabase.from('category_overrides').select('slug, group_id, status');
+    if (error || !data) return;
+    const next: Record<string, { groupId?: CategoryGroupId; status?: Category['status'] }> = {};
+    data.forEach((row) => {
+      next[row.slug] = {
+        groupId: (row.group_id as CategoryGroupId) ?? undefined,
+        status: (row.status as Category['status']) ?? undefined,
+      };
+    });
+    setCategoryOverrides(next);
+  }, []);
+
   const refreshProposedCategories = useCallback(async () => {
     const { data, error } = await supabase
       .from('proposed_categories')
@@ -461,7 +493,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     refreshBusinessListings();
     refreshReviews();
     refreshProposedCategories();
-  }, [refreshBusinessListings, refreshReviews, refreshProposedCategories]);
+    refreshCategoryOverrides();
+  }, [refreshBusinessListings, refreshReviews, refreshProposedCategories, refreshCategoryOverrides]);
 
   // A business's own pending proposals only become visible to it once it is
   // signed in, and an admin only sees the full queue after signing in — so
@@ -488,11 +521,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'proposed_categories' }, () => {
         refreshProposedCategories();
       })
+      // Admin reordering a listing or moving a category lands on browsing
+      // customers without them reopening the app.
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'category_overrides' }, () => {
+        refreshCategoryOverrides();
+      })
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [refreshBusinessListings, refreshProposedCategories]);
+  }, [refreshBusinessListings, refreshProposedCategories, refreshCategoryOverrides]);
 
   // Requests are only visible to their two participants, plus admins
   // (enforced by RLS) — fetch them once we know who's logged in. Admins get
@@ -920,15 +958,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const toggleCategoryStatus = useCallback((id: string) => {
-    setBaseCategories((prev) => {
-      const next = prev.map((c) =>
-        c.id === id ? { ...c, status: (c.status === 'live' ? 'coming-soon' : 'live') as Category['status'] } : c
-      );
-      AsyncStorage.setItem(STORAGE_KEYS.categories, JSON.stringify(next));
-      return next;
-    });
-  }, []);
+  // Was AsyncStorage-only, which meant toggling a category live only ever
+  // affected the admin's own device. Goes through the same server-side
+  // override table as group moves so it reaches customers.
+  const toggleCategoryStatus = useCallback(
+    (id: string) => {
+      const current = categories.find((c) => c.id === id);
+      const nextStatus: Category['status'] = current?.status === 'live' ? 'coming-soon' : 'live';
+      setCategoryOverrides((prev) => ({ ...prev, [id]: { ...prev[id], status: nextStatus } }));
+      supabase
+        .from('category_overrides')
+        .upsert({ slug: id, status: nextStatus, updated_at: new Date().toISOString() }, { onConflict: 'slug' })
+        .then(({ error }) => {
+          if (error) refreshCategoryOverrides();
+        });
+    },
+    [categories, refreshCategoryOverrides]
+  );
 
   const addCategory = useCallback((category: Category) => {
     setBaseCategories((prev) => {
@@ -979,6 +1025,66 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
     },
     []
+  );
+
+  const setCategoryGroup = useCallback(
+    async (slug: string, groupId: CategoryGroupId) => {
+      // Optimistic: the admin sees the move land immediately, and realtime
+      // carries it to everyone else a moment later.
+      setCategoryOverrides((prev) => ({ ...prev, [slug]: { ...prev[slug], groupId } }));
+      const { error } = await supabase
+        .from('category_overrides')
+        .upsert({ slug, group_id: groupId, updated_at: new Date().toISOString() }, { onConflict: 'slug' });
+      if (error) await refreshCategoryOverrides();
+    },
+    [refreshCategoryOverrides]
+  );
+
+  /**
+   * Reorders one listing within a category by rewriting the priority of every
+   * listing in that category.
+   *
+   * Priorities all start at 0, so nudging a single row is not enough to
+   * establish an order — the whole category gets renumbered from its current
+   * displayed sequence, which also repairs any ties left by earlier moves.
+   * Demo businesses are skipped: they aren't database rows, so there is
+   * nothing to write.
+   */
+  const moveListingInCategory = useCallback(
+    async (listingId: string, categoryId: string, direction: 'up' | 'down' | 'top') => {
+      const inCategory = rawBusinessListings
+        .filter((l) => (l.category_ids ?? []).includes(categoryId))
+        .sort((a, b) => (b.display_priority ?? 0) - (a.display_priority ?? 0));
+
+      const from = inCategory.findIndex((l) => l.id === listingId);
+      if (from === -1) return;
+      const to = direction === 'top' ? 0 : direction === 'up' ? from - 1 : from + 1;
+      if (to < 0 || to >= inCategory.length) return;
+
+      const reordered = [...inCategory];
+      const [moved] = reordered.splice(from, 1);
+      reordered.splice(to, 0, moved);
+
+      const updates = reordered.map((listing, index) => ({
+        id: listing.id,
+        priority: reordered.length - index,
+      }));
+
+      setRawBusinessListings((prev) =>
+        prev.map((l) => {
+          const update = updates.find((u) => u.id === l.id);
+          return update ? { ...l, display_priority: update.priority } : l;
+        })
+      );
+
+      await Promise.all(
+        updates.map((u) =>
+          supabase.from('business_listings').update({ display_priority: u.priority }).eq('id', u.id)
+        )
+      );
+      await refreshBusinessListings();
+    },
+    [rawBusinessListings, refreshBusinessListings]
   );
 
   const approveProposedCategory = useCallback(
@@ -1165,6 +1271,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       pendingCategories,
       approveProposedCategory,
       rejectProposedCategory,
+      setCategoryGroup,
+      moveListingInCategory,
       adminBusinesses,
       refreshAdminBusinesses,
       approveAdminApplication,
@@ -1230,6 +1338,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       pendingCategories,
       approveProposedCategory,
       rejectProposedCategory,
+      setCategoryGroup,
+      moveListingInCategory,
       adminBusinesses,
       refreshAdminBusinesses,
       approveAdminApplication,

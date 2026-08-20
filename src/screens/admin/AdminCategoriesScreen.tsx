@@ -27,8 +27,18 @@ const ICON_OPTIONS: Category['icon'][] = [
 ];
 
 export default function AdminCategoriesScreen() {
-  const { categories, toggleCategoryStatus, addCategory, pendingCategories, approveProposedCategory, rejectProposedCategory } =
-    useApp();
+  const {
+    categories,
+    toggleCategoryStatus,
+    addCategory,
+    pendingCategories,
+    approveProposedCategory,
+    rejectProposedCategory,
+    setCategoryGroup,
+    moveListingInCategory,
+    businessListings,
+  } = useApp();
+  const [orderingCategoryId, setOrderingCategoryId] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [icon, setIcon] = useState<Category['icon']>(ICON_OPTIONS[0]);
@@ -83,18 +93,96 @@ export default function AdminCategoriesScreen() {
       )}
 
       <SectionLabel>Live ({liveCategories.length})</SectionLabel>
-      {liveCategories.map((c) => (
-        <Card key={c.id} style={styles.categoryCard}>
-          <View style={styles.categoryRow}>
-            <Ionicons name={c.icon} size={18} color={colors.primary} />
-            <View style={{ flex: 1, marginLeft: spacing.sm }}>
-              <Text style={styles.categoryName}>{c.name}</Text>
-              <Text style={styles.categoryDesc}>{c.description}</Text>
+      {liveCategories.map((c) => {
+        const expanded = orderingCategoryId === c.id;
+        const listings = businessListings.filter((b) => b.categoryIds.includes(c.id));
+        const realListings = listings.filter((b) => !b.id.startsWith('demo-'));
+        return (
+          <Card key={c.id} style={styles.categoryCard}>
+            <View style={styles.categoryRow}>
+              <Ionicons name={c.icon} size={18} color={colors.primary} />
+              <View style={{ flex: 1, marginLeft: spacing.sm }}>
+                <Text style={styles.categoryName}>{c.name}</Text>
+                <Text style={styles.categoryDesc}>{c.description}</Text>
+              </View>
+              <Switch value={true} onValueChange={() => toggleCategoryStatus(c.id)} trackColor={{ false: colors.border, true: colors.primary }} />
             </View>
-            <Switch value={true} onValueChange={() => toggleCategoryStatus(c.id)} trackColor={{ false: colors.border, true: colors.primary }} />
-          </View>
-        </Card>
-      ))}
+
+            <Text style={styles.controlLabel}>Group</Text>
+            <View style={styles.groupWrap}>
+              {CATEGORY_GROUPS.map((g) => (
+                <Chip
+                  key={g.id}
+                  label={g.name}
+                  selected={c.groupId === g.id}
+                  onPress={() => setCategoryGroup(c.id, g.id)}
+                />
+              ))}
+            </View>
+
+            <Pressable
+              onPress={() => setOrderingCategoryId(expanded ? null : c.id)}
+              style={styles.orderToggle}
+            >
+              <Ionicons name={expanded ? 'chevron-down' : 'chevron-forward'} size={15} color={colors.primary} />
+              <Text style={styles.orderToggleText}>
+                Order businesses ({realListings.length})
+              </Text>
+            </Pressable>
+
+            {expanded && (
+              <View style={styles.orderList}>
+                {realListings.length === 0 && (
+                  <Text style={styles.orderEmpty}>No real businesses listed in this category yet.</Text>
+                )}
+                {realListings.map((b, index) => (
+                  <View key={b.id} style={styles.orderRow}>
+                    <Text style={styles.orderIndex}>{index + 1}</Text>
+                    <Text style={styles.orderName} numberOfLines={1}>
+                      {b.name}
+                    </Text>
+                    <Pressable
+                      onPress={() => moveListingInCategory(b.id, c.id, 'top')}
+                      disabled={index === 0}
+                      hitSlop={8}
+                      style={[styles.orderButton, index === 0 && styles.orderButtonDisabled]}
+                    >
+                      <Ionicons name="arrow-up-circle" size={20} color={index === 0 ? colors.textFaint : colors.primary} />
+                    </Pressable>
+                    <Pressable
+                      onPress={() => moveListingInCategory(b.id, c.id, 'up')}
+                      disabled={index === 0}
+                      hitSlop={8}
+                      style={[styles.orderButton, index === 0 && styles.orderButtonDisabled]}
+                    >
+                      <Ionicons name="chevron-up" size={20} color={index === 0 ? colors.textFaint : colors.text} />
+                    </Pressable>
+                    <Pressable
+                      onPress={() => moveListingInCategory(b.id, c.id, 'down')}
+                      disabled={index === realListings.length - 1}
+                      hitSlop={8}
+                      style={[styles.orderButton, index === realListings.length - 1 && styles.orderButtonDisabled]}
+                    >
+                      <Ionicons
+                        name="chevron-down"
+                        size={20}
+                        color={index === realListings.length - 1 ? colors.textFaint : colors.text}
+                      />
+                    </Pressable>
+                  </View>
+                ))}
+                {listings.length > realListings.length && (
+                  <Text style={styles.orderEmpty}>
+                    {listings.length - realListings.length} demo business
+                    {listings.length - realListings.length === 1 ? '' : 'es'} hidden — demo entries aren’t saved
+                    records, so they can’t be reordered.
+                  </Text>
+                )}
+              </View>
+            )}
+          </Card>
+        );
+      })}
 
       <SectionLabel>Coming soon ({comingSoonCategories.length})</SectionLabel>
       {comingSoonCategories.map((c) => (
@@ -165,6 +253,24 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 13, color: colors.textMuted, marginTop: 4, marginBottom: spacing.md },
   categoryCard: { marginTop: spacing.xs, marginBottom: spacing.sm },
   reviewActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
+  controlLabel: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginTop: spacing.md,
+    marginBottom: 6,
+  },
+  orderToggle: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: spacing.sm, paddingVertical: 4 },
+  orderToggleText: { fontSize: 12.5, fontWeight: '700', color: colors.primary },
+  orderList: { marginTop: spacing.xs, gap: 4 },
+  orderRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: 5 },
+  orderIndex: { fontSize: 11.5, fontWeight: '700', color: colors.textMuted, width: 18 },
+  orderName: { flex: 1, fontSize: 13, fontWeight: '600', color: colors.text },
+  orderButton: { padding: 2 },
+  orderButtonDisabled: { opacity: 0.4 },
+  orderEmpty: { fontSize: 11.5, color: colors.textMuted, lineHeight: 16, marginTop: 4 },
   categoryRow: { flexDirection: 'row', alignItems: 'center' },
   categoryName: { fontSize: 14.5, fontWeight: '700', color: colors.text },
   categoryDesc: { fontSize: 11.5, color: colors.textMuted, marginTop: 2 },

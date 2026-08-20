@@ -280,6 +280,9 @@ export function buildDemoCompanies(): Company[] {
         services: trade.services,
         color: colorFromId(id),
         availableNow: seededValue(id, i + 13, 0, 2) === 0,
+        // Demo entries are never DB rows, so an admin can't reorder them.
+        // Leaving them at zero keeps any curated real listing above them.
+        displayPriority: 0,
       });
     }
   });

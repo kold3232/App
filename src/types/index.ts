@@ -52,6 +52,8 @@ export type Company = {
   color: string;
   availableNow?: boolean;
   coverPhotoUrl?: string;
+  // Admin-curated position; higher sorts first, ties fall back to rating.
+  displayPriority: number;
 };
 
 export type GalleryImage = {
