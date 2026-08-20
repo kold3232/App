@@ -10,6 +10,7 @@ export const DEFAULT_CATEGORIES: Category[] = [
   { id: 'aircon', name: 'Air Con', icon: 'snow-outline', description: 'Install, service & repair', status: 'live', groupId: 'home' },
   { id: 'gardener', name: 'Gardener', icon: 'leaf-outline', description: 'Maintenance, patios & terraces', status: 'live', groupId: 'home' },
   { id: 'tilers', name: 'Tilers', icon: 'grid-outline', description: 'Floor, wall & bathroom tiling', status: 'live', groupId: 'home' },
+  { id: 'cleaning', name: 'Cleaning', icon: 'sparkles-outline', description: 'Domestic, deep cleans & end of tenancy', status: 'live', groupId: 'home' },
   { id: 'removals', name: 'Removals', icon: 'cube-outline', description: 'House moves & deliveries', status: 'live', groupId: 'other' },
   { id: 'mechanic-detailers', name: 'Mechanic & Detailers', icon: 'car-outline', description: 'Car servicing, repairs & detailing', status: 'live', groupId: 'vehicle' },
 

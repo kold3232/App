@@ -21,6 +21,16 @@ export type Category = {
   groupId: CategoryGroupId;
 };
 
+export type ProposedCategory = {
+  id: string;
+  slug: string;
+  name: string;
+  proposedBy: string | null;
+  proposedByName?: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+};
+
 export type ServiceLine = {
   name: string;
   priceFrom: number | null;

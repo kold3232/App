@@ -27,7 +27,8 @@ const ICON_OPTIONS: Category['icon'][] = [
 ];
 
 export default function AdminCategoriesScreen() {
-  const { categories, toggleCategoryStatus, addCategory } = useApp();
+  const { categories, toggleCategoryStatus, addCategory, pendingCategories, approveProposedCategory, rejectProposedCategory } =
+    useApp();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [icon, setIcon] = useState<Category['icon']>(ICON_OPTIONS[0]);
@@ -53,6 +54,33 @@ export default function AdminCategoriesScreen() {
     <ScrollView style={styles.container} contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xl * 2 }}>
       <Text style={styles.title}>Categories</Text>
       <Text style={styles.subtitle}>Toggle categories live or coming-soon, or add a new one.</Text>
+
+      {pendingCategories.length > 0 && (
+        <>
+          <SectionLabel>Suggested by businesses ({pendingCategories.length})</SectionLabel>
+          {pendingCategories.map((p) => (
+            <Card key={p.id} style={styles.categoryCard}>
+              <View style={styles.categoryRow}>
+                <Ionicons name="pricetag-outline" size={18} color={colors.pending} />
+                <View style={{ flex: 1, marginLeft: spacing.sm }}>
+                  <Text style={styles.categoryName}>{p.name}</Text>
+                  <Text style={styles.categoryDesc}>
+                    Approving publishes it under “Other” for every customer straight away.
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.reviewActions}>
+                <View style={{ flex: 1 }}>
+                  <Button title="Approve" onPress={() => approveProposedCategory(p.id)} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Button title="Reject" variant="secondary" onPress={() => rejectProposedCategory(p.id)} />
+                </View>
+              </View>
+            </Card>
+          ))}
+        </>
+      )}
 
       <SectionLabel>Live ({liveCategories.length})</SectionLabel>
       {liveCategories.map((c) => (
@@ -136,6 +164,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: '800', color: colors.text, letterSpacing: 0.1 },
   subtitle: { fontSize: 13, color: colors.textMuted, marginTop: 4, marginBottom: spacing.md },
   categoryCard: { marginTop: spacing.xs, marginBottom: spacing.sm },
+  reviewActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
   categoryRow: { flexDirection: 'row', alignItems: 'center' },
   categoryName: { fontSize: 14.5, fontWeight: '700', color: colors.text },
   categoryDesc: { fontSize: 11.5, color: colors.textMuted, marginTop: 2 },

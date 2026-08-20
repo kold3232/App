@@ -179,6 +179,23 @@ const TRADES: Record<string, TradeConfig> = {
       { name: 'Wet room installation', priceFrom: 2100 },
     ],
   },
+  cleaning: {
+    suffixes: ['Cleaning', 'Cleaning Co.', 'Domestic Care', 'Clean & Care', 'Housekeeping'],
+    taglines: [
+      'Regular cleans and one-off deep cleans',
+      'End of tenancy specialists',
+      'Spotless, every visit',
+      'Trusted cleaners, vetted and insured',
+    ],
+    description:
+      'Domestic and commercial cleaning across Gibraltar — weekly visits, deep cleans and end-of-tenancy work, with vetted and insured cleaners.',
+    services: [
+      { name: 'Weekly domestic clean', priceFrom: 45 },
+      { name: 'Deep clean', priceFrom: 180 },
+      { name: 'End of tenancy', priceFrom: 260 },
+      { name: 'Office cleaning', priceFrom: 90 },
+    ],
+  },
   removals: {
     suffixes: ['Removals', 'Movers', 'Logistics', 'Moving Co.', 'Transport'],
     taglines: [

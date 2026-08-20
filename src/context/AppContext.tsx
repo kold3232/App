@@ -19,6 +19,7 @@ import {
   CustomerProfile,
   GalleryImage,
   NotifySignup,
+  ProposedCategory,
   Review,
   ServiceRequest,
   UserMode,
@@ -93,6 +94,11 @@ type AppContextValue = {
   categories: Category[];
   toggleCategoryStatus: (id: string) => void;
   addCategory: (category: Category) => void;
+  proposeCategory: (name: string) => Promise<{ error?: string }>;
+  myProposedCategories: ProposedCategory[];
+  pendingCategories: ProposedCategory[];
+  approveProposedCategory: (id: string) => Promise<void>;
+  rejectProposedCategory: (id: string) => Promise<void>;
   adminBusinesses: AdminBusiness[];
   refreshAdminBusinesses: () => Promise<void>;
   approveAdminApplication: (id: string) => Promise<void>;
@@ -136,9 +142,39 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
   const [myListings, setMyListings] = useState<CompanyProfile[]>([]);
   const [notifySignups, setNotifySignups] = useState<NotifySignup[]>([]);
-  const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
+  const [baseCategories, setBaseCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
+  const [proposedCategories, setProposedCategories] = useState<ProposedCategory[]>([]);
   const [adminBusinesses, setAdminBusinesses] = useState<AdminBusiness[]>([]);
   const [rawBusinessListings, setRawBusinessListings] = useState<BusinessListingRow[]>([]);
+
+  // Built-in categories ship with the app; approved business proposals are
+  // merged on top as live entries in the "Other" group. A proposal is only
+  // ever additive — it can't shadow a built-in category, since the slug
+  // check on insert rejects names that already exist.
+  const categories = useMemo<Category[]>(() => {
+    const approved = proposedCategories
+      .filter((p) => p.status === 'approved')
+      .filter((p) => !baseCategories.some((c) => c.id === p.slug))
+      .map<Category>((p) => ({
+        id: p.slug,
+        name: p.name,
+        icon: 'pricetag-outline',
+        description: 'Added by a Gibraltar business',
+        status: 'live',
+        groupId: 'other',
+      }));
+    return [...baseCategories, ...approved];
+  }, [baseCategories, proposedCategories]);
+
+  const myProposedCategories = useMemo(
+    () => proposedCategories.filter((p) => p.proposedBy && p.proposedBy === businessAccount?.id),
+    [proposedCategories, businessAccount]
+  );
+
+  const pendingCategories = useMemo(
+    () => proposedCategories.filter((p) => p.status === 'pending'),
+    [proposedCategories]
+  );
 
   const businessListings = useMemo<Company[]>(() => {
     const real = rawBusinessListings.map((l) => {
@@ -183,7 +219,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           setModeState(parsedMode === 'admin' ? null : parsedMode);
         }
         if (storedSignups) setNotifySignups(JSON.parse(storedSignups));
-        if (storedCategories) setCategories(JSON.parse(storedCategories));
+        if (storedCategories) setBaseCategories(JSON.parse(storedCategories));
         if (storedHasAcceptedLegal) setHasAcceptedLegal(JSON.parse(storedHasAcceptedLegal));
       } finally {
         setIsReady(true);
@@ -281,6 +317,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       );
     }
   }, []);
+
+  const mapProposedRow = useCallback(
+    (row: any): ProposedCategory => ({
+      id: row.id,
+      slug: row.slug,
+      name: row.name,
+      proposedBy: row.proposed_by ?? null,
+      status: row.status,
+      createdAt: row.created_at,
+    }),
+    []
+  );
+
+  // RLS decides what comes back: the public sees approved rows, a business
+  // additionally sees its own, an admin sees everything. One query covers
+  // all three cases rather than branching on role here.
+  const refreshProposedCategories = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('proposed_categories')
+      .select('id, slug, name, proposed_by, status, created_at')
+      .order('created_at', { ascending: false });
+    if (!error && data) setProposedCategories(data.map(mapProposedRow));
+  }, [mapProposedRow]);
 
   const mapRequestRow = useCallback(
     (row: any): ServiceRequest => ({
@@ -395,12 +454,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
   }, [fetchCustomerProfile, fetchBusinessAccount, fetchIsAdmin]);
 
-  // Business listings and reviews are public — anyone can browse them regardless of login state.
+  // Business listings, reviews and approved categories are public — anyone can
+  // browse them regardless of login state.
   useEffect(() => {
     if (!isSupabaseConfigured) return;
     refreshBusinessListings();
     refreshReviews();
-  }, [refreshBusinessListings, refreshReviews]);
+    refreshProposedCategories();
+  }, [refreshBusinessListings, refreshReviews, refreshProposedCategories]);
+
+  // A business's own pending proposals only become visible to it once it is
+  // signed in, and an admin only sees the full queue after signing in — so
+  // re-fetch when either identity resolves.
+  useEffect(() => {
+    if (!isSupabaseConfigured || authLoading) return;
+    if (businessAccount || isAdminUser) refreshProposedCategories();
+  }, [businessAccount, isAdminUser, authLoading, refreshProposedCategories]);
 
   // Live updates: a saved/edited listing, or a newly-approved business, shows up
   // for browsing customers immediately without needing to reopen the app.
@@ -414,11 +483,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'businesses' }, () => {
         refreshBusinessListings();
       })
+      // An admin approving a proposed category publishes it to every device
+      // straight away, which is the point of storing them server-side.
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'proposed_categories' }, () => {
+        refreshProposedCategories();
+      })
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [refreshBusinessListings]);
+  }, [refreshBusinessListings, refreshProposedCategories]);
 
   // Requests are only visible to their two participants, plus admins
   // (enforced by RLS) — fetch them once we know who's logged in. Admins get
@@ -847,7 +921,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const toggleCategoryStatus = useCallback((id: string) => {
-    setCategories((prev) => {
+    setBaseCategories((prev) => {
       const next = prev.map((c) =>
         c.id === id ? { ...c, status: (c.status === 'live' ? 'coming-soon' : 'live') as Category['status'] } : c
       );
@@ -857,12 +931,65 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const addCategory = useCallback((category: Category) => {
-    setCategories((prev) => {
+    setBaseCategories((prev) => {
       const next = [...prev, category];
       AsyncStorage.setItem(STORAGE_KEYS.categories, JSON.stringify(next));
       return next;
     });
   }, []);
+
+  const proposeCategory = useCallback(
+    async (name: string): Promise<{ error?: string }> => {
+      const trimmed = name.trim();
+      if (!trimmed) return { error: 'Enter a category name.' };
+      const slug = trimmed.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+      if (!slug) return { error: 'Enter a category name using letters or numbers.' };
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      const businessId = sessionData.session?.user.id;
+      if (!businessId) return { error: 'Not signed in.' };
+
+      if (baseCategories.some((c) => c.id === slug)) {
+        return { error: 'That category already exists — you can pick it from the list above.' };
+      }
+
+      const { error } = await supabase
+        .from('proposed_categories')
+        .insert({ slug, name: trimmed, proposed_by: businessId });
+      if (error) {
+        // The unique index on slug is what stops two businesses proposing
+        // the same trade twice; surface that as a normal outcome, not a bug.
+        if (error.code === '23505') return { error: 'That category has already been suggested.' };
+        return { error: error.message };
+      }
+      await refreshProposedCategories();
+      return {};
+    },
+    [baseCategories, refreshProposedCategories]
+  );
+
+  const reviewProposedCategory = useCallback(
+    async (id: string, status: 'approved' | 'rejected') => {
+      const { error } = await supabase
+        .from('proposed_categories')
+        .update({ status, reviewed_at: new Date().toISOString() })
+        .eq('id', id);
+      if (!error) {
+        setProposedCategories((prev) => prev.map((p) => (p.id === id ? { ...p, status } : p)));
+      }
+    },
+    []
+  );
+
+  const approveProposedCategory = useCallback(
+    (id: string) => reviewProposedCategory(id, 'approved'),
+    [reviewProposedCategory]
+  );
+
+  const rejectProposedCategory = useCallback(
+    (id: string) => reviewProposedCategory(id, 'rejected'),
+    [reviewProposedCategory]
+  );
 
   const refreshAdminBusinesses = useCallback(async () => {
     const [{ data: bizRows, error: bizError }, { data: listingRows }, { data: reqRows }, { data: flagRows }] =
@@ -1033,6 +1160,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       categories,
       toggleCategoryStatus,
       addCategory,
+      proposeCategory,
+      myProposedCategories,
+      pendingCategories,
+      approveProposedCategory,
+      rejectProposedCategory,
       adminBusinesses,
       refreshAdminBusinesses,
       approveAdminApplication,
@@ -1093,6 +1225,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       categories,
       toggleCategoryStatus,
       addCategory,
+      proposeCategory,
+      myProposedCategories,
+      pendingCategories,
+      approveProposedCategory,
+      rejectProposedCategory,
       adminBusinesses,
       refreshAdminBusinesses,
       approveAdminApplication,

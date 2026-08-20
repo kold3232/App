@@ -62,6 +62,8 @@ export default function ListingEditorScreen({ route, navigation }: Props) {
     updateListing,
     deleteListing,
     categories,
+    proposeCategory,
+    myProposedCategories,
     businessAccount,
     uploadCoverPhoto,
     fetchGalleryImages,
@@ -79,6 +81,20 @@ export default function ListingEditorScreen({ route, navigation }: Props) {
   const [coverUploading, setCoverUploading] = useState(false);
   const [gallery, setGallery] = useState<GalleryImage[]>([]);
   const [galleryUploading, setGalleryUploading] = useState(false);
+  const [proposedName, setProposedName] = useState('');
+  const [proposing, setProposing] = useState(false);
+
+  async function handleProposeCategory() {
+    setProposing(true);
+    const { error } = await proposeCategory(proposedName);
+    setProposing(false);
+    if (error) {
+      notify('Could not suggest that', error);
+      return;
+    }
+    setProposedName('');
+    notify('Suggestion sent', 'An admin will review it. You’ll see it here once it’s approved.');
+  }
 
   useEffect(() => {
     if (existing) setProfile(existing);
@@ -261,6 +277,53 @@ export default function ListingEditorScreen({ route, navigation }: Props) {
           ))}
         </View>
 
+        <View style={styles.suggestBox}>
+          <Text style={styles.suggestHeading}>Can’t find your trade?</Text>
+          <Text style={styles.suggestBody}>
+            Suggest it and we’ll review it. Once approved it appears under “Other” for customers to browse.
+          </Text>
+          <View style={styles.suggestRow}>
+            <TextInput
+              style={styles.suggestInput}
+              value={proposedName}
+              onChangeText={setProposedName}
+              placeholder="e.g. Pool maintenance"
+              placeholderTextColor={colors.textFaint}
+              selectionColor={colors.primary}
+            />
+            <Button title="Suggest" onPress={handleProposeCategory} loading={proposing} />
+          </View>
+          {myProposedCategories.length > 0 && (
+            <View style={styles.proposalList}>
+              {myProposedCategories.map((p) => (
+                <View key={p.id} style={styles.proposalRow}>
+                  <Ionicons
+                    name={
+                      p.status === 'approved'
+                        ? 'checkmark-circle'
+                        : p.status === 'rejected'
+                        ? 'close-circle'
+                        : 'time-outline'
+                    }
+                    size={15}
+                    color={
+                      p.status === 'approved'
+                        ? colors.success
+                        : p.status === 'rejected'
+                        ? colors.textFaint
+                        : colors.pending
+                    }
+                  />
+                  <Text style={styles.proposalName}>{p.name}</Text>
+                  <Text style={styles.proposalStatus}>
+                    {p.status === 'approved' ? 'Approved' : p.status === 'rejected' ? 'Not approved' : 'Awaiting review'}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+
         <SectionLabel>Price range</SectionLabel>
         <View style={styles.chipWrap}>
           {PRICE_OPTIONS.map((p) => (
@@ -382,6 +445,31 @@ const styles = StyleSheet.create({
   },
   multiline: { minHeight: 90, textAlignVertical: 'top' },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', marginTop: spacing.xs, marginBottom: spacing.sm },
+  suggestBox: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+    ...shadow.card,
+  },
+  suggestHeading: { fontSize: 14, fontWeight: '800', color: colors.text },
+  suggestBody: { fontSize: 12.5, color: colors.textMuted, marginTop: 3, lineHeight: 17 },
+  suggestRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm },
+  suggestInput: {
+    flex: 1,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: colors.text,
+  },
+  proposalList: { marginTop: spacing.md, gap: 6 },
+  proposalRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  proposalName: { fontSize: 13, fontWeight: '600', color: colors.text },
+  proposalStatus: { fontSize: 11.5, color: colors.textMuted, marginLeft: 'auto' },
   serviceRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',

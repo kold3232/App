@@ -565,3 +565,58 @@ create index if not exists business_flags_business_id_idx on public.business_fla
 
 create index if not exists commission_payments_business_id_idx on public.commission_payments (business_id);
 create index if not exists commission_payment_items_request_id_idx on public.commission_payment_items (request_id);
+
+-- Gib Trades — business-proposed categories
+-- Categories themselves still ship with the app (data/categories.ts). This
+-- table only covers trades a business asks for that aren't in that list.
+-- Approved rows are merged into the category list at runtime and land in the
+-- "Other" group, so admin approval publishes a category to every device
+-- rather than only the one that approved it — the app previously kept
+-- categories in per-device AsyncStorage, where an approval went nowhere.
+create table if not exists public.proposed_categories (
+  id uuid primary key default gen_random_uuid(),
+  slug text not null unique,
+  name text not null,
+  proposed_by uuid references public.businesses (id) on delete set null,
+  status text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
+  created_at timestamptz not null default now(),
+  reviewed_at timestamptz
+);
+
+alter table public.proposed_categories enable row level security;
+
+-- Customers need to see approved categories to browse them at all, so the
+-- read policy is deliberately open rather than limited to signed-in users.
+create policy "Anyone can view approved categories"
+  on public.proposed_categories for select
+  using (status = 'approved');
+
+create policy "Businesses can view their own proposals"
+  on public.proposed_categories for select
+  using (auth.uid() = proposed_by);
+
+create policy "Businesses can propose categories"
+  on public.proposed_categories for insert
+  with check (auth.uid() = proposed_by);
+
+create policy "Admins can view all proposed categories"
+  on public.proposed_categories for select
+  using (exists (select 1 from public.admins a where a.id = auth.uid()));
+
+create policy "Admins can review proposed categories"
+  on public.proposed_categories for update
+  using (exists (select 1 from public.admins a where a.id = auth.uid()));
+
+create index if not exists proposed_categories_status_idx on public.proposed_categories (status);
+create index if not exists proposed_categories_proposed_by_idx on public.proposed_categories (proposed_by);
+
+-- Realtime, so an approval reaches browsing customers without a restart.
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'proposed_categories'
+  ) then
+    alter publication supabase_realtime add table public.proposed_categories;
+  end if;
+end $$;
