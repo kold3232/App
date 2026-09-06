@@ -15,7 +15,7 @@ import { colorFromId } from '../utils/color';
  * businesses cannot take bookings (their ids are not real listing rows, so a
  * request insert would be rejected by the foreign key).
  */
-export const DEMO_MODE = true;
+export const DEMO_MODE = false;
 
 const PREFIXES = [
   'Rock',
