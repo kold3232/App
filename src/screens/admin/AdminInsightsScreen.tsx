@@ -1,12 +1,26 @@
-import React, { useMemo } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import React, { useCallback, useMemo } from 'react';
 import { ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { Button, Card, EmptyState, SectionLabel } from '../../components/ui';
 import { useApp } from '../../context/AppContext';
-import { colors, spacing } from '../../theme';
+import { colors, radius, spacing } from '../../theme';
 import { confirmAction, notify } from '../../utils/alert';
 
+// A business that takes a lot of enquiries and logs almost no completions is
+// either bad at closing or doing the work off-platform. This cannot tell the
+// two apart — it just surfaces who is worth a phone call.
+const LEAKAGE_MIN_REQUESTS = 3;
+const LEAKAGE_RATIO = 0.25;
+
 export default function AdminInsightsScreen() {
-  const { adminBusinesses, categories, notifySignups, logoutAdmin } = useApp();
+  const { adminBusinesses, categories, notifySignups, logoutAdmin, requests, businessListings, refreshRequests } =
+    useApp();
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshRequests();
+    }, [refreshRequests])
+  );
 
   function handleExit() {
     confirmAction('Log out of admin', 'You will need the passcode again to return to the admin dashboard.', 'Log out', logoutAdmin);
@@ -28,6 +42,49 @@ export default function AdminInsightsScreen() {
 
     return { onboarded: approved.length, jobsCompleted, commissionCollected, commissionOwed, categoryBreakdown };
   }, [adminBusinesses, categories]);
+
+  // Grouped by listing rather than by account: a business with several
+  // listings can be leaking through one of them and clean on the rest.
+  const conversionByListing = useMemo(() => {
+    const byListing = new Map<
+      string,
+      { name: string; received: number; quoted: number; accepted: number; completed: number }
+    >();
+    requests.forEach((r) => {
+      const row = byListing.get(r.companyId) ?? {
+        name: r.companyName,
+        received: 0,
+        quoted: 0,
+        accepted: 0,
+        completed: 0,
+      };
+      row.received += 1;
+      if (r.quotedAmount != null) row.quoted += 1;
+      if (r.quoteAccepted) row.accepted += 1;
+      if (r.status === 'completed') row.completed += 1;
+      byListing.set(r.companyId, row);
+    });
+
+    return Array.from(byListing.entries())
+      .map(([id, row]) => {
+        const listing = businessListings.find((l) => l.id === id);
+        const rate = row.received === 0 ? 0 : row.completed / row.received;
+        return {
+          ...row,
+          id,
+          // The listing's current name beats the one copied onto the request,
+          // which is a snapshot from whenever the request was raised.
+          name: listing?.name ?? row.name,
+          rate,
+          // Only flag once there's enough volume for the ratio to mean
+          // anything — one unconverted enquiry is not a pattern.
+          flagged: row.received >= LEAKAGE_MIN_REQUESTS && rate < LEAKAGE_RATIO,
+        };
+      })
+      .sort((a, b) => Number(b.flagged) - Number(a.flagged) || b.received - a.received);
+  }, [requests, businessListings]);
+
+  const flaggedCount = conversionByListing.filter((r) => r.flagged).length;
 
   const waitlistByCategory = useMemo(() => {
     const map = new Map<string, number>();
@@ -94,6 +151,44 @@ export default function AdminInsightsScreen() {
         )}
       </Card>
 
+      <SectionLabel>Requests vs completions</SectionLabel>
+      <Text style={styles.sectionNote}>
+        Enquiries received against jobs actually logged as complete. A business under{' '}
+        {Math.round(LEAKAGE_RATIO * 100)}% on {LEAKAGE_MIN_REQUESTS}+ enquiries is flagged. That is a prompt to look,
+        not proof of anything.
+      </Text>
+      {conversionByListing.length === 0 ? (
+        <EmptyState
+          icon="trending-up-outline"
+          title="No requests yet"
+          subtitle="Once customers start sending requests, conversion per business shows up here."
+        />
+      ) : (
+        <Card style={{ marginTop: spacing.xs, marginBottom: spacing.md }}>
+          {flaggedCount > 0 && (
+            <Text style={styles.flagSummary}>
+              {flaggedCount} {flaggedCount === 1 ? 'business' : 'businesses'} worth a look
+            </Text>
+          )}
+          {conversionByListing.map((row) => (
+            <View key={row.id} style={styles.conversionRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.conversionName}>
+                  {row.flagged ? '⚠️ ' : ''}
+                  {row.name}
+                </Text>
+                <Text style={styles.conversionDetail}>
+                  {row.received} received · {row.quoted} quoted · {row.accepted} accepted · {row.completed} completed
+                </Text>
+              </View>
+              <Text style={[styles.conversionRate, row.flagged && styles.conversionRateFlagged]}>
+                {Math.round(row.rate * 100)}%
+              </Text>
+            </View>
+          ))}
+        </Card>
+      )}
+
       <SectionLabel>"Notify me" waitlist</SectionLabel>
       {waitlistByCategory.length === 0 ? (
         <EmptyState icon="mail-outline" title="No signups yet" subtitle="Waitlist signups from coming-soon categories will show here." />
@@ -136,4 +231,34 @@ const styles = StyleSheet.create({
   tierLabel: { fontSize: 14, color: colors.text, textTransform: 'capitalize' },
   tierValue: { fontSize: 14, fontWeight: '700', color: colors.primary },
   emptyText: { fontSize: 13, color: colors.textMuted },
+  sectionNote: { fontSize: 11.5, color: colors.textMuted, marginTop: 4, lineHeight: 16 },
+  flagSummary: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: colors.danger,
+    marginBottom: spacing.sm,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  conversionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: 9,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  conversionName: { fontSize: 14, fontWeight: '700', color: colors.text },
+  conversionDetail: { fontSize: 11.5, color: colors.textMuted, marginTop: 3 },
+  conversionRate: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: colors.primary,
+    minWidth: 48,
+    textAlign: 'right',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.sm,
+  },
+  conversionRateFlagged: { color: colors.danger, backgroundColor: 'rgba(220,38,38,0.08)' },
 });

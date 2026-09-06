@@ -80,7 +80,7 @@ export default function MyRequestsScreen() {
               </Text>
               {item.jobDetails ? <Text style={styles.detail}>{item.jobDetails}</Text> : null}
               <Text style={styles.meta} numberOfLines={1}>
-                📍 {item.address}
+                📍 {item.contact?.address || item.area}
                 {item.type === 'instant' && item.scheduledSlot ? `  ·  🗓️ ${item.scheduledSlot}` : ''}
                 {item.type === 'quote' && item.preferredDate ? `  ·  🗓️ ${item.preferredDate}` : ''}
               </Text>

@@ -88,7 +88,7 @@ export default function InvoicesScreen() {
         renderItem={({ item }) => (
           <Card>
             <View style={styles.row}>
-              <Text style={styles.customerName}>{item.customerName}</Text>
+              <Text style={styles.customerName}>{item.contact?.name ?? item.customerName}</Text>
               <Text style={styles.date}>{new Date(item.createdAt).toLocaleDateString()}</Text>
             </View>
             <Text style={styles.category}>{item.categoryName}</Text>

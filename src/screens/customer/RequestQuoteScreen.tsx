@@ -4,8 +4,9 @@ import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput
 import { Button, Card, Chip, SectionLabel } from '../../components/ui';
 import { Calendar } from '../../components/Calendar';
 import { useApp } from '../../context/AppContext';
+import { GIBRALTAR_AREAS } from '../../data/areas';
 import { BrowseStackParamList } from '../../navigation/types';
-import { colors, spacing } from '../../theme';
+import { colors, radius, spacing } from '../../theme';
 import { notify } from '../../utils/alert';
 
 type Props = NativeStackScreenProps<BrowseStackParamList, 'RequestQuote'>;
@@ -20,6 +21,7 @@ export default function RequestQuoteScreen({ route, navigation }: Props) {
   const [phone, setPhone] = useState(customerProfile?.phone ?? '');
   const [useSavedAddress, setUseSavedAddress] = useState(!!customerProfile?.address);
   const [address, setAddress] = useState('');
+  const [area, setArea] = useState<string | null>(null);
   const [jobDetails, setJobDetails] = useState('');
   const [preferredIsoDate, setPreferredIsoDate] = useState<string | null>(null);
   const [preferredTime, setPreferredTime] = useState<string | null>(null);
@@ -33,6 +35,7 @@ export default function RequestQuoteScreen({ route, navigation }: Props) {
     customerName.trim().length > 0 &&
     phone.trim().length > 0 &&
     resolvedAddress.length > 0 &&
+    !!area &&
     jobDetails.trim().length > 0;
 
   function selectDate(isoDate: string) {
@@ -56,13 +59,16 @@ export default function RequestQuoteScreen({ route, navigation }: Props) {
       companyName: company!.name,
       categoryName,
       type: 'quote',
-      customerName: customerName.trim(),
-      phone: phone.trim(),
-      address: resolvedAddress,
+      area: area ?? '',
       jobDetails: jobDetails.trim(),
       preferredDate,
       scheduledSlot: '',
       status: 'pending',
+      contact: {
+        name: customerName.trim(),
+        phone: phone.trim(),
+        address: resolvedAddress,
+      },
     });
     setSubmitting(false);
     if (!id) {
@@ -84,6 +90,13 @@ export default function RequestQuoteScreen({ route, navigation }: Props) {
       >
         <Text style={styles.title}>Request a quote</Text>
         <Text style={styles.subtitle}>Sending to {company.name}</Text>
+
+        <View style={styles.privacyNote}>
+          <Text style={styles.privacyNoteText}>
+            🔒 {company.name} will see your job description and your general area. Your phone number and exact
+            address are only shared once you accept their quote in the app.
+          </Text>
+        </View>
 
         <Card>
           <View style={styles.field}>
@@ -145,6 +158,18 @@ export default function RequestQuoteScreen({ route, navigation }: Props) {
           </View>
 
           <View style={[styles.field, styles.fieldBorder]}>
+            <SectionLabel>Which area is this in?</SectionLabel>
+            <Text style={styles.fieldHint}>
+              This is all {company.name} sees until you accept their quote.
+            </Text>
+            <View style={styles.chipWrap}>
+              {GIBRALTAR_AREAS.map((option) => (
+                <Chip key={option} label={option} selected={area === option} onPress={() => setArea(option)} />
+              ))}
+            </View>
+          </View>
+
+          <View style={[styles.field, styles.fieldBorder]}>
             <SectionLabel>What do you need done?</SectionLabel>
             <TextInput
               style={[styles.input, styles.multiline]}
@@ -200,6 +225,16 @@ const styles = StyleSheet.create({
     padding: 0,
   },
   multiline: { minHeight: 70, textAlignVertical: 'top' },
+  fieldHint: { fontSize: 12, color: colors.textMuted, marginTop: 4, lineHeight: 17 },
+  privacyNote: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  privacyNoteText: { fontSize: 12.5, color: colors.textMuted, lineHeight: 18 },
   addressChipRow: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 6 },
   savedAddressText: { fontSize: 14.5, color: colors.text, marginTop: spacing.xs, lineHeight: 20 },
   prefHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },

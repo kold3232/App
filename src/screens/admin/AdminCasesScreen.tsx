@@ -25,7 +25,13 @@ export default function AdminCasesScreen() {
       ? requests
       : requests.filter((r) => {
           if (String(r.caseNumber).includes(q)) return true;
-          return r.customerName.toLowerCase().includes(q) || r.companyName.toLowerCase().includes(q);
+          // Admins can read the contact table, so a search here should reach
+          // the real name and phone number, not just the masked display name.
+          const haystack = [r.customerName, r.companyName, r.contact?.name, r.contact?.phone]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase();
+          return haystack.includes(q);
         });
     return [...list].sort((a, b) => b.caseNumber - a.caseNumber);
   }, [requests, query]);
@@ -60,8 +66,17 @@ export default function AdminCasesScreen() {
                   <Text style={styles.caseNumber}>Case #{item.caseNumber}</Text>
                   <StatusBadge status={item.status} />
                 </View>
-                <Text style={styles.parties}>{item.customerName} ↔ {item.companyName}</Text>
+                <Text style={styles.parties}>{item.contact?.name ?? item.customerName} ↔ {item.companyName}</Text>
                 <Text style={styles.category}>{item.categoryName} · {item.type === 'instant' ? 'Instant booking' : 'Quote request'}</Text>
+                {item.contact && (
+                  <Text style={styles.contact}>
+                    {item.contact.phone} · {item.contact.address}
+                  </Text>
+                )}
+                <Text style={styles.contact}>
+                  Business sees: {item.area || 'no area given'}
+                  {item.quoteAccepted ? ' · full contact unlocked' : ' · contact still masked'}
+                </Text>
                 <Text style={styles.date}>{new Date(item.createdAt).toLocaleString()}</Text>
               </Card>
             )}
@@ -103,5 +118,6 @@ const styles = StyleSheet.create({
   caseNumber: { fontSize: 16, fontWeight: '700', color: colors.text },
   parties: { fontSize: 13.5, color: colors.text, marginTop: 6, fontWeight: '600' },
   category: { fontSize: 12, color: colors.primary, fontWeight: '700', marginTop: 4 },
+  contact: { fontSize: 11.5, color: colors.textMuted, marginTop: 4 },
   date: { fontSize: 11, color: colors.textMuted, marginTop: 6 },
 });

@@ -100,13 +100,21 @@ export default function DashboardScreen() {
             <Text style={styles.category}>
               Case #{item.caseNumber} · {item.categoryName} · {item.type === 'instant' ? 'Instant booking' : 'Quote request'}
             </Text>
+            {myListings.length > 1 && <Text style={styles.forListing}>For {item.companyName}</Text>}
             {item.jobDetails ? <Text style={styles.detail}>{item.jobDetails}</Text> : null}
             <Text style={styles.meta} numberOfLines={1}>
-              📍 {item.address}
+              📍 {item.contact ? item.contact.address : item.area || 'Area not given'}
               {item.type === 'instant' && item.scheduledSlot ? `  ·  🗓️ ${item.scheduledSlot}` : ''}
               {item.type === 'quote' && item.preferredDate ? `  ·  🗓️ ${item.preferredDate}` : ''}
             </Text>
-            <Text style={styles.meta}>📞 {item.phone}</Text>
+            {item.contact ? (
+              <Text style={styles.meta}>📞 {item.contact.phone}</Text>
+            ) : (
+              <Text style={styles.locked}>
+                🔒 {item.customerName}'s full name, phone number and exact address unlock as soon as they accept
+                your quote. Use the chat to ask anything you need to price the job.
+              </Text>
+            )}
             <Text style={styles.date}>{new Date(item.createdAt).toLocaleString()}</Text>
 
             {item.status === 'pending' && (
@@ -220,6 +228,8 @@ const styles = StyleSheet.create({
   category: { fontSize: 12, color: colors.primary, fontWeight: '700', marginTop: 2 },
   detail: { fontSize: 13, color: colors.text, marginTop: spacing.sm },
   meta: { fontSize: 12, color: colors.textMuted, marginTop: 6 },
+  forListing: { fontSize: 11.5, color: colors.textMuted, fontWeight: '600', marginTop: 3 },
+  locked: { fontSize: 11.5, color: colors.textMuted, marginTop: 8, lineHeight: 17, fontStyle: 'italic' },
   date: { fontSize: 11, color: colors.textMuted, marginTop: 6 },
   actions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
   completeForm: { marginTop: spacing.md, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.border },

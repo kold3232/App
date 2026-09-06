@@ -93,11 +93,16 @@ export function ChatModal({
     }
   }
 
+  const customerLabel = request.contact?.name ?? request.customerName;
   const otherPartyName = readOnly
-    ? `${request.customerName} · ${request.companyName}`
+    ? `${customerLabel} · ${request.companyName}`
     : perspective === 'customer'
     ? request.companyName
-    : request.customerName;
+    : customerLabel;
+
+  // The business is looking at a masked request. Nothing stops it asking for a
+  // phone number in here, but say plainly what the deal is on both sides.
+  const showMaskNotice = !readOnly && request.type === 'quote' && !request.quoteAccepted;
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
@@ -115,6 +120,17 @@ export function ChatModal({
           </Pressable>
         </View>
 
+        {showMaskNotice && (
+          <View style={styles.maskNotice}>
+            <Ionicons name="lock-closed-outline" size={14} color={colors.textMuted} />
+            <Text style={styles.maskNoticeText}>
+              {perspective === 'business'
+                ? `Area: ${request.area || 'not given'}. Full contact details unlock when the customer accepts your quote.`
+                : 'Keep the job in the app — your phone number and address stay private until you accept a quote, and only jobs booked here are covered by RockServ.'}
+            </Text>
+          </View>
+        )}
+
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <ScrollView style={styles.thread} contentContainerStyle={styles.threadContent}>
             {thread.length === 0 && (
@@ -130,8 +146,10 @@ export function ChatModal({
                   <View key={m.id} style={isMine ? styles.bubbleWrapMine : styles.bubbleWrapTheirs}>
                     {readOnly && <Text style={styles.senderLabel}>{senderLabel}</Text>}
                     <View style={[styles.quoteCard, isMine ? styles.bubbleMine : styles.bubbleTheirs]}>
-                      <Text style={styles.quoteLabel}>Quote</Text>
-                      <Text style={styles.quoteAmount}>£{m.amount?.toFixed(2)}</Text>
+                      <Text style={[styles.quoteLabel, isMine && styles.quoteLabelMine]}>Quote</Text>
+                      <Text style={[styles.quoteAmount, isMine && styles.quoteAmountMine]}>
+                        £{m.amount?.toFixed(2)}
+                      </Text>
                       {isAccepted ? (
                         <View style={styles.acceptedPill}>
                           <Ionicons name="checkmark-circle" size={14} color={colors.success} />
@@ -257,7 +275,22 @@ const styles = StyleSheet.create({
   chatImage: { width: 200, height: 200, borderRadius: radius.sm, backgroundColor: colors.surfaceAlt },
   quoteCard: { maxWidth: '80%', borderRadius: radius.md, padding: spacing.md, marginBottom: 4, borderWidth: 1, borderColor: colors.border },
   quoteLabel: { fontSize: 10.5, fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.4 },
+  // Own-side bubbles are navy, so the default near-black text made the amount
+  // unreadable for whoever sent the quote — always the business.
   quoteAmount: { fontSize: 22, fontWeight: '800', color: colors.text, marginTop: 2 },
+  quoteAmountMine: { color: colors.textInverse },
+  quoteLabelMine: { color: 'rgba(255,255,255,0.7)' },
+  maskNotice: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.surfaceAlt,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  maskNoticeText: { flex: 1, fontSize: 11.5, color: colors.textMuted, lineHeight: 16 },
   acceptedPill: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: spacing.sm },
   acceptedText: { fontSize: 12.5, fontWeight: '700', color: colors.success },
   quoteToggle: {

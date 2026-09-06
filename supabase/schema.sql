@@ -676,3 +676,181 @@ begin
     alter publication supabase_realtime add table public.category_overrides;
   end if;
 end $$;
+
+-- RockServ — masked customer contact details (commission protection)
+-- A business used to receive the customer's full name, phone number and exact
+-- address the moment a request landed. That is everything needed to take the
+-- job off the platform before RockServ has any record that it happened, and
+-- hiding the fields in the app fixes nothing: a business holds a real session
+-- token and can query any row RLS lets it read, whatever the app draws.
+--
+-- So the contact details move out of service_requests into their own table,
+-- and that table's RLS only lets the business read a row once the customer has
+-- accepted a quote in-app (or booked an instant job, which is an acceptance in
+-- itself). Until then the business sees the job description and a general area.
+--
+-- This cannot stop a business asking for a phone number in chat — nothing can.
+-- It closes the easy path and makes the harder one leave a trail.
+--
+-- NOTE: this drops columns that older builds still insert into. Every device
+-- has to be on this build or newer; an older build's request will now fail.
+create table if not exists public.service_request_contacts (
+  request_id uuid primary key references public.service_requests (id) on delete cascade,
+  customer_name text not null,
+  phone text not null,
+  address text not null,
+  created_at timestamptz not null default now()
+);
+
+-- area: the general neighbourhood, safe to show before acceptance.
+-- customer_display_name: "John S." rather than the full name. Gibraltar is
+-- small enough that a full name is close to contact details on its own.
+alter table public.service_requests
+  add column if not exists area text not null default '',
+  add column if not exists customer_display_name text not null default '',
+  add column if not exists quote_accepted_at timestamptz;
+
+-- Move existing rows across before the columns go. Guarded on the old columns
+-- still existing so re-running this file after the drop is a no-op.
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'service_requests' and column_name = 'phone'
+  ) then
+    insert into public.service_request_contacts (request_id, customer_name, phone, address)
+    select id, customer_name, phone, address from public.service_requests
+    on conflict (request_id) do nothing;
+
+    update public.service_requests
+      set customer_display_name = split_part(trim(customer_name), ' ', 1)
+      where customer_display_name = '';
+  end if;
+end $$;
+
+alter table public.service_requests
+  drop column if exists phone,
+  drop column if exists address,
+  drop column if exists customer_name;
+
+alter table public.service_request_contacts enable row level security;
+
+create policy "Customers can view their own request contacts"
+  on public.service_request_contacts for select
+  using (exists (
+    select 1 from public.service_requests r
+    where r.id = service_request_contacts.request_id and r.customer_id = auth.uid()
+  ));
+
+create policy "Customers can attach contacts to their own requests"
+  on public.service_request_contacts for insert
+  with check (exists (
+    select 1 from public.service_requests r
+    where r.id = service_request_contacts.request_id and r.customer_id = auth.uid()
+  ));
+
+-- The whole point of the table. A business gets nothing back until the
+-- customer has accepted a quote, or booked an instant job themselves.
+-- Deliberately NOT unlocked by the business accepting the request or marking
+-- it complete — either of those would let the business unlock on its own.
+create policy "Businesses can view contacts once the customer has accepted"
+  on public.service_request_contacts for select
+  using (exists (
+    select 1
+    from public.service_requests r
+    join public.business_listings l on l.id = r.listing_id
+    where r.id = service_request_contacts.request_id
+      and l.business_id = auth.uid()
+      and (r.quote_accepted = true or r.type = 'instant')
+  ));
+
+create policy "Admins can view all request contacts"
+  on public.service_request_contacts for select
+  using (exists (select 1 from public.admins a where a.id = auth.uid()));
+
+-- No update or delete policy anywhere: once written, a contact row is fixed.
+
+create index if not exists service_requests_quote_accepted_idx
+  on public.service_requests (listing_id, quote_accepted);
+
+-- RockServ — stop each side writing the other side's fields
+-- "Businesses can update requests addressed to them" grants UPDATE on the
+-- whole row, so a business could simply set quote_accepted = true on a request
+-- it received and unlock the customer's contact details itself — which would
+-- make the whole masking scheme decorative. Column privileges can't fix this:
+-- customer and business are the same Postgres role (authenticated), so a GRANT
+-- cannot tell them apart. A trigger can, because it sees auth.uid().
+--
+-- Fields are quietly reverted rather than raising, so a partial update that
+-- happens to include a column stays a normal success for the caller.
+create or replace function public.enforce_service_request_field_ownership()
+returns trigger language plpgsql as $$
+declare
+  is_customer boolean;
+  is_business boolean;
+begin
+  if exists (select 1 from public.admins a where a.id = auth.uid()) then
+    return new;
+  end if;
+
+  is_customer := (auth.uid() = old.customer_id);
+  is_business := exists (
+    select 1 from public.business_listings l
+    where l.id = old.listing_id and l.business_id = auth.uid()
+  );
+
+  -- Accepting a quote is what unlocks the contact details, so this is the
+  -- line that matters most. The area and display name are the customer's to
+  -- set too — a business must not be able to rewrite what it was shown.
+  if not is_customer then
+    new.customer_id := old.customer_id;
+    new.quoted_amount := old.quoted_amount;
+    new.quote_accepted := old.quote_accepted;
+    new.quote_accepted_at := old.quote_accepted_at;
+    new.customer_display_name := old.customer_display_name;
+    new.area := old.area;
+    -- A business may clear a confirmation when it re-completes a job, but
+    -- must never be able to confirm on the customer's behalf.
+    if new.customer_confirmed and not old.customer_confirmed then
+      new.customer_confirmed := old.customer_confirmed;
+    end if;
+  end if;
+
+  -- The other direction: job value drives commission, so a customer must not
+  -- be able to zero it, mark it paid, or close the job off themselves.
+  if not is_business then
+    new.status := old.status;
+    new.job_value := old.job_value;
+    new.commission := old.commission;
+    new.commission_paid := old.commission_paid;
+    new.scheduled_slot := old.scheduled_slot;
+  end if;
+
+  return new;
+end $$;
+
+drop trigger if exists service_requests_field_ownership on public.service_requests;
+create trigger service_requests_field_ownership
+  before update on public.service_requests
+  for each row execute function public.enforce_service_request_field_ownership();
+
+-- A request always starts unquoted, unaccepted and unpaid, whatever the
+-- client sends. Otherwise a customer could insert one pre-accepted and hand
+-- over their contact details before the business has quoted anything.
+create or replace function public.reset_service_request_progress()
+returns trigger language plpgsql as $$
+begin
+  new.quoted_amount := null;
+  new.quote_accepted := false;
+  new.quote_accepted_at := null;
+  new.customer_confirmed := false;
+  new.job_value := null;
+  new.commission := null;
+  new.commission_paid := false;
+  return new;
+end $$;
+
+drop trigger if exists service_requests_reset_progress on public.service_requests;
+create trigger service_requests_reset_progress
+  before insert on public.service_requests
+  for each row execute function public.reset_service_request_progress();

@@ -3,6 +3,7 @@ import React, { useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Button, Card, Chip, SectionLabel } from '../../components/ui';
 import { useApp } from '../../context/AppContext';
+import { GIBRALTAR_AREAS } from '../../data/areas';
 import { BrowseStackParamList } from '../../navigation/types';
 import { colors, spacing } from '../../theme';
 import { notify } from '../../utils/alert';
@@ -31,12 +32,18 @@ export default function InstantBookScreen({ route, navigation }: Props) {
   const [customerName, setCustomerName] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
+  const [area, setArea] = useState<string | null>(null);
 
   if (!company) return null;
 
   const categoryName = categories.find((c) => c.id === company.categoryIds[0])?.name ?? '';
   const selectedSlot = slots.find((s) => s.id === selectedSlotId);
-  const canSubmit = !!selectedSlot && customerName.trim().length > 0 && phone.trim().length > 0 && address.trim().length > 0;
+  const canSubmit =
+    !!selectedSlot &&
+    customerName.trim().length > 0 &&
+    phone.trim().length > 0 &&
+    address.trim().length > 0 &&
+    !!area;
 
   async function handleSubmit() {
     const id = await addRequest({
@@ -44,13 +51,16 @@ export default function InstantBookScreen({ route, navigation }: Props) {
       companyName: company!.name,
       categoryName,
       type: 'instant',
-      customerName: customerName.trim(),
-      phone: phone.trim(),
-      address: address.trim(),
+      area: area ?? '',
       jobDetails: '',
       preferredDate: '',
       scheduledSlot: `${selectedSlot!.dayLabel} · ${selectedSlot!.time}`,
       status: 'accepted',
+      contact: {
+        name: customerName.trim(),
+        phone: phone.trim(),
+        address: address.trim(),
+      },
     });
     if (!id) {
       notify('Could not confirm booking', 'Something went wrong sending your booking. Please try again.');
@@ -117,6 +127,14 @@ export default function InstantBookScreen({ route, navigation }: Props) {
               placeholderTextColor={colors.textFaint}
               selectionColor={colors.primary}
             />
+          </View>
+          <View style={[styles.field, styles.fieldBorder]}>
+            <SectionLabel>Which area is this in?</SectionLabel>
+            <View style={styles.chipWrap}>
+              {GIBRALTAR_AREAS.map((option) => (
+                <Chip key={option} label={option} selected={area === option} onPress={() => setArea(option)} />
+              ))}
+            </View>
           </View>
         </Card>
 

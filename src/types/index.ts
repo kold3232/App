@@ -64,6 +64,15 @@ export type GalleryImage = {
 export type RequestStatus = 'pending' | 'accepted' | 'declined' | 'completed';
 export type BookingType = 'quote' | 'instant';
 
+// The customer's real contact details. Held in their own table so the
+// database — not the app — decides who may read them; a business only gets
+// this back once the customer has accepted a quote in-app.
+export type RequestContact = {
+  name: string;
+  phone: string;
+  address: string;
+};
+
 export type ServiceRequest = {
   id: string;
   caseNumber: number;
@@ -72,9 +81,13 @@ export type ServiceRequest = {
   companyName: string;
   categoryName: string;
   type: BookingType;
+  // Safe to show to anyone: "John S.", not the full name.
   customerName: string;
-  phone: string;
-  address: string;
+  // General neighbourhood — what the business sees before acceptance.
+  area: string;
+  // Present only when the viewer is allowed the real details: the customer
+  // themselves, an admin, or a business whose quote has been accepted.
+  contact?: RequestContact;
   jobDetails: string;
   preferredDate: string;
   scheduledSlot: string;
@@ -86,6 +99,22 @@ export type ServiceRequest = {
   customerConfirmed?: boolean;
   quotedAmount?: number;
   quoteAccepted?: boolean;
+  quoteAcceptedAt?: string;
+};
+
+// What a customer fills in to raise a request. Separate from ServiceRequest
+// because the contact details go to a different table than the rest.
+export type NewServiceRequest = {
+  companyId: string;
+  companyName: string;
+  categoryName: string;
+  type: BookingType;
+  area: string;
+  jobDetails: string;
+  preferredDate: string;
+  scheduledSlot: string;
+  status: RequestStatus;
+  contact: RequestContact;
 };
 
 export type CustomerProfile = {

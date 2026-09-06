@@ -20,11 +20,14 @@ import {
   CustomerProfile,
   GalleryImage,
   NotifySignup,
+  NewServiceRequest,
   ProposedCategory,
+  RequestContact,
   Review,
   ServiceRequest,
   UserMode,
 } from '../types';
+import { toDisplayName } from '../utils/name';
 
 const STORAGE_KEYS = {
   mode: '@sortedforyou/mode',
@@ -53,7 +56,7 @@ type AppContextValue = {
   sendImageMessage: (requestId: string, sender: ChatMessageSender, imageUri: string) => Promise<void>;
   acceptQuote: (requestId: string, amount: number) => Promise<void>;
   requests: ServiceRequest[];
-  addRequest: (input: Omit<ServiceRequest, 'id' | 'caseNumber' | 'createdAt' | 'customerId'>) => Promise<string>;
+  addRequest: (input: NewServiceRequest) => Promise<string>;
   updateRequestStatus: (id: string, status: ServiceRequest['status']) => Promise<void>;
   completeRequest: (id: string, jobValue: number) => Promise<void>;
   confirmCompletion: (id: string) => Promise<void>;
@@ -374,7 +377,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [mapProposedRow]);
 
   const mapRequestRow = useCallback(
-    (row: any): ServiceRequest => ({
+    (row: any, contact?: RequestContact): ServiceRequest => ({
       id: row.id,
       caseNumber: row.case_number,
       companyId: row.listing_id,
@@ -382,9 +385,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       companyName: row.company_name,
       categoryName: row.category_name,
       type: row.type,
-      customerName: row.customer_name,
-      phone: row.phone,
-      address: row.address,
+      customerName: row.customer_display_name || 'Customer',
+      area: row.area ?? '',
+      contact,
       jobDetails: row.job_details ?? '',
       preferredDate: row.preferred_date ?? '',
       scheduledSlot: row.scheduled_slot ?? '',
@@ -396,9 +399,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       customerConfirmed: !!row.customer_confirmed,
       quotedAmount: row.quoted_amount ?? undefined,
       quoteAccepted: !!row.quote_accepted,
+      quoteAcceptedAt: row.quote_accepted_at ?? undefined,
     }),
     []
   );
+
+  // Contact details live in their own table and are gated by RLS, so this
+  // simply asks for all of them and takes whatever comes back — rows the
+  // caller isn't entitled to are filtered out by the database, not here.
+  // Chunked because an admin can be asking about a thousand requests at once
+  // and the id list travels in the query string.
+  const fetchRequestContacts = useCallback(async (requestIds: string[]) => {
+    const found = new Map<string, RequestContact>();
+    for (let i = 0; i < requestIds.length; i += 200) {
+      const { data } = await supabase
+        .from('service_request_contacts')
+        .select('request_id, customer_name, phone, address')
+        .in('request_id', requestIds.slice(i, i + 200));
+      (data ?? []).forEach((row: any) =>
+        found.set(row.request_id, { name: row.customer_name, phone: row.phone, address: row.address })
+      );
+    }
+    return found;
+  }, []);
 
   // Customer/business rows are already bounded by RLS to just their own
   // requests; the 1000-row cap is really a stopgap for admins, who get every
@@ -411,8 +434,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       .select('*')
       .order('created_at', { ascending: false })
       .limit(1000);
-    if (!error && data) setRequests(data.map(mapRequestRow));
-  }, [mapRequestRow]);
+    if (error || !data) return;
+    const contacts = await fetchRequestContacts(data.map((row: any) => row.id));
+    setRequests(data.map((row: any) => mapRequestRow(row, contacts.get(row.id))));
+  }, [mapRequestRow, fetchRequestContacts]);
 
   const mapMessageRow = useCallback(
     (row: any): ChatMessage => ({
@@ -581,7 +606,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const addRequest = useCallback(
-    async (input: Omit<ServiceRequest, 'id' | 'caseNumber' | 'createdAt' | 'customerId'>) => {
+    async (input: NewServiceRequest) => {
       const { data: sessionData } = await supabase.auth.getSession();
       const customerId = sessionData.session?.user.id;
       if (!customerId) return '';
@@ -593,9 +618,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           company_name: input.companyName,
           category_name: input.categoryName,
           type: input.type,
-          customer_name: input.customerName,
-          phone: input.phone,
-          address: input.address,
+          customer_display_name: toDisplayName(input.contact.name),
+          area: input.area,
           job_details: input.jobDetails,
           preferred_date: input.preferredDate,
           scheduled_slot: input.scheduledSlot,
@@ -604,7 +628,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         .select()
         .single();
       if (error || !data) return '';
-      setRequests((prev) => [mapRequestRow(data), ...prev]);
+
+      // Second write, deliberately: these are the fields the business must not
+      // see yet, and they only exist in a table it cannot read from until the
+      // customer accepts. If this insert fails the request is still real — the
+      // customer can be reached through the in-app chat either way.
+      await supabase.from('service_request_contacts').insert({
+        request_id: data.id,
+        customer_name: input.contact.name,
+        phone: input.contact.phone,
+        address: input.contact.address,
+      });
+
+      setRequests((prev) => [mapRequestRow(data, input.contact), ...prev]);
       return data.id as string;
     },
     [mapRequestRow]
@@ -716,14 +752,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [mapMessageRow]
   );
 
+  // This is the moment the business earns the customer's contact details: the
+  // RLS policy on service_request_contacts keys off quote_accepted, so setting
+  // it here is what unlocks them. The business picks them up on its next
+  // refresh — the dashboard refreshes on focus.
   const acceptQuote = useCallback(async (requestId: string, amount: number) => {
+    const acceptedAt = new Date().toISOString();
     const { error } = await supabase
       .from('service_requests')
-      .update({ quoted_amount: amount, quote_accepted: true })
+      .update({ quoted_amount: amount, quote_accepted: true, quote_accepted_at: acceptedAt })
       .eq('id', requestId);
     if (!error) {
       setRequests((prev) =>
-        prev.map((r) => (r.id === requestId ? { ...r, quotedAmount: amount, quoteAccepted: true } : r))
+        prev.map((r) =>
+          r.id === requestId ? { ...r, quotedAmount: amount, quoteAccepted: true, quoteAcceptedAt: acceptedAt } : r
+        )
       );
     }
   }, []);
