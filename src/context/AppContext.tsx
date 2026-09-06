@@ -11,6 +11,8 @@ import {
   AdminBusinessStatus,
   ApplicationStatus,
   BusinessAccount,
+  BusySummaryRow,
+  CalendarEntry,
   Category,
   CategoryGroupId,
   Employee,
@@ -191,6 +193,20 @@ type AppContextValue = {
     id: string,
     decision: { approve: boolean; seats?: number; note: string }
   ) => Promise<{ error?: string }>;
+  // Business calendar. Only the business's own private entries live here —
+  // RockServ jobs come off service_requests and are merged for display.
+  calendarEntries: CalendarEntry[];
+  refreshCalendar: () => Promise<void>;
+  addCalendarEntry: (entry: {
+    title: string;
+    notes: string;
+    startsAt: string;
+    endsAt: string;
+  }) => Promise<{ error?: string }>;
+  deleteCalendarEntry: (id: string) => Promise<{ error?: string }>;
+  setRequestSchedule: (requestId: string, scheduledFor: string | null) => Promise<{ error?: string }>;
+  busySummary: BusySummaryRow[];
+  refreshBusySummary: () => Promise<void>;
 };
 
 type ServiceLineRow = { name: string; priceFrom: number | null };
@@ -226,6 +242,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [myEmployment, setMyEmployment] = useState<Employee | null>(null);
   const [myEmployeeAccessRequest, setMyEmployeeAccessRequest] = useState<EmployeeAccessRequest | null>(null);
   const [employeeAccessRequests, setEmployeeAccessRequests] = useState<EmployeeAccessRequest[]>([]);
+  const [calendarEntries, setCalendarEntries] = useState<CalendarEntry[]>([]);
+  const [busySummary, setBusySummary] = useState<BusySummaryRow[]>([]);
   const [authEmail, setAuthEmail] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(isSupabaseConfigured);
   const [mode, setModeState] = useState<UserMode | null>(null);
@@ -498,6 +516,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       quotedAmount: row.quoted_amount ?? undefined,
       quoteAccepted: !!row.quote_accepted,
       quoteAcceptedAt: row.quote_accepted_at ?? undefined,
+      scheduledFor: row.scheduled_for ?? undefined,
       assignedEmployeeId: row.assigned_employee_id ?? undefined,
       assignmentNotes: row.assignment_notes ?? '',
       assignmentMapUrl: row.assignment_map_url ?? '',
@@ -1567,6 +1586,92 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [employeeAccessRequests, refreshEmployeeAccessRequests]
   );
 
+  // --- Business calendar ----------------------------------------------------
+
+  const refreshCalendar = useCallback(async () => {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData.session?.user.id;
+    if (!userId) {
+      setCalendarEntries([]);
+      return;
+    }
+    const { data, error } = await supabase
+      .from('calendar_entries')
+      .select('*')
+      .eq('business_id', userId)
+      .order('starts_at');
+    if (!error && data) {
+      setCalendarEntries(
+        data.map((row: any) => ({
+          id: row.id,
+          businessId: row.business_id,
+          title: row.title ?? '',
+          notes: row.notes ?? '',
+          startsAt: row.starts_at,
+          endsAt: row.ends_at,
+        }))
+      );
+    }
+  }, []);
+
+  const addCalendarEntry = useCallback(
+    async (entry: { title: string; notes: string; startsAt: string; endsAt: string }) => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const userId = sessionData.session?.user.id;
+      if (!userId) return { error: 'Not signed in.' };
+      const { error } = await supabase.from('calendar_entries').insert({
+        business_id: userId,
+        title: entry.title,
+        notes: entry.notes,
+        starts_at: entry.startsAt,
+        ends_at: entry.endsAt,
+      });
+      if (error) return { error: error.message };
+      await refreshCalendar();
+      return {};
+    },
+    [refreshCalendar]
+  );
+
+  const deleteCalendarEntry = useCallback(
+    async (id: string) => {
+      const { error } = await supabase.from('calendar_entries').delete().eq('id', id);
+      if (error) return { error: error.message };
+      await refreshCalendar();
+      return {};
+    },
+    [refreshCalendar]
+  );
+
+  const setRequestSchedule = useCallback(
+    async (requestId: string, scheduledFor: string | null) => {
+      const { error } = await supabase
+        .from('service_requests')
+        .update({ scheduled_for: scheduledFor })
+        .eq('id', requestId);
+      if (error) return { error: error.message };
+      await refreshRequests();
+      return {};
+    },
+    [refreshRequests]
+  );
+
+  // Deliberately an RPC rather than a table read: admins have no select policy
+  // on calendar_entries at all, so this is the only thing they can learn about
+  // a business's diary — how full it is, never what is in it.
+  const refreshBusySummary = useCallback(async () => {
+    const { data, error } = await supabase.rpc('admin_busy_summary', { window_days: 90 });
+    if (!error && data) {
+      setBusySummary(
+        (data as any[]).map((row) => ({
+          businessId: row.business_id,
+          busyHours: Number(row.busy_hours ?? 0),
+          entryCount: Number(row.entry_count ?? 0),
+        }))
+      );
+    }
+  }, []);
+
   const value = useMemo(
     () => ({
       isReady,
@@ -1652,6 +1757,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       employeeAccessRequests,
       refreshEmployeeAccessRequests,
       reviewEmployeeAccessRequest,
+      calendarEntries,
+      refreshCalendar,
+      addCalendarEntry,
+      deleteCalendarEntry,
+      setRequestSchedule,
+      busySummary,
+      refreshBusySummary,
     }),
     [
       isReady,
@@ -1737,6 +1849,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       employeeAccessRequests,
       refreshEmployeeAccessRequests,
       reviewEmployeeAccessRequest,
+      calendarEntries,
+      refreshCalendar,
+      addCalendarEntry,
+      deleteCalendarEntry,
+      setRequestSchedule,
+      busySummary,
+      refreshBusySummary,
     ]
   );
 

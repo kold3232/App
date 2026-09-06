@@ -11,15 +11,28 @@ import { confirmAction, notify } from '../../utils/alert';
 // two apart — it just surfaces who is worth a phone call.
 const LEAKAGE_MIN_REQUESTS = 3;
 const LEAKAGE_RATIO = 0.25;
+// Hours a business has blocked out in its own diary over the last 90 days.
+// We can see the total and nothing else — no titles, no clients.
+const BUSY_HOURS_FLAG = 20;
 
 export default function AdminInsightsScreen() {
-  const { adminBusinesses, categories, notifySignups, logoutAdmin, requests, businessListings, refreshRequests } =
-    useApp();
+  const {
+    adminBusinesses,
+    categories,
+    notifySignups,
+    logoutAdmin,
+    requests,
+    businessListings,
+    refreshRequests,
+    busySummary,
+    refreshBusySummary,
+  } = useApp();
 
   useFocusEffect(
     useCallback(() => {
       refreshRequests();
-    }, [refreshRequests])
+      refreshBusySummary();
+    }, [refreshRequests, refreshBusySummary])
   );
 
   function handleExit() {
@@ -69,6 +82,10 @@ export default function AdminInsightsScreen() {
       .map(([id, row]) => {
         const listing = businessListings.find((l) => l.id === id);
         const rate = row.received === 0 ? 0 : row.completed / row.received;
+        // Diary hours are per business account, not per listing — all we get
+        // back is a total, never what is in it.
+        const busy = listing ? busySummary.find((b) => b.businessId === listing.businessId) : undefined;
+        const busyHours = busy?.busyHours ?? 0;
         return {
           ...row,
           id,
@@ -76,15 +93,22 @@ export default function AdminInsightsScreen() {
           // which is a snapshot from whenever the request was raised.
           name: listing?.name ?? row.name,
           rate,
+          busyHours,
           // Only flag once there's enough volume for the ratio to mean
           // anything — one unconverted enquiry is not a pattern.
           flagged: row.received >= LEAKAGE_MIN_REQUESTS && rate < LEAKAGE_RATIO,
+          // The second, independent signal: plenty of time blocked out, no
+          // RockServ jobs closed against it.
+          busyFlagged: busyHours >= BUSY_HOURS_FLAG && row.completed === 0,
         };
       })
-      .sort((a, b) => Number(b.flagged) - Number(a.flagged) || b.received - a.received);
-  }, [requests, businessListings]);
+      .sort(
+        (a, b) =>
+          Number(b.flagged || b.busyFlagged) - Number(a.flagged || a.busyFlagged) || b.received - a.received
+      );
+  }, [requests, businessListings, busySummary]);
 
-  const flaggedCount = conversionByListing.filter((r) => r.flagged).length;
+  const flaggedCount = conversionByListing.filter((r) => r.flagged || r.busyFlagged).length;
 
   const waitlistByCategory = useMemo(() => {
     const map = new Map<string, number>();
@@ -153,9 +177,10 @@ export default function AdminInsightsScreen() {
 
       <SectionLabel>Requests vs completions</SectionLabel>
       <Text style={styles.sectionNote}>
-        Enquiries received against jobs actually logged as complete. A business under{' '}
-        {Math.round(LEAKAGE_RATIO * 100)}% on {LEAKAGE_MIN_REQUESTS}+ enquiries is flagged. That is a prompt to look,
-        not proof of anything.
+        Enquiries received against jobs actually logged as complete, plus how much time each business blocks out in
+        its own calendar. A business under {Math.round(LEAKAGE_RATIO * 100)}% on {LEAKAGE_MIN_REQUESTS}+ enquiries is
+        flagged, as is one with {BUSY_HOURS_FLAG}h+ booked and nothing logged against it. Both are prompts to look,
+        not proof of anything — and we only ever see the hours, never who they are for.
       </Text>
       {conversionByListing.length === 0 ? (
         <EmptyState
@@ -174,12 +199,18 @@ export default function AdminInsightsScreen() {
             <View key={row.id} style={styles.conversionRow}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.conversionName}>
-                  {row.flagged ? '⚠️ ' : ''}
+                  {row.flagged || row.busyFlagged ? '⚠️ ' : ''}
                   {row.name}
                 </Text>
                 <Text style={styles.conversionDetail}>
                   {row.received} received · {row.quoted} quoted · {row.accepted} accepted · {row.completed} completed
                 </Text>
+                {row.busyHours > 0 && (
+                  <Text style={[styles.conversionDetail, row.busyFlagged && styles.busyFlaggedText]}>
+                    {row.busyHours}h blocked out in their own calendar (90 days)
+                    {row.busyFlagged ? ' — nothing logged against it' : ''}
+                  </Text>
+                )}
               </View>
               <Text style={[styles.conversionRate, row.flagged && styles.conversionRateFlagged]}>
                 {Math.round(row.rate * 100)}%
@@ -261,4 +292,5 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
   },
   conversionRateFlagged: { color: colors.danger, backgroundColor: 'rgba(220,38,38,0.08)' },
+  busyFlaggedText: { color: colors.danger, fontWeight: '600' },
 });

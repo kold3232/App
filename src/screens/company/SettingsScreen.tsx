@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import React, { useState } from 'react';
 import { Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import { LegalTextModal } from '../../components/LegalTextModal';
@@ -10,6 +11,7 @@ import { confirmAction } from '../../utils/alert';
 
 export default function SettingsScreen() {
   const { setMode, businessAccount, signOutBusiness } = useApp();
+  const navigation = useNavigation<any>();
   const [showTerms, setShowTerms] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
 
@@ -55,6 +57,13 @@ export default function SettingsScreen() {
               <Text style={styles.text}>Gibraltar 🇬🇮 — the only region currently supported.</Text>
             </View>
           </View>
+        </Card>
+
+        <Card style={{ marginTop: spacing.md }}>
+          <Pressable style={styles.legalRow} onPress={() => navigation.navigate('Team')}>
+            <Text style={styles.legalText}>Your team</Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.textFaint} />
+          </Pressable>
         </Card>
 
         <Card style={{ marginTop: spacing.md }}>

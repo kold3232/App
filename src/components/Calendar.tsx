@@ -5,8 +5,11 @@ import { colors, radius, spacing } from '../theme';
 
 const WEEKDAY_LABELS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
 
+// Built from the local date parts, not toISOString(). Gibraltar runs UTC+1 or
+// +2, so a local midnight converted to UTC lands on the previous day — tapping
+// 6 September used to hand back "2025-09-05".
 function toIsoDate(date: Date) {
-  return date.toISOString().slice(0, 10);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
 function startOfMonth(date: Date) {
@@ -22,15 +25,21 @@ function startOfDay(date: Date) {
 export function Calendar({
   selectedDate,
   onSelectDate,
+  // A business looking at its own diary needs to see last week; a customer
+  // picking a preferred date does not. Off by default, so booking is unchanged.
+  allowPast = false,
+  markedDates,
 }: {
   selectedDate: string | null;
   onSelectDate: (isoDate: string) => void;
+  allowPast?: boolean;
+  markedDates?: Set<string>;
 }) {
   const today = useMemo(() => startOfDay(new Date()), []);
   const [viewMonth, setViewMonth] = useState(() => startOfMonth(today));
 
   const monthLabel = viewMonth.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
-  const canGoBack = startOfMonth(viewMonth) > startOfMonth(today);
+  const canGoBack = allowPast || startOfMonth(viewMonth) > startOfMonth(today);
 
   const cells = useMemo(() => {
     const first = startOfMonth(viewMonth);
@@ -73,9 +82,10 @@ export function Calendar({
         {cells.map((date, i) => {
           if (!date) return <View key={`blank-${i}`} style={styles.cell} />;
           const iso = toIsoDate(date);
-          const isPast = date < today;
+          const isPast = !allowPast && date < today;
           const isSelected = selectedDate === iso;
           const isToday = date.getTime() === today.getTime();
+          const isMarked = !!markedDates?.has(iso);
           return (
             <View key={iso} style={styles.cell}>
               <Pressable
@@ -87,6 +97,7 @@ export function Calendar({
                   {date.getDate()}
                 </Text>
               </Pressable>
+              {isMarked && <View style={[styles.marker, isSelected && styles.markerSelected]} />}
             </View>
           );
         })}
@@ -111,6 +122,8 @@ const styles = StyleSheet.create({
   weekdayLabel: { width: `${100 / 7}%`, textAlign: 'center', fontSize: 11, fontWeight: '700', color: colors.textFaint },
   grid: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 4 },
   cell: { width: `${100 / 7}%`, aspectRatio: 1, alignItems: 'center', justifyContent: 'center' },
+  marker: { position: 'absolute', bottom: 5, width: 4, height: 4, borderRadius: 2, backgroundColor: colors.primary },
+  markerSelected: { backgroundColor: colors.textInverse },
   dayCircle: { width: 32, height: 32, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   dayCircleSelected: { backgroundColor: colors.primary },
   dayCircleToday: { borderWidth: 1.5, borderColor: colors.primary },

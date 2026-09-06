@@ -100,6 +100,10 @@ export type ServiceRequest = {
   quotedAmount?: number;
   quoteAccepted?: boolean;
   quoteAcceptedAt?: string;
+  // When the business has actually put this job in the diary. Distinct from
+  // preferredDate (what the customer asked for) and scheduledSlot (the label
+  // an instant booking was made against).
+  scheduledFor?: string;
   // Set by the manager when the job is handed to a member of staff.
   assignedEmployeeId?: string;
   assignmentNotes: string;
@@ -125,6 +129,27 @@ export type NewServiceRequest = {
   scheduledSlot: string;
   status: RequestStatus;
   contact: RequestContact;
+};
+
+// A job the business does that has nothing to do with RockServ. Their own
+// diary — we store it so it syncs across their devices, and no admin can read
+// it. RockServ jobs are not duplicated in here; they come off the request
+// itself, so rescheduling one can't leave a stale copy behind.
+export type CalendarEntry = {
+  id: string;
+  businessId: string;
+  title: string;
+  notes: string;
+  startsAt: string;
+  endsAt: string;
+};
+
+// What an admin is allowed to know about a business's diary: how full it is,
+// never what is in it.
+export type BusySummaryRow = {
+  businessId: string;
+  busyHours: number;
+  entryCount: number;
 };
 
 export type CustomerProfile = {

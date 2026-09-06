@@ -2,12 +2,15 @@ import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Button, Card, Chip, EmptyState, StatusBadge } from '../../components/ui';
+import { Calendar } from '../../components/Calendar';
 import { ChatModal } from '../../components/ChatModal';
 import { googleMapsUrl, useApp } from '../../context/AppContext';
 import { RequestStatus } from '../../types';
 import { colors, radius, spacing } from '../../theme';
 import { notify } from '../../utils/alert';
 import { generateSlots } from '../../utils/booking';
+
+const SCHEDULE_TIMES = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'];
 
 const FILTERS: { id: RequestStatus | 'all'; label: string }[] = [
   { id: 'all', label: 'All' },
@@ -29,6 +32,7 @@ export default function DashboardScreen() {
     employees,
     refreshEmployees,
     assignRequestToEmployee,
+    setRequestSchedule,
   } = useApp();
   const [filter, setFilter] = useState<RequestStatus | 'all'>('all');
 
@@ -44,6 +48,9 @@ export default function DashboardScreen() {
   const [chatRequestId, setChatRequestId] = useState<string | null>(null);
   const [assigningId, setAssigningId] = useState<string | null>(null);
   const [assignNotes, setAssignNotes] = useState('');
+  const [schedulingId, setSchedulingId] = useState<string | null>(null);
+  const [scheduleDate, setScheduleDate] = useState<string | null>(null);
+  const [scheduleTime, setScheduleTime] = useState('09:00');
   const activeEmployees = useMemo(() => employees.filter((e) => e.status === 'active'), [employees]);
   const slots = useMemo(() => generateSlots(), []);
   // A single account can hold both roles, and can now own several listings —
@@ -81,6 +88,20 @@ export default function DashboardScreen() {
     }
     setAssigningId(null);
     setAssignNotes('');
+  }
+
+  async function handleSchedule(requestId: string) {
+    if (!scheduleDate) return;
+    const [h, m] = scheduleTime.split(':').map(Number);
+    const [y, mo, d] = scheduleDate.split('-').map(Number);
+    const when = new Date(y, mo - 1, d, h, m, 0, 0);
+    const { error } = await setRequestSchedule(requestId, when.toISOString());
+    if (error) {
+      notify('Could not schedule', error);
+      return;
+    }
+    setSchedulingId(null);
+    setScheduleDate(null);
   }
 
   async function handleUnassign(requestId: string) {
@@ -160,6 +181,67 @@ export default function DashboardScreen() {
                 </View>
               </View>
             )}
+            {/* Putting a date on the job is what lands it in the calendar. */}
+            {item.status === 'accepted' && (
+              <View style={styles.assignBox}>
+                {schedulingId === item.id ? (
+                  <View>
+                    <Text style={styles.assignLabel}>When is this happening?</Text>
+                    <View style={{ marginTop: spacing.sm }}>
+                      <Calendar selectedDate={scheduleDate} onSelectDate={setScheduleDate} />
+                    </View>
+                    {scheduleDate && (
+                      <View style={styles.chipWrap}>
+                        {SCHEDULE_TIMES.map((t) => (
+                          <Chip key={t} label={t} selected={scheduleTime === t} onPress={() => setScheduleTime(t)} />
+                        ))}
+                      </View>
+                    )}
+                    <View style={styles.actions}>
+                      <View style={{ flex: 1 }}>
+                        <Button title="Save to calendar" onPress={() => handleSchedule(item.id)} disabled={!scheduleDate} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Button title="Cancel" variant="outline" onPress={() => setSchedulingId(null)} />
+                      </View>
+                    </View>
+                  </View>
+                ) : item.scheduledFor ? (
+                  <View style={styles.assignedRow}>
+                    <Text style={styles.assignedTo}>
+                      🗓️ In the diary for{' '}
+                      {new Date(item.scheduledFor).toLocaleString('en-GB', {
+                        weekday: 'short',
+                        day: 'numeric',
+                        month: 'short',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </Text>
+                    <Text
+                      style={styles.assignLink}
+                      onPress={() => {
+                        setScheduleDate(null);
+                        setSchedulingId(item.id);
+                      }}
+                    >
+                      Change
+                    </Text>
+                  </View>
+                ) : (
+                  <Text
+                    style={styles.assignLink}
+                    onPress={() => {
+                      setScheduleDate(null);
+                      setSchedulingId(item.id);
+                    }}
+                  >
+                    + Put this in the calendar
+                  </Text>
+                )}
+              </View>
+            )}
+
             {/* Assignment only makes sense once the job is on. Marking the job
                 complete stays here on the manager's side either way — an
                 employee's "done" is just a nudge that it is ready to close. */}

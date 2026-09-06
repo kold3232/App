@@ -1168,3 +1168,159 @@ drop trigger if exists service_requests_assignment_owner on public.service_reque
 create trigger service_requests_assignment_owner
   before insert or update on public.service_requests
   for each row execute function public.enforce_assignment_is_own_employee();
+
+-- RockServ — business calendar
+-- The business's whole diary, not just RockServ work: accepted RockServ jobs
+-- come from service_requests, and anything else the business is doing goes in
+-- calendar_entries. Two sources rather than copying jobs into a second table,
+-- so rescheduling a job can't leave a stale duplicate behind.
+--
+-- Privacy: there is deliberately NO admin select policy on calendar_entries.
+-- We have no business reading who else a plumber works for. Admins only ever
+-- see how many hours are blocked out, through admin_busy_summary below —
+-- which is the leakage signal anyway. A row-level policy could not do this,
+-- since RLS grants whole rows and the titles are the sensitive part.
+alter table public.service_requests
+  add column if not exists scheduled_for timestamptz;
+
+create index if not exists service_requests_scheduled_for_idx
+  on public.service_requests (listing_id, scheduled_for);
+
+create table if not exists public.calendar_entries (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid not null references public.businesses (id) on delete cascade,
+  title text not null default '',
+  notes text not null default '',
+  starts_at timestamptz not null,
+  ends_at timestamptz not null,
+  created_at timestamptz not null default now(),
+  constraint calendar_entries_ends_after_start check (ends_at > starts_at)
+);
+
+alter table public.calendar_entries enable row level security;
+
+create policy "Businesses can view their own calendar"
+  on public.calendar_entries for select
+  using (auth.uid() = business_id);
+
+create policy "Businesses can add to their own calendar"
+  on public.calendar_entries for insert
+  with check (auth.uid() = business_id);
+
+create policy "Businesses can update their own calendar"
+  on public.calendar_entries for update
+  using (auth.uid() = business_id);
+
+create policy "Businesses can delete from their own calendar"
+  on public.calendar_entries for delete
+  using (auth.uid() = business_id);
+
+create index if not exists calendar_entries_business_starts_idx
+  on public.calendar_entries (business_id, starts_at);
+
+-- Hours blocked out against RockServ jobs actually completed. A business that
+-- is always busy but rarely logs a completion is worth a call. It proves
+-- nothing on its own — plenty of trades have private work that has nothing to
+-- do with us — which is why this returns counts and not diary entries.
+create or replace function public.admin_busy_summary(window_days int default 90)
+returns table (business_id uuid, busy_hours numeric, entry_count bigint)
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not exists (select 1 from public.admins a where a.id = auth.uid()) then
+    raise exception 'Admins only.';
+  end if;
+  return query
+    select c.business_id,
+           round(sum(extract(epoch from (c.ends_at - c.starts_at)) / 3600.0)::numeric, 1) as busy_hours,
+           count(*) as entry_count
+      from public.calendar_entries c
+     where c.starts_at >= now() - make_interval(days => window_days)
+     group by c.business_id;
+end $$;
+
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then
+    revoke all on function public.admin_busy_summary(int) from public;
+    grant execute on function public.admin_busy_summary(int) to authenticated;
+  end if;
+end $$;
+
+-- scheduled_for belongs to whoever runs the job, same as the other job-state
+-- columns, so it is locked away from the customer alongside them.
+create or replace function public.enforce_service_request_field_ownership()
+returns trigger language plpgsql as $$
+declare
+  is_customer boolean;
+  is_business boolean;
+  is_employee boolean;
+  wants_done boolean;
+begin
+  if exists (select 1 from public.admins a where a.id = auth.uid()) then
+    return new;
+  end if;
+
+  is_customer := (auth.uid() = old.customer_id);
+  is_business := exists (
+    select 1 from public.business_listings l
+    where l.id = old.listing_id and l.business_id = auth.uid()
+  );
+  is_employee := exists (
+    select 1 from public.business_employees e
+    where e.id = old.assigned_employee_id and e.user_id = auth.uid() and e.status = 'active'
+  );
+
+  -- An employee may move exactly one flag on their own job and nothing else.
+  if is_employee and not is_business and not is_customer then
+    wants_done := new.employee_done;
+    new := old;
+    new.employee_done := wants_done;
+    new.employee_done_at := case
+      when wants_done and not old.employee_done then now()
+      when not wants_done then null
+      else old.employee_done_at
+    end;
+    return new;
+  end if;
+
+  -- Accepting a quote is what unlocks the contact details, so this is the
+  -- line that matters most. The area and display name are the customer's to
+  -- set too — a business must not be able to rewrite what it was shown.
+  if not is_customer then
+    new.customer_id := old.customer_id;
+    new.quoted_amount := old.quoted_amount;
+    new.quote_accepted := old.quote_accepted;
+    new.quote_accepted_at := old.quote_accepted_at;
+    new.customer_display_name := old.customer_display_name;
+    new.area := old.area;
+    -- A business may clear a confirmation when it re-completes a job, but
+    -- must never be able to confirm on the customer's behalf.
+    if new.customer_confirmed and not old.customer_confirmed then
+      new.customer_confirmed := old.customer_confirmed;
+    end if;
+  end if;
+
+  -- The other direction: job value drives commission, so a customer must not
+  -- be able to zero it, mark it paid, or close the job off themselves. Nor
+  -- can they hand their own job to someone else's employee, or move it in the
+  -- business's diary.
+  if not is_business then
+    new.status := old.status;
+    new.job_value := old.job_value;
+    new.commission := old.commission;
+    new.commission_paid := old.commission_paid;
+    new.scheduled_slot := old.scheduled_slot;
+    new.scheduled_for := old.scheduled_for;
+    new.assigned_employee_id := old.assigned_employee_id;
+    new.assignment_notes := old.assignment_notes;
+    new.assignment_map_url := old.assignment_map_url;
+    new.assigned_at := old.assigned_at;
+    new.employee_done := old.employee_done;
+    new.employee_done_at := old.employee_done_at;
+  end if;
+
+  return new;
+end $$;
