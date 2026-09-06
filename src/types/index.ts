@@ -100,6 +100,16 @@ export type ServiceRequest = {
   quotedAmount?: number;
   quoteAccepted?: boolean;
   quoteAcceptedAt?: string;
+  // Set by the manager when the job is handed to a member of staff.
+  assignedEmployeeId?: string;
+  assignmentNotes: string;
+  assignmentMapUrl: string;
+  assignedAt?: string;
+  // The employee's own "I've finished" flag. Internal to the business — it is
+  // the manager who marks the job complete, which is what starts customer
+  // confirmation and commission.
+  employeeDone: boolean;
+  employeeDoneAt?: string;
 };
 
 // What a customer fills in to raise a request. Separate from ServiceRequest
@@ -158,7 +168,36 @@ export type CompanyProfile = {
   coverPhotoUrl?: string;
 };
 
-export type UserMode = 'customer' | 'company' | 'admin';
+export type UserMode = 'customer' | 'company' | 'admin' | 'employee';
+
+export type EmployeeStatus = 'invited' | 'active' | 'disabled';
+
+export type Employee = {
+  id: string;
+  businessId: string;
+  userId: string | null;
+  name: string;
+  email: string;
+  phone: string;
+  inviteCode: string;
+  status: EmployeeStatus;
+  createdAt: string;
+  acceptedAt?: string;
+};
+
+// A business asking to be allowed staff accounts. Seats are granted by hand,
+// so there is no plan or price attached — an admin decides the number.
+export type EmployeeAccessRequest = {
+  id: string;
+  businessId: string;
+  businessName: string;
+  businessEmail: string;
+  note: string;
+  status: 'pending' | 'approved' | 'rejected';
+  seatsApproved?: number;
+  adminNote: string;
+  createdAt: string;
+};
 
 export type NotifySignup = {
   categoryId: string;

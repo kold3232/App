@@ -31,6 +31,8 @@ export default function ModeSelectScreen() {
         <Button title="I need a service" onPress={() => setMode('customer')} />
         <View style={{ height: spacing.sm }} />
         <Button title="I run a business" onPress={() => setMode('company')} variant="accent" />
+        <View style={{ height: spacing.sm }} />
+        <Button title="I work for a business" onPress={() => setMode('employee')} variant="outline" />
         <Text style={styles.hint}>You can switch between these anytime from your profile.</Text>
       </View>
 

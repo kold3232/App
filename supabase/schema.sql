@@ -854,3 +854,317 @@ drop trigger if exists service_requests_reset_progress on public.service_request
 create trigger service_requests_reset_progress
   before insert on public.service_requests
   for each row execute function public.reset_service_request_progress();
+
+-- RockServ — manager and employee accounts
+-- Until now one login meant one business. Construction and cleaning firms have
+-- staff, so a business account (the "manager") can now invite employees who
+-- see only the jobs assigned to them: not other jobs, not each other, not
+-- billing, not analytics. That restriction is enforced here rather than by
+-- which screens the app draws, for the same reason the contact masking is.
+--
+-- Seats are granted by hand. A business asks, an admin decides how many (and
+-- what to charge, off-platform), so there is no plan tier or price in here.
+alter table public.businesses
+  add column if not exists employee_seats int not null default 0;
+
+create table if not exists public.employee_access_requests (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid not null references public.businesses (id) on delete cascade,
+  note text not null default '',
+  status text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
+  seats_approved int,
+  admin_note text not null default '',
+  created_at timestamptz not null default now(),
+  reviewed_at timestamptz
+);
+
+alter table public.employee_access_requests enable row level security;
+
+create policy "Businesses can view their own access requests"
+  on public.employee_access_requests for select
+  using (auth.uid() = business_id);
+
+create policy "Businesses can ask for employee access"
+  on public.employee_access_requests for insert
+  with check (auth.uid() = business_id);
+
+create policy "Admins can view all access requests"
+  on public.employee_access_requests for select
+  using (exists (select 1 from public.admins a where a.id = auth.uid()));
+
+create policy "Admins can review access requests"
+  on public.employee_access_requests for update
+  using (exists (select 1 from public.admins a where a.id = auth.uid()));
+
+create index if not exists employee_access_requests_status_idx
+  on public.employee_access_requests (status, created_at desc);
+
+-- invite_code is what an employee types after signing up. No email is sent —
+-- see redeem_employee_invite below for why a code beats an emailed link here.
+create table if not exists public.business_employees (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid not null references public.businesses (id) on delete cascade,
+  user_id uuid references auth.users (id) on delete set null,
+  name text not null,
+  email text not null default '',
+  phone text not null default '',
+  invite_code text not null unique,
+  status text not null default 'invited' check (status in ('invited', 'active', 'disabled')),
+  created_at timestamptz not null default now(),
+  accepted_at timestamptz
+);
+
+alter table public.business_employees enable row level security;
+
+-- The manager sees and manages their whole team.
+create policy "Businesses can view their own employees"
+  on public.business_employees for select
+  using (auth.uid() = business_id);
+
+create policy "Businesses can invite employees"
+  on public.business_employees for insert
+  with check (auth.uid() = business_id);
+
+create policy "Businesses can update their own employees"
+  on public.business_employees for update
+  using (auth.uid() = business_id);
+
+create policy "Businesses can remove their own employees"
+  on public.business_employees for delete
+  using (auth.uid() = business_id);
+
+-- An employee sees their own row and nothing else — deliberately not the rest
+-- of the team, which is why this is user_id and not business_id.
+create policy "Employees can view their own record"
+  on public.business_employees for select
+  using (auth.uid() = user_id);
+
+create policy "Admins can view all employees"
+  on public.business_employees for select
+  using (exists (select 1 from public.admins a where a.id = auth.uid()));
+
+create index if not exists business_employees_business_id_idx on public.business_employees (business_id);
+create index if not exists business_employees_user_id_idx on public.business_employees (user_id);
+
+-- Seats are checked here, not in the app: a manager holds a real token and
+-- could otherwise insert past whatever the admin approved.
+create or replace function public.enforce_employee_seat_limit()
+returns trigger language plpgsql as $$
+declare
+  seats int;
+  used int;
+begin
+  select employee_seats into seats from public.businesses where id = new.business_id;
+  select count(*) into used from public.business_employees
+    where business_id = new.business_id and status <> 'disabled';
+  if used >= coalesce(seats, 0) then
+    raise exception 'No employee seats left. Ask RockServ to approve more.'
+      using errcode = 'check_violation';
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists business_employees_seat_limit on public.business_employees;
+create trigger business_employees_seat_limit
+  before insert on public.business_employees
+  for each row execute function public.enforce_employee_seat_limit();
+
+-- Redeeming an invite has to be security definer: the employee has just
+-- signed up and cannot yet see any row in business_employees, so they can't
+-- look their own invite up to claim it. A code the manager hands over beats
+-- an emailed link here — these are staff standing in the same yard, and an
+-- emailed link needs mail infrastructure that can silently fail.
+create or replace function public.redeem_employee_invite(code text)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  emp public.business_employees;
+  seats int;
+  used int;
+begin
+  if auth.uid() is null then
+    raise exception 'You need to be signed in to accept an invite.';
+  end if;
+
+  select * into emp from public.business_employees
+    where upper(invite_code) = upper(btrim(code))
+      and status = 'invited'
+      and user_id is null;
+  if not found then
+    raise exception 'That invite code is not valid, or it has already been used.';
+  end if;
+
+  select employee_seats into seats from public.businesses where id = emp.business_id;
+  select count(*) into used from public.business_employees
+    where business_id = emp.business_id and status = 'active';
+  if used >= coalesce(seats, 0) then
+    raise exception 'This business has used all of its approved employee seats.';
+  end if;
+
+  update public.business_employees
+    set user_id = auth.uid(), status = 'active', accepted_at = now()
+    where id = emp.id;
+  return emp.id;
+end $$;
+
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then
+    revoke all on function public.redeem_employee_invite(text) from public;
+    grant execute on function public.redeem_employee_invite(text) to authenticated;
+  end if;
+end $$;
+
+-- Assignment lives on the request itself: one job goes to one employee.
+-- assignment_map_url is a plain Google Maps link the manager can override,
+-- so a job can point at a site entrance rather than the billing address.
+alter table public.service_requests
+  add column if not exists assigned_employee_id uuid references public.business_employees (id) on delete set null,
+  add column if not exists assignment_notes text not null default '',
+  add column if not exists assignment_map_url text not null default '',
+  add column if not exists assigned_at timestamptz,
+  add column if not exists employee_done boolean not null default false,
+  add column if not exists employee_done_at timestamptz;
+
+create index if not exists service_requests_assigned_employee_idx
+  on public.service_requests (assigned_employee_id);
+
+create policy "Employees can view jobs assigned to them"
+  on public.service_requests for select
+  using (exists (
+    select 1 from public.business_employees e
+    where e.id = service_requests.assigned_employee_id
+      and e.user_id = auth.uid()
+      and e.status = 'active'
+  ));
+
+create policy "Employees can update jobs assigned to them"
+  on public.service_requests for update
+  using (exists (
+    select 1 from public.business_employees e
+    where e.id = service_requests.assigned_employee_id
+      and e.user_id = auth.uid()
+      and e.status = 'active'
+  ));
+
+-- An employee on site needs the address and a number to ring, but only for
+-- their own job and only once it has unlocked for the business anyway.
+create policy "Employees can view contacts for jobs assigned to them"
+  on public.service_request_contacts for select
+  using (exists (
+    select 1
+    from public.service_requests r
+    join public.business_employees e on e.id = r.assigned_employee_id
+    where r.id = service_request_contacts.request_id
+      and e.user_id = auth.uid()
+      and e.status = 'active'
+      and (r.quote_accepted = true or r.type = 'instant')
+  ));
+
+-- Marking a job "Done" is an internal flag between employee and manager. The
+-- manager still performs Mark Complete, which is what starts customer
+-- confirmation and commission — so employee_done must not touch status.
+create or replace function public.enforce_service_request_field_ownership()
+returns trigger language plpgsql as $$
+declare
+  is_customer boolean;
+  is_business boolean;
+  is_employee boolean;
+  wants_done boolean;
+begin
+  if exists (select 1 from public.admins a where a.id = auth.uid()) then
+    return new;
+  end if;
+
+  is_customer := (auth.uid() = old.customer_id);
+  is_business := exists (
+    select 1 from public.business_listings l
+    where l.id = old.listing_id and l.business_id = auth.uid()
+  );
+  is_employee := exists (
+    select 1 from public.business_employees e
+    where e.id = old.assigned_employee_id and e.user_id = auth.uid() and e.status = 'active'
+  );
+
+  -- An employee may move exactly one flag on their own job and nothing else.
+  if is_employee and not is_business and not is_customer then
+    wants_done := new.employee_done;
+    new := old;
+    new.employee_done := wants_done;
+    new.employee_done_at := case
+      when wants_done and not old.employee_done then now()
+      when not wants_done then null
+      else old.employee_done_at
+    end;
+    return new;
+  end if;
+
+  -- Accepting a quote is what unlocks the contact details, so this is the
+  -- line that matters most. The area and display name are the customer's to
+  -- set too — a business must not be able to rewrite what it was shown.
+  if not is_customer then
+    new.customer_id := old.customer_id;
+    new.quoted_amount := old.quoted_amount;
+    new.quote_accepted := old.quote_accepted;
+    new.quote_accepted_at := old.quote_accepted_at;
+    new.customer_display_name := old.customer_display_name;
+    new.area := old.area;
+    -- A business may clear a confirmation when it re-completes a job, but
+    -- must never be able to confirm on the customer's behalf.
+    if new.customer_confirmed and not old.customer_confirmed then
+      new.customer_confirmed := old.customer_confirmed;
+    end if;
+  end if;
+
+  -- The other direction: job value drives commission, so a customer must not
+  -- be able to zero it, mark it paid, or close the job off themselves. Nor
+  -- can they hand their own job to someone else's employee.
+  if not is_business then
+    new.status := old.status;
+    new.job_value := old.job_value;
+    new.commission := old.commission;
+    new.commission_paid := old.commission_paid;
+    new.scheduled_slot := old.scheduled_slot;
+    new.assigned_employee_id := old.assigned_employee_id;
+    new.assignment_notes := old.assignment_notes;
+    new.assignment_map_url := old.assignment_map_url;
+    new.assigned_at := old.assigned_at;
+    new.employee_done := old.employee_done;
+    new.employee_done_at := old.employee_done_at;
+  end if;
+
+  return new;
+end $$;
+
+-- A manager can only assign to their own staff — otherwise a business could
+-- point a job at a rival's employee and hand them the customer's details.
+create or replace function public.enforce_assignment_is_own_employee()
+returns trigger language plpgsql as $$
+declare
+  owner uuid;
+begin
+  if new.assigned_employee_id is null then
+    return new;
+  end if;
+  if tg_op = 'UPDATE' and new.assigned_employee_id is not distinct from old.assigned_employee_id then
+    return new;
+  end if;
+  select l.business_id into owner
+    from public.business_listings l where l.id = new.listing_id;
+  if not exists (
+    select 1 from public.business_employees e
+    where e.id = new.assigned_employee_id and e.business_id = owner and e.status = 'active'
+  ) then
+    raise exception 'That employee does not work for this business.'
+      using errcode = 'check_violation';
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists service_requests_assignment_owner on public.service_requests;
+create trigger service_requests_assignment_owner
+  before insert or update on public.service_requests
+  for each row execute function public.enforce_assignment_is_own_employee();

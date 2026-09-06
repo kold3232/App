@@ -16,9 +16,14 @@ export type CustomerTabParamList = {
 
 export type CompanyTabParamList = {
   Dashboard: undefined;
+  Team: undefined;
   Invoices: undefined;
   MyListing: undefined;
   Settings: undefined;
+};
+
+export type EmployeeStackParamList = {
+  EmployeeJobs: undefined;
 };
 
 export type CompanyStackParamList = {

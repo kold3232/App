@@ -3,7 +3,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Button, Card, Chip, EmptyState, StatusBadge } from '../../components/ui';
 import { ChatModal } from '../../components/ChatModal';
-import { useApp } from '../../context/AppContext';
+import { googleMapsUrl, useApp } from '../../context/AppContext';
 import { RequestStatus } from '../../types';
 import { colors, radius, spacing } from '../../theme';
 import { notify } from '../../utils/alert';
@@ -18,18 +18,33 @@ const FILTERS: { id: RequestStatus | 'all'; label: string }[] = [
 ];
 
 export default function DashboardScreen() {
-  const { requests: allRequests, updateRequestStatus, completeRequest, rescheduleRequest, myListings, businessAccount, refreshRequests } = useApp();
+  const {
+    requests: allRequests,
+    updateRequestStatus,
+    completeRequest,
+    rescheduleRequest,
+    myListings,
+    businessAccount,
+    refreshRequests,
+    employees,
+    refreshEmployees,
+    assignRequestToEmployee,
+  } = useApp();
   const [filter, setFilter] = useState<RequestStatus | 'all'>('all');
 
   useFocusEffect(
     useCallback(() => {
       refreshRequests();
-    }, [refreshRequests])
+      refreshEmployees();
+    }, [refreshRequests, refreshEmployees])
   );
   const [completingId, setCompletingId] = useState<string | null>(null);
   const [jobValueInput, setJobValueInput] = useState('');
   const [reschedulingId, setReschedulingId] = useState<string | null>(null);
   const [chatRequestId, setChatRequestId] = useState<string | null>(null);
+  const [assigningId, setAssigningId] = useState<string | null>(null);
+  const [assignNotes, setAssignNotes] = useState('');
+  const activeEmployees = useMemo(() => employees.filter((e) => e.status === 'active'), [employees]);
   const slots = useMemo(() => generateSlots(), []);
   // A single account can hold both roles, and can now own several listings —
   // only show requests addressed to one of this business's own listings.
@@ -53,6 +68,24 @@ export default function DashboardScreen() {
     }
     completeRequest(id, value);
     setCompletingId(null);
+  }
+
+  async function handleAssign(requestId: string, employeeId: string, address?: string) {
+    const { error } = await assignRequestToEmployee(requestId, employeeId, {
+      notes: assignNotes.trim(),
+      mapUrl: address ? googleMapsUrl(address) : '',
+    });
+    if (error) {
+      notify('Could not assign', error);
+      return;
+    }
+    setAssigningId(null);
+    setAssignNotes('');
+  }
+
+  async function handleUnassign(requestId: string) {
+    const { error } = await assignRequestToEmployee(requestId, null, { notes: '', mapUrl: '' });
+    if (error) notify('Could not unassign', error);
   }
 
   function confirmReschedule(id: string, slotId: string) {
@@ -127,6 +160,68 @@ export default function DashboardScreen() {
                 </View>
               </View>
             )}
+            {/* Assignment only makes sense once the job is on. Marking the job
+                complete stays here on the manager's side either way — an
+                employee's "done" is just a nudge that it is ready to close. */}
+            {activeEmployees.length > 0 && (item.status === 'accepted' || item.status === 'pending') && (
+              <View style={styles.assignBox}>
+                {item.assignedEmployeeId ? (
+                  <View style={styles.assignedRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.assignedTo}>
+                        Assigned to{' '}
+                        {employees.find((e) => e.id === item.assignedEmployeeId)?.name ?? 'a former employee'}
+                      </Text>
+                      <Text style={styles.assignedStatus}>
+                        {item.employeeDone
+                          ? `✓ Marked done${item.employeeDoneAt ? ` ${new Date(item.employeeDoneAt).toLocaleDateString()}` : ''} — ready for you to complete`
+                          : 'Not finished yet'}
+                      </Text>
+                      {item.assignmentNotes ? <Text style={styles.assignedNotes}>{item.assignmentNotes}</Text> : null}
+                    </View>
+                    <Text style={styles.unassignLink} onPress={() => handleUnassign(item.id)}>
+                      Unassign
+                    </Text>
+                  </View>
+                ) : assigningId === item.id ? (
+                  <View>
+                    <Text style={styles.assignLabel}>Assign to</Text>
+                    <TextInput
+                      style={styles.assignInput}
+                      value={assignNotes}
+                      onChangeText={setAssignNotes}
+                      placeholder="Anything they need to know (optional)"
+                      placeholderTextColor={colors.textFaint}
+                      selectionColor={colors.primary}
+                      multiline
+                    />
+                    <View style={styles.chipWrap}>
+                      {activeEmployees.map((employee) => (
+                        <Chip
+                          key={employee.id}
+                          label={employee.name}
+                          onPress={() => handleAssign(item.id, employee.id, item.contact?.address)}
+                        />
+                      ))}
+                    </View>
+                    <View style={{ marginTop: spacing.sm }}>
+                      <Button title="Cancel" variant="outline" onPress={() => setAssigningId(null)} />
+                    </View>
+                  </View>
+                ) : (
+                  <Text
+                    style={styles.assignLink}
+                    onPress={() => {
+                      setAssignNotes('');
+                      setAssigningId(item.id);
+                    }}
+                  >
+                    + Assign to an employee
+                  </Text>
+                )}
+              </View>
+            )}
+
             {item.status === 'accepted' &&
               (completingId === item.id ? (
                 <View style={styles.completeForm}>
@@ -253,4 +348,30 @@ const styles = StyleSheet.create({
   },
   completedText: { fontSize: 12.5, fontWeight: '700', color: colors.primary },
   confirmStatus: { fontSize: 11.5, color: colors.textMuted, marginTop: 6 },
+  assignBox: { marginTop: spacing.md, paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: colors.border },
+  assignLink: { fontSize: 12.5, fontWeight: '700', color: colors.primary },
+  assignLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  assignInput: {
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    fontSize: 13,
+    color: colors.text,
+    marginTop: 6,
+    minHeight: 46,
+    textAlignVertical: 'top',
+  },
+  assignedRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+  assignedTo: { fontSize: 13, fontWeight: '700', color: colors.text },
+  assignedStatus: { fontSize: 11.5, color: colors.textMuted, marginTop: 3 },
+  assignedNotes: { fontSize: 11.5, color: colors.textMuted, marginTop: 4, fontStyle: 'italic' },
+  unassignLink: { fontSize: 12, fontWeight: '700', color: colors.danger },
 });

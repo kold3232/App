@@ -13,6 +13,9 @@ import {
   BusinessAccount,
   Category,
   CategoryGroupId,
+  Employee,
+  EmployeeAccessRequest,
+  EmployeeStatus,
   ChatMessage,
   ChatMessageSender,
   Company,
@@ -38,6 +41,53 @@ const STORAGE_KEYS = {
 
 // Flat commission structure: 10% on jobs of £500 or less, 5% above £500.
 export const COMMISSION_RATE = (jobValue: number) => (jobValue > 500 ? 0.05 : 0.1);
+
+function mapEmployeeRow(row: any): Employee {
+  return {
+    id: row.id,
+    businessId: row.business_id,
+    userId: row.user_id ?? null,
+    name: row.name,
+    email: row.email ?? '',
+    phone: row.phone ?? '',
+    inviteCode: row.invite_code,
+    status: row.status,
+    createdAt: row.created_at,
+    acceptedAt: row.accepted_at ?? undefined,
+  };
+}
+
+function mapAccessRequestRow(row: any): EmployeeAccessRequest {
+  return {
+    id: row.id,
+    businessId: row.business_id,
+    businessName: row.businesses?.name ?? '',
+    businessEmail: row.businesses?.email ?? '',
+    note: row.note ?? '',
+    status: row.status,
+    seatsApproved: row.seats_approved ?? undefined,
+    adminNote: row.admin_note ?? '',
+    createdAt: row.created_at,
+  };
+}
+
+// Six characters, no vowels and no 0/O/1/I — these get read out over the phone
+// or written on a job sheet, so ambiguity costs more than entropy does.
+const INVITE_ALPHABET = 'BCDFGHJKLMNPQRSTVWXYZ23456789';
+function generateInviteCode() {
+  let out = '';
+  for (let i = 0; i < 6; i += 1) {
+    out += INVITE_ALPHABET.charAt(Math.floor(Math.random() * INVITE_ALPHABET.length));
+  }
+  return out;
+}
+
+// Deep-linking into the Maps app is deliberately a plain URL rather than an
+// embedded map: react-native-maps would mean a config plugin and per-platform
+// API keys, and all a fitter actually needs is "open this in Maps".
+export function googleMapsUrl(address: string) {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${address}, Gibraltar`)}`;
+}
 
 type AppContextValue = {
   isReady: boolean;
@@ -113,6 +163,34 @@ type AppContextValue = {
   reinstateBusiness: (id: string) => Promise<void>;
   addComplaintFlag: (id: string, note: string) => Promise<void>;
   markCommissionPaid: (id: string) => Promise<void>;
+  // Manager side of the multi-account system.
+  employees: Employee[];
+  employeeSeats: number;
+  refreshEmployees: () => Promise<void>;
+  inviteEmployee: (input: { name: string; email: string; phone: string }) => Promise<{ error?: string; code?: string }>;
+  setEmployeeStatus: (id: string, status: EmployeeStatus) => Promise<{ error?: string }>;
+  removeEmployee: (id: string) => Promise<{ error?: string }>;
+  requestEmployeeAccess: (note: string) => Promise<{ error?: string }>;
+  myEmployeeAccessRequest: EmployeeAccessRequest | null;
+  assignRequestToEmployee: (
+    requestId: string,
+    employeeId: string | null,
+    details: { notes: string; mapUrl: string }
+  ) => Promise<{ error?: string }>;
+  // Employee side.
+  myEmployment: Employee | null;
+  signInEmployee: (email: string, password: string) => Promise<{ error?: string }>;
+  signUpEmployee: (email: string, password: string) => Promise<{ error?: string; needsEmailConfirmation?: boolean }>;
+  redeemEmployeeInvite: (code: string) => Promise<{ error?: string }>;
+  setEmployeeJobDone: (requestId: string, done: boolean) => Promise<{ error?: string }>;
+  signOutEmployee: () => Promise<void>;
+  // Admin side.
+  employeeAccessRequests: EmployeeAccessRequest[];
+  refreshEmployeeAccessRequests: () => Promise<void>;
+  reviewEmployeeAccessRequest: (
+    id: string,
+    decision: { approve: boolean; seats?: number; note: string }
+  ) => Promise<{ error?: string }>;
 };
 
 type ServiceLineRow = { name: string; priceFrom: number | null };
@@ -143,6 +221,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [customerProfile, setCustomerProfile] = useState<CustomerProfile | null>(null);
   const [businessAccount, setBusinessAccount] = useState<BusinessAccount | null>(null);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [employeeSeats, setEmployeeSeats] = useState(0);
+  const [myEmployment, setMyEmployment] = useState<Employee | null>(null);
+  const [myEmployeeAccessRequest, setMyEmployeeAccessRequest] = useState<EmployeeAccessRequest | null>(null);
+  const [employeeAccessRequests, setEmployeeAccessRequests] = useState<EmployeeAccessRequest[]>([]);
   const [authEmail, setAuthEmail] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(isSupabaseConfigured);
   const [mode, setModeState] = useState<UserMode | null>(null);
@@ -268,14 +351,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const fetchBusinessAccount = useCallback(async (userId: string) => {
     const { data, error } = await supabase
       .from('businesses')
-      .select('id, name, email, phone')
+      .select('id, name, email, phone, employee_seats')
       .eq('id', userId)
       .maybeSingle();
     if (!error && data) {
       setBusinessAccount({ id: data.id, name: data.name, email: data.email, phone: data.phone });
+      setEmployeeSeats(data.employee_seats ?? 0);
     } else {
       setBusinessAccount(null);
+      setEmployeeSeats(0);
     }
+  }, []);
+
+  // An employee only ever has a row where user_id is their own auth id — the
+  // policy on business_employees sees to that — so this doubles as the check
+  // for "is this account staff at all".
+  const fetchMyEmployment = useCallback(async (userId: string) => {
+    const { data, error } = await supabase
+      .from('business_employees')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .maybeSingle();
+    setMyEmployment(!error && data ? mapEmployeeRow(data) : null);
   }, []);
 
   const refreshMyListings = useCallback(async () => {
@@ -400,6 +498,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       quotedAmount: row.quoted_amount ?? undefined,
       quoteAccepted: !!row.quote_accepted,
       quoteAcceptedAt: row.quote_accepted_at ?? undefined,
+      assignedEmployeeId: row.assigned_employee_id ?? undefined,
+      assignmentNotes: row.assignment_notes ?? '',
+      assignmentMapUrl: row.assignment_map_url ?? '',
+      assignedAt: row.assigned_at ?? undefined,
+      employeeDone: !!row.employee_done,
+      employeeDoneAt: row.employee_done_at ?? undefined,
     }),
     []
   );
@@ -481,12 +585,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           fetchCustomerProfile(session.user.id),
           fetchBusinessAccount(session.user.id),
           fetchIsAdmin(session.user.id),
+          fetchMyEmployment(session.user.id),
         ]);
       } else {
         setAuthEmail(null);
         setCustomerProfile(null);
         setBusinessAccount(null);
         setIsAdminUser(false);
+        setMyEmployment(null);
+        setEmployees([]);
+        setEmployeeSeats(0);
         setRequests([]);
         setMessages([]);
       }
@@ -509,7 +617,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       isMounted = false;
       subscription.subscription.unsubscribe();
     };
-  }, [fetchCustomerProfile, fetchBusinessAccount, fetchIsAdmin]);
+  }, [fetchCustomerProfile, fetchBusinessAccount, fetchIsAdmin, fetchMyEmployment]);
 
   // Business listings, reviews and approved categories are public — anyone can
   // browse them regardless of login state.
@@ -1257,6 +1365,208 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [refreshAdminBusinesses]
   );
 
+  // --- Multi-account: manager side -----------------------------------------
+
+  const refreshEmployees = useCallback(async () => {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData.session?.user.id;
+    if (!userId) {
+      setEmployees([]);
+      return;
+    }
+    const [{ data: staff }, { data: seatRow }, { data: reqRows }] = await Promise.all([
+      supabase.from('business_employees').select('*').eq('business_id', userId).order('created_at'),
+      supabase.from('businesses').select('employee_seats').eq('id', userId).maybeSingle(),
+      supabase
+        .from('employee_access_requests')
+        .select('*')
+        .eq('business_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(1),
+    ]);
+    setEmployees((staff ?? []).map(mapEmployeeRow));
+    setEmployeeSeats(seatRow?.employee_seats ?? 0);
+    setMyEmployeeAccessRequest(reqRows && reqRows.length > 0 ? mapAccessRequestRow(reqRows[0]) : null);
+  }, []);
+
+  const inviteEmployee = useCallback(
+    async (input: { name: string; email: string; phone: string }) => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const userId = sessionData.session?.user.id;
+      if (!userId) return { error: 'Not signed in.' };
+      const code = generateInviteCode();
+      const { error } = await supabase.from('business_employees').insert({
+        business_id: userId,
+        name: input.name,
+        email: input.email,
+        phone: input.phone,
+        invite_code: code,
+      });
+      // The seat limit is a database trigger, so hitting it surfaces here
+      // rather than being something the UI has to predict.
+      if (error) return { error: error.message };
+      await refreshEmployees();
+      return { code };
+    },
+    [refreshEmployees]
+  );
+
+  const setEmployeeStatus = useCallback(
+    async (id: string, status: EmployeeStatus) => {
+      const { error } = await supabase.from('business_employees').update({ status }).eq('id', id);
+      if (error) return { error: error.message };
+      await refreshEmployees();
+      return {};
+    },
+    [refreshEmployees]
+  );
+
+  const removeEmployee = useCallback(
+    async (id: string) => {
+      const { error } = await supabase.from('business_employees').delete().eq('id', id);
+      if (error) return { error: error.message };
+      await refreshEmployees();
+      return {};
+    },
+    [refreshEmployees]
+  );
+
+  const requestEmployeeAccess = useCallback(
+    async (note: string) => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const userId = sessionData.session?.user.id;
+      if (!userId) return { error: 'Not signed in.' };
+      const { error } = await supabase.from('employee_access_requests').insert({ business_id: userId, note });
+      if (error) return { error: error.message };
+      await refreshEmployees();
+      return {};
+    },
+    [refreshEmployees]
+  );
+
+  const assignRequestToEmployee = useCallback(
+    async (requestId: string, employeeId: string | null, details: { notes: string; mapUrl: string }) => {
+      const patch = employeeId
+        ? {
+            assigned_employee_id: employeeId,
+            assignment_notes: details.notes,
+            assignment_map_url: details.mapUrl,
+            assigned_at: new Date().toISOString(),
+          }
+        : {
+            assigned_employee_id: null,
+            assignment_notes: '',
+            assignment_map_url: '',
+            assigned_at: null,
+            employee_done: false,
+            employee_done_at: null,
+          };
+      const { error } = await supabase.from('service_requests').update(patch).eq('id', requestId);
+      if (error) return { error: error.message };
+      await refreshRequests();
+      return {};
+    },
+    [refreshRequests]
+  );
+
+  // --- Multi-account: employee side ----------------------------------------
+
+  const signInEmployee = useCallback(
+    async (email: string, password: string) => {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) return { error: error.message };
+      if (data.session) await fetchMyEmployment(data.session.user.id);
+      return {};
+    },
+    [fetchMyEmployment]
+  );
+
+  const signUpEmployee = useCallback(async (email: string, password: string) => {
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    if (error) return { error: error.message };
+    if (data.user && data.user.identities && data.user.identities.length === 0) {
+      return { error: 'An account with this email already exists. Log in instead.' };
+    }
+    if (!data.session) return { needsEmailConfirmation: true };
+    return {};
+  }, []);
+
+  // Goes through an RPC because a freshly signed-up employee cannot see any
+  // row in business_employees yet — there is nothing to match them on until
+  // this claims the invite for them.
+  const redeemEmployeeInvite = useCallback(
+    async (code: string) => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const userId = sessionData.session?.user.id;
+      if (!userId) return { error: 'Sign in first, then enter your code.' };
+      const { error } = await supabase.rpc('redeem_employee_invite', { code });
+      if (error) return { error: error.message };
+      await fetchMyEmployment(userId);
+      return {};
+    },
+    [fetchMyEmployment]
+  );
+
+  // Purely an internal flag for the manager. Completing the job — and with it
+  // customer confirmation and commission — stays with the manager, and the
+  // database enforces that rather than trusting this screen.
+  const setEmployeeJobDone = useCallback(
+    async (requestId: string, done: boolean) => {
+      const { error } = await supabase.from('service_requests').update({ employee_done: done }).eq('id', requestId);
+      if (error) return { error: error.message };
+      await refreshRequests();
+      return {};
+    },
+    [refreshRequests]
+  );
+
+  const signOutEmployee = useCallback(async () => {
+    await supabase.auth.signOut();
+    setMyEmployment(null);
+    setAuthEmail(null);
+    setModeState(null);
+    AsyncStorage.setItem(STORAGE_KEYS.mode, JSON.stringify(null));
+  }, []);
+
+  // --- Multi-account: admin side -------------------------------------------
+
+  const refreshEmployeeAccessRequests = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('employee_access_requests')
+      .select('*, businesses (name, email)')
+      .order('created_at', { ascending: false })
+      .limit(200);
+    if (!error && data) setEmployeeAccessRequests(data.map(mapAccessRequestRow));
+  }, []);
+
+  const reviewEmployeeAccessRequest = useCallback(
+    async (id: string, decision: { approve: boolean; seats?: number; note: string }) => {
+      const target = employeeAccessRequests.find((r) => r.id === id);
+      const { error } = await supabase
+        .from('employee_access_requests')
+        .update({
+          status: decision.approve ? 'approved' : 'rejected',
+          seats_approved: decision.approve ? decision.seats ?? 0 : null,
+          admin_note: decision.note,
+          reviewed_at: new Date().toISOString(),
+        })
+        .eq('id', id);
+      if (error) return { error: error.message };
+      // Approving is what actually grants the seats; the request row is only
+      // the paper trail.
+      if (decision.approve && target) {
+        const { error: seatError } = await supabase
+          .from('businesses')
+          .update({ employee_seats: decision.seats ?? 0 })
+          .eq('id', target.businessId);
+        if (seatError) return { error: seatError.message };
+      }
+      await refreshEmployeeAccessRequests();
+      return {};
+    },
+    [employeeAccessRequests, refreshEmployeeAccessRequests]
+  );
+
   const value = useMemo(
     () => ({
       isReady,
@@ -1324,6 +1634,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       reinstateBusiness,
       addComplaintFlag,
       markCommissionPaid,
+      employees,
+      employeeSeats,
+      refreshEmployees,
+      inviteEmployee,
+      setEmployeeStatus,
+      removeEmployee,
+      requestEmployeeAccess,
+      myEmployeeAccessRequest,
+      assignRequestToEmployee,
+      myEmployment,
+      signInEmployee,
+      signUpEmployee,
+      redeemEmployeeInvite,
+      setEmployeeJobDone,
+      signOutEmployee,
+      employeeAccessRequests,
+      refreshEmployeeAccessRequests,
+      reviewEmployeeAccessRequest,
     }),
     [
       isReady,
@@ -1391,6 +1719,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       reinstateBusiness,
       addComplaintFlag,
       markCommissionPaid,
+      employees,
+      employeeSeats,
+      refreshEmployees,
+      inviteEmployee,
+      setEmployeeStatus,
+      removeEmployee,
+      requestEmployeeAccess,
+      myEmployeeAccessRequest,
+      assignRequestToEmployee,
+      myEmployment,
+      signInEmployee,
+      signUpEmployee,
+      redeemEmployeeInvite,
+      setEmployeeJobDone,
+      signOutEmployee,
+      employeeAccessRequests,
+      refreshEmployeeAccessRequests,
+      reviewEmployeeAccessRequest,
     ]
   );
 
