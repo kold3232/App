@@ -1324,3 +1324,29 @@ begin
 
   return new;
 end $$;
+
+-- RockServ — live chat
+-- A message only appeared after closing and reopening the thread, because the
+-- app read the list once on open and never heard about anything after that.
+-- Postgres only broadcasts changes for tables in the realtime publication, so
+-- the subscription in the app is inert until these two are added.
+--
+-- service_requests is here as well as chat_messages: accepting a quote changes
+-- the request rather than sending a message, and both sides need to see that
+-- land — the customer's "Accepted" pill, and the business's contact details
+-- unlocking.
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'chat_messages'
+  ) then
+    alter publication supabase_realtime add table public.chat_messages;
+  end if;
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'service_requests'
+  ) then
+    alter publication supabase_realtime add table public.service_requests;
+  end if;
+end $$;

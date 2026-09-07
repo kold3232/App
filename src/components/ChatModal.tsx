@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Image,
   KeyboardAvoidingView,
   Modal,
@@ -33,10 +34,22 @@ export function ChatModal({
   perspective: ChatMessageSender;
   readOnly?: boolean;
 }) {
-  const { messages, sendMessage, sendQuote, sendImageMessage, acceptQuote, refreshMessages, refreshRequests } = useApp();
+  const {
+    messages,
+    sendMessage,
+    sendQuote,
+    sendImageMessage,
+    acceptQuote,
+    refreshMessages,
+    refreshRequests,
+    subscribeToThread,
+    subscribeToRequest,
+  } = useApp();
   const [text, setText] = useState('');
   const [showQuoteForm, setShowQuoteForm] = useState(false);
   const [quoteAmount, setQuoteAmount] = useState('');
+  const [sendingImage, setSendingImage] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     if (visible) {
@@ -44,6 +57,18 @@ export function ChatModal({
       refreshRequests();
     }
   }, [visible, request.id, refreshMessages, refreshRequests]);
+
+  // Live while the thread is open, and torn down when it closes so a device
+  // isn't holding a socket open for a conversation nobody is looking at.
+  useEffect(() => {
+    if (!visible) return;
+    const stopMessages = subscribeToThread(request.id, () => refreshMessages(request.id));
+    const stopRequest = subscribeToRequest(request.id, () => refreshRequests());
+    return () => {
+      stopMessages();
+      stopRequest();
+    };
+  }, [visible, request.id, subscribeToThread, subscribeToRequest, refreshMessages, refreshRequests]);
 
   const thread = useMemo(
     () =>
@@ -89,7 +114,11 @@ export function ChatModal({
       quality: 0.6,
     });
     if (!result.canceled && result.assets?.[0]?.uri) {
-      sendImageMessage(request.id, perspective, result.assets[0].uri);
+      // Uploading a photo takes a moment, and without this the tap looked
+      // like it had done nothing at all.
+      setSendingImage(true);
+      await sendImageMessage(request.id, perspective, result.assets[0].uri);
+      setSendingImage(false);
     }
   }
 
@@ -132,7 +161,12 @@ export function ChatModal({
         )}
 
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <ScrollView style={styles.thread} contentContainerStyle={styles.threadContent}>
+          <ScrollView
+            ref={scrollRef}
+            style={styles.thread}
+            contentContainerStyle={styles.threadContent}
+            onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
+          >
             {thread.length === 0 && (
               <Text style={styles.emptyText}>No messages yet. Say hello and discuss the job specs.</Text>
             )}
@@ -215,8 +249,12 @@ export function ChatModal({
 
           {!readOnly && (
             <View style={styles.inputRow}>
-              <Pressable style={styles.attachButton} onPress={handlePickImage}>
-                <Ionicons name="image-outline" size={20} color={colors.primary} />
+              <Pressable style={styles.attachButton} onPress={handlePickImage} disabled={sendingImage}>
+                {sendingImage ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : (
+                  <Ionicons name="image-outline" size={20} color={colors.primary} />
+                )}
               </Pressable>
               <TextInput
                 style={styles.textInput}

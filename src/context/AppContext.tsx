@@ -126,6 +126,8 @@ type AppContextValue = {
   businessListings: Company[];
   refreshRequests: () => Promise<void>;
   refreshMessages: (requestId: string) => Promise<void>;
+  subscribeToThread: (requestId: string, onMessage: (message: ChatMessage) => void) => () => void;
+  subscribeToRequest: (requestId: string, onChange: () => void) => () => void;
   customerProfile: CustomerProfile | null;
   businessAccount: BusinessAccount | null;
   authEmail: string | null;
@@ -867,16 +869,72 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [mapMessageRow]
   );
 
+  // The picker hands back a file:// path on this device. Storing that meant
+  // the other side received a URI that means nothing on their phone, which is
+  // why every received image rendered as an empty box. Upload first, store the
+  // public URL.
   const sendImageMessage = useCallback(
     async (requestId: string, sender: ChatMessageSender, imageUri: string) => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const userId = sessionData.session?.user.id;
+      if (!userId) return;
+      const { url, error: uploadError } = await uploadBusinessMedia(
+        userId,
+        imageUri,
+        `chat/${requestId}/${Date.now()}.jpg`
+      );
+      if (uploadError || !url) return;
       const { data, error } = await supabase
         .from('chat_messages')
-        .insert({ request_id: requestId, sender, kind: 'image', image_uri: imageUri })
+        .insert({ request_id: requestId, sender, kind: 'image', image_uri: url })
         .select()
         .single();
       if (!error && data) setMessages((prev) => [...prev, mapMessageRow(data)]);
     },
     [mapMessageRow]
+  );
+
+  // Live chat. Without this a message only appeared after closing and
+  // reopening the thread, because the list was populated once on open.
+  // Scoped to a single request so a device isn't woken by every conversation
+  // on the platform — which for an admin account would be all of them.
+  const subscribeToThread = useCallback(
+    (requestId: string, onMessage: (message: ChatMessage) => void) => {
+      if (!isSupabaseConfigured) return () => {};
+      const channel = supabase
+        .channel(`chat-${requestId}`)
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'chat_messages', filter: `request_id=eq.${requestId}` },
+          (payload) => onMessage(mapMessageRow(payload.new))
+        )
+        .subscribe();
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    },
+    [mapMessageRow]
+  );
+
+  // Accepting a quote flips fields on the request, and the other side needs to
+  // see that land — the customer's "Accepted" pill, and the business's newly
+  // unlocked contact details.
+  const subscribeToRequest = useCallback(
+    (requestId: string, onChange: () => void) => {
+      if (!isSupabaseConfigured) return () => {};
+      const channel = supabase
+        .channel(`request-${requestId}`)
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'service_requests', filter: `id=eq.${requestId}` },
+          () => onChange()
+        )
+        .subscribe();
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    },
+    []
   );
 
   // This is the moment the business earns the customer's contact details: the
@@ -1708,6 +1766,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       businessListings,
       refreshRequests,
       refreshMessages,
+      subscribeToThread,
+      subscribeToRequest,
       customerProfile,
       businessAccount,
       authEmail,
@@ -1800,6 +1860,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       businessListings,
       refreshRequests,
       refreshMessages,
+      subscribeToThread,
+      subscribeToRequest,
       customerProfile,
       businessAccount,
       authEmail,
