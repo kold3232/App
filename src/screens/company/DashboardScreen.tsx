@@ -2,6 +2,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Button, Card, Chip, EmptyState, StatusBadge } from '../../components/ui';
+import { Screen } from '../../components/Screen';
 import { Calendar } from '../../components/Calendar';
 import { ChatModal } from '../../components/ChatModal';
 import { googleMapsUrl, useApp } from '../../context/AppContext';
@@ -123,7 +124,7 @@ export default function DashboardScreen() {
   );
 
   return (
-    <View style={styles.container}>
+    <Screen style={styles.container}>
       <FlatList
         data={filtered}
         keyExtractor={(item) => item.id}
@@ -389,7 +390,7 @@ export default function DashboardScreen() {
           perspective="business"
         />
       )}
-    </View>
+    </Screen>
   );
 }
 

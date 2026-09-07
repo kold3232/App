@@ -1,4 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar } from 'expo-status-bar';
 import React from 'react';
 import { Image, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import { Button } from '../components/ui';
@@ -18,6 +19,8 @@ export default function ModeSelectScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* The only dark screen in the app — everything else is light. */}
+      <StatusBar style="light" />
       <View style={styles.hero}>
         <View style={styles.logoGlow}>
           <LinearGradient colors={['#F4F5F8', '#DDE1EA']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.logoCard}>

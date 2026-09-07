@@ -2,6 +2,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Card, EmptyState, StatusBadge } from '../../components/ui';
+import { Screen } from '../../components/Screen';
 import { ChatModal } from '../../components/ChatModal';
 import { useApp } from '../../context/AppContext';
 import { colors, radius, shadow, spacing } from '../../theme';
@@ -37,7 +38,7 @@ export default function AdminCasesScreen() {
   }, [requests, query]);
 
   return (
-    <View style={styles.container}>
+    <Screen style={styles.container}>
       <FlatList
         data={cases}
         keyExtractor={(item) => item.id}
@@ -92,7 +93,7 @@ export default function AdminCasesScreen() {
           readOnly
         />
       )}
-    </View>
+    </Screen>
   );
 }
 

@@ -2,6 +2,7 @@ import { RouteProp, useFocusEffect, useNavigation, useRoute } from '@react-navig
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Button, Card, EmptyState, StatusBadge } from '../../components/ui';
+import { Screen } from '../../components/Screen';
 import { ChatModal } from '../../components/ChatModal';
 import { StarRating } from '../../components/StarRating';
 import { useApp } from '../../context/AppContext';
@@ -52,7 +53,7 @@ export default function MyRequestsScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <Screen style={styles.container}>
       <FlatList
         data={requests}
         keyExtractor={(item) => item.id}
@@ -157,7 +158,7 @@ export default function MyRequestsScreen() {
           perspective="customer"
         />
       )}
-    </View>
+    </Screen>
   );
 }
 

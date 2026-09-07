@@ -3,6 +3,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useMemo, useState } from 'react';
 import { FlatList, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Button, Card, Chip, EmptyState } from '../../components/ui';
+import { Screen } from '../../components/Screen';
 import { googleMapsUrl, useApp } from '../../context/AppContext';
 import { colors, radius, spacing } from '../../theme';
 import { confirmAction, notify } from '../../utils/alert';
@@ -54,7 +55,7 @@ export default function EmployeeJobsScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <Screen style={styles.container}>
       <FlatList
         data={jobs}
         keyExtractor={(item) => item.id}
@@ -148,7 +149,7 @@ export default function EmployeeJobsScreen() {
           );
         }}
       />
-    </View>
+    </Screen>
   );
 }
 

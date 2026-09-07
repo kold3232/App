@@ -3,6 +3,7 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import React, { useCallback } from 'react';
 import { FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Button, Card, EmptyState } from '../../components/ui';
+import { Screen } from '../../components/Screen';
 import { useApp } from '../../context/AppContext';
 import { colors, radius, spacing } from '../../theme';
 
@@ -17,7 +18,7 @@ export default function MyListingScreen() {
   );
 
   return (
-    <View style={styles.container}>
+    <Screen style={styles.container}>
       <FlatList
         data={myListings}
         keyExtractor={(item) => item.id ?? item.name}
@@ -69,7 +70,7 @@ export default function MyListingScreen() {
       <View style={styles.addWrap}>
         <Button title="Add new listing" onPress={() => navigation.navigate('ListingEditor', { listingId: undefined })} />
       </View>
-    </View>
+    </Screen>
   );
 }
 

@@ -2,6 +2,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { Button, Card, EmptyState } from '../../components/ui';
+import { Screen } from '../../components/Screen';
 import { useApp } from '../../context/AppContext';
 import { colors, spacing } from '../../theme';
 import { notify } from '../../utils/alert';
@@ -48,7 +49,7 @@ export default function InvoicesScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <Screen style={styles.container}>
       <FlatList
         data={invoices}
         keyExtractor={(item) => item.id}
@@ -111,7 +112,7 @@ export default function InvoicesScreen() {
           </Card>
         )}
       />
-    </View>
+    </Screen>
   );
 }
 

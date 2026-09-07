@@ -2,6 +2,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useMemo } from 'react';
 import { ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { Button, Card, EmptyState, SectionLabel } from '../../components/ui';
+import { Screen } from '../../components/Screen';
 import { useApp } from '../../context/AppContext';
 import { colors, radius, spacing } from '../../theme';
 import { confirmAction, notify } from '../../utils/alert';
@@ -138,7 +139,8 @@ export default function AdminInsightsScreen() {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xl * 2 }}>
+    <Screen style={styles.container}>
+      <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xl * 2 }}>
       <Text style={styles.title}>Insights</Text>
       <Text style={styles.subtitle}>Basic analytics across the platform</Text>
 
@@ -241,6 +243,7 @@ export default function AdminInsightsScreen() {
         <Button title="Log out of admin" variant="outline" onPress={handleExit} />
       </View>
     </ScrollView>
+    </Screen>
   );
 }
 

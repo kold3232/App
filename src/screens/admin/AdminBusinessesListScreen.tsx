@@ -3,6 +3,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Card, Chip, EmptyState } from '../../components/ui';
+import { Screen } from '../../components/Screen';
 import { useApp } from '../../context/AppContext';
 import { AdminBusinessesStackParamList } from '../../navigation/types';
 import { colors, radius, shadow, spacing } from '../../theme';
@@ -37,7 +38,7 @@ export default function AdminBusinessesListScreen({ navigation }: Props) {
   }, [adminBusinesses, query, filter]);
 
   return (
-    <View style={styles.container}>
+    <Screen style={styles.container}>
       <FlatList
         data={businesses}
         keyExtractor={(item) => item.id}
@@ -112,7 +113,7 @@ export default function AdminBusinessesListScreen({ navigation }: Props) {
           );
         }}
       />
-    </View>
+    </Screen>
   );
 }
 

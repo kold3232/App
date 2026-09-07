@@ -2,6 +2,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useState } from 'react';
 import { FlatList, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Button, Card, EmptyState, SectionLabel } from '../../components/ui';
+import { Screen } from '../../components/Screen';
 import { useApp } from '../../context/AppContext';
 import { colors, radius, spacing } from '../../theme';
 import { notify } from '../../utils/alert';
@@ -63,7 +64,7 @@ export default function AdminQueueScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <Screen style={styles.container}>
       <FlatList
         data={pending}
         keyExtractor={(item) => item.id}
@@ -173,7 +174,7 @@ export default function AdminQueueScreen() {
           );
         }}
       />
-    </View>
+    </Screen>
   );
 }
 

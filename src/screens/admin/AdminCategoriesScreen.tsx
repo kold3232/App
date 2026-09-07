@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { Button, Card, Chip, SectionLabel } from '../../components/ui';
+import { Screen } from '../../components/Screen';
 import { CATEGORY_GROUPS } from '../../data/categoryGroups';
 import { useApp } from '../../context/AppContext';
 import { Category, CategoryGroupId } from '../../types';
@@ -61,7 +62,8 @@ export default function AdminCategoriesScreen() {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xl * 2 }}>
+    <Screen style={styles.container}>
+      <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xl * 2 }}>
       <Text style={styles.title}>Categories</Text>
       <Text style={styles.subtitle}>Toggle categories live or coming-soon, or add a new one.</Text>
 
@@ -244,6 +246,7 @@ export default function AdminCategoriesScreen() {
       <View style={{ height: spacing.sm }} />
       <Button title="Add category (coming soon)" onPress={handleAddCategory} disabled={!name.trim()} />
     </ScrollView>
+    </Screen>
   );
 }
 

@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { Calendar } from '../../components/Calendar';
 import { Button, Card, Chip, EmptyState, SectionLabel } from '../../components/ui';
+import { Screen } from '../../components/Screen';
 import { useApp } from '../../context/AppContext';
 import { colors, radius, spacing } from '../../theme';
 import { confirmAction, notify } from '../../utils/alert';
@@ -154,7 +155,8 @@ export default function CalendarScreen() {
   });
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <Screen style={styles.container}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView
         style={styles.container}
         contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xl * 2 }}
@@ -283,6 +285,7 @@ export default function CalendarScreen() {
         )}
       </ScrollView>
     </KeyboardAvoidingView>
+    </Screen>
   );
 }
 
