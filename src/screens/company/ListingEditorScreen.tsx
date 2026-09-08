@@ -23,6 +23,39 @@ import { confirmAction, notify } from '../../utils/alert';
 
 type Props = NativeStackScreenProps<CompanyStackParamList, 'ListingEditor'>;
 
+const WEEKDAYS = [
+  { iso: 1, label: 'Mon' },
+  { iso: 2, label: 'Tue' },
+  { iso: 3, label: 'Wed' },
+  { iso: 4, label: 'Thu' },
+  { iso: 5, label: 'Fri' },
+  { iso: 6, label: 'Sat' },
+  { iso: 7, label: 'Sun' },
+];
+const DEFAULT_DAYS = [1, 2, 3, 4, 5];
+// Minutes from midnight, on the hour, 07:00 to 21:00.
+const HOURS = Array.from({ length: 15 }, (_, i) => (7 + i) * 60);
+const SLOT_LENGTHS = [15, 30, 45, 60, 90, 120];
+
+function minuteLabel(minute: number) {
+  const h = Math.floor(minute / 60);
+  const m = minute % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+// Plain-English summary so a business can sanity-check what customers will be
+// offered without doing the arithmetic themselves.
+function describeBooking(profile: { bookingDays?: number[]; bookingStartMinute?: number; bookingEndMinute?: number; bookingSlotMinutes?: number }) {
+  const days = profile.bookingDays ?? DEFAULT_DAYS;
+  if (days.length === 0) return 'Pick at least one day, or customers will see no slots at all.';
+  const start = profile.bookingStartMinute ?? 540;
+  const end = profile.bookingEndMinute ?? 1020;
+  const step = profile.bookingSlotMinutes ?? 60;
+  const perDay = Math.max(0, Math.floor((end - start) / step));
+  const names = WEEKDAYS.filter((d) => days.includes(d.iso)).map((d) => d.label).join(', ');
+  return `Customers will see ${perDay} slot${perDay === 1 ? '' : 's'} a day on ${names}, ${minuteLabel(start)} to ${minuteLabel(end)}.`;
+}
+
 const PRICE_OPTIONS: CompanyProfile['priceRange'][] = ['£', '££', '£££'];
 
 function blankProfile(defaultPhone: string): Omit<CompanyProfile, 'id'> {
@@ -358,6 +391,73 @@ export default function ListingEditorScreen({ route, navigation }: Props) {
             and you confirm it. Turn it on for fixed-length work like a standard clean, where the time is the only
             thing to agree.
           </Text>
+
+          {profile.liveBookingEnabled && (
+            <View style={styles.bookingBox}>
+              <Text style={styles.bookingLabel}>Days you work</Text>
+              <View style={styles.chipWrap}>
+                {WEEKDAYS.map((day) => {
+                  const days = profile.bookingDays ?? DEFAULT_DAYS;
+                  const on = days.includes(day.iso);
+                  return (
+                    <Chip
+                      key={day.iso}
+                      label={day.label}
+                      selected={on}
+                      onPress={() =>
+                        setProfile((p) => {
+                          const current = p.bookingDays ?? DEFAULT_DAYS;
+                          const next = on ? current.filter((d) => d !== day.iso) : [...current, day.iso].sort();
+                          return { ...p, bookingDays: next };
+                        })
+                      }
+                    />
+                  );
+                })}
+              </View>
+
+              <Text style={styles.bookingLabel}>First slot starts</Text>
+              <View style={styles.chipWrap}>
+                {HOURS.map((minute) => (
+                  <Chip
+                    key={`from-${minute}`}
+                    label={minuteLabel(minute)}
+                    selected={(profile.bookingStartMinute ?? 540) === minute}
+                    onPress={() => setProfile((p) => ({ ...p, bookingStartMinute: minute }))}
+                  />
+                ))}
+              </View>
+
+              <Text style={styles.bookingLabel}>Last slot ends by</Text>
+              <View style={styles.chipWrap}>
+                {HOURS.filter((m) => m > (profile.bookingStartMinute ?? 540)).map((minute) => (
+                  <Chip
+                    key={`to-${minute}`}
+                    label={minuteLabel(minute)}
+                    selected={(profile.bookingEndMinute ?? 1020) === minute}
+                    onPress={() => setProfile((p) => ({ ...p, bookingEndMinute: minute }))}
+                  />
+                ))}
+              </View>
+
+              <Text style={styles.bookingLabel}>How long is each slot</Text>
+              <View style={styles.chipWrap}>
+                {SLOT_LENGTHS.map((mins) => (
+                  <Chip
+                    key={mins}
+                    label={mins >= 60 ? `${mins / 60} hour${mins === 60 ? '' : 's'}` : `${mins} min`}
+                    selected={(profile.bookingSlotMinutes ?? 60) === mins}
+                    onPress={() => setProfile((p) => ({ ...p, bookingSlotMinutes: mins }))}
+                  />
+                ))}
+              </View>
+
+              <Text style={styles.availabilityHint}>
+                {describeBooking(profile)} Anything already in your calendar — a RockServ job or your own private
+                work — takes its slot out automatically, so you can't be double-booked.
+              </Text>
+            </View>
+          )}
         </Card>
 
         <SectionLabel>Phone</SectionLabel>
@@ -448,6 +548,15 @@ const styles = StyleSheet.create({
   availabilityRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   availabilityLabel: { fontSize: 14, color: colors.text, flex: 1, marginRight: spacing.sm },
   availabilityHint: { fontSize: 11.5, color: colors.textMuted, marginTop: spacing.sm, lineHeight: 16 },
+  bookingBox: { marginTop: spacing.md, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.border },
+  bookingLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    marginTop: spacing.md,
+  },
   upsellText: { fontSize: 12.5, color: colors.textMuted, lineHeight: 18 },
   input: {
     backgroundColor: colors.surface,

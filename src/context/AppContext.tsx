@@ -113,7 +113,6 @@ type AppContextValue = {
   completeRequest: (id: string, jobValue: number) => Promise<void>;
   confirmCompletion: (id: string) => Promise<void>;
   payCommission: () => Promise<{ error?: string }>;
-  rescheduleRequest: (id: string, newSlot: string) => Promise<void>;
   myListings: CompanyProfile[];
   refreshMyListings: () => Promise<void>;
   createListing: (profile: Omit<CompanyProfile, 'id'>) => Promise<{ error?: string; id?: string }>;
@@ -121,6 +120,7 @@ type AppContextValue = {
   deleteListing: (id: string) => Promise<{ error?: string }>;
   uploadCoverPhoto: (listingId: string, localUri: string) => Promise<{ error?: string }>;
   fetchGalleryImages: (listingId: string) => Promise<GalleryImage[]>;
+  fetchAvailableSlots: (listingId: string) => Promise<string[]>;
   addGalleryImage: (listingId: string, localUri: string) => Promise<{ error?: string }>;
   removeGalleryImage: (imageId: string) => Promise<void>;
   businessListings: Company[];
@@ -226,6 +226,10 @@ type BusinessListingRow = {
   services: ServiceLineRow[] | null;
   available_now: boolean | null;
   live_booking_enabled: boolean | null;
+  booking_days: number[] | null;
+  booking_start_minute: number | null;
+  booking_end_minute: number | null;
+  booking_slot_minutes: number | null;
   cover_photo_url: string | null;
   display_priority: number | null;
 };
@@ -320,6 +324,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           color: colorFromId(l.business_id),
           availableNow: !!l.available_now,
           liveBookingEnabled: !!l.live_booking_enabled,
+          bookingDays: l.booking_days ?? [1, 2, 3, 4, 5],
+          bookingStartMinute: l.booking_start_minute ?? 540,
+          bookingEndMinute: l.booking_end_minute ?? 1020,
+          bookingSlotMinutes: l.booking_slot_minutes ?? 60,
           coverPhotoUrl: l.cover_photo_url ?? undefined,
           displayPriority: l.display_priority ?? 0,
         };
@@ -408,7 +416,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
     const { data, error } = await supabase
       .from('business_listings')
-      .select('id, name, phone, category_ids, tagline, description, price_range, services, available_now, live_booking_enabled, cover_photo_url')
+      .select('id, name, phone, category_ids, tagline, description, price_range, services, available_now, live_booking_enabled, booking_days, booking_start_minute, booking_end_minute, booking_slot_minutes, cover_photo_url')
       .eq('business_id', userId)
       .order('created_at', { ascending: true });
     if (!error && data) {
@@ -424,6 +432,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           services: l.services ?? [],
           availableNow: !!l.available_now,
           liveBookingEnabled: !!l.live_booking_enabled,
+          bookingDays: l.booking_days ?? [1, 2, 3, 4, 5],
+          bookingStartMinute: l.booking_start_minute ?? 540,
+          bookingEndMinute: l.booking_end_minute ?? 1020,
+          bookingSlotMinutes: l.booking_slot_minutes ?? 60,
           coverPhotoUrl: l.cover_photo_url ?? undefined,
         }))
       );
@@ -434,7 +446,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const [{ data: listingRows, error: listingError }, { data: bizRows }] = await Promise.all([
       supabase
         .from('business_listings')
-        .select('id, business_id, name, phone, category_ids, tagline, description, price_range, services, available_now, live_booking_enabled, cover_photo_url, display_priority'),
+        .select('id, business_id, name, phone, category_ids, tagline, description, price_range, services, available_now, live_booking_enabled, booking_days, booking_start_minute, booking_end_minute, booking_slot_minutes, cover_photo_url, display_priority'),
       supabase.from('businesses').select('id, is_approved, business_status'),
     ]);
     if (listingError || !listingRows || !bizRows) return;
@@ -830,10 +842,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return {};
   }, []);
 
-  const rescheduleRequest = useCallback(async (id: string, newSlot: string) => {
-    const { error } = await supabase.from('service_requests').update({ scheduled_slot: newSlot }).eq('id', id);
-    if (!error) setRequests((prev) => prev.map((r) => (r.id === id ? { ...r, scheduledSlot: newSlot } : r)));
-  }, []);
 
   const addReview = useCallback(async (requestId: string, companyId: string, rating: number, comment: string) => {
     const { data: sessionData } = await supabase.auth.getSession();
@@ -981,6 +989,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           services: profile.services,
           available_now: !!profile.availableNow,
           live_booking_enabled: !!profile.liveBookingEnabled,
+          booking_days: profile.bookingDays ?? [1, 2, 3, 4, 5],
+          booking_start_minute: profile.bookingStartMinute ?? 540,
+          booking_end_minute: profile.bookingEndMinute ?? 1020,
+          booking_slot_minutes: profile.bookingSlotMinutes ?? 60,
         })
         .select()
         .single();
@@ -1006,6 +1018,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           services: profile.services,
           available_now: !!profile.availableNow,
           live_booking_enabled: !!profile.liveBookingEnabled,
+          booking_days: profile.bookingDays ?? [1, 2, 3, 4, 5],
+          booking_start_minute: profile.bookingStartMinute ?? 540,
+          booking_end_minute: profile.bookingEndMinute ?? 1020,
+          booking_slot_minutes: profile.bookingSlotMinutes ?? 60,
         })
         .eq('id', id);
       if (error) return { error: error.message };
@@ -1673,6 +1689,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [employeeAccessRequests, refreshEmployeeAccessRequests]
   );
 
+  // Free slots are worked out server-side: deciding them means reading the
+  // business's own calendar, which customers cannot see and should not. They
+  // learn that 11:00 is taken, never who by.
+  const fetchAvailableSlots = useCallback(async (listingId: string) => {
+    const { data, error } = await supabase.rpc('available_slots', { p_listing_id: listingId });
+    if (error || !data) return [];
+    return (data as any[]).map((row) => row.slot_at as string);
+  }, []);
+
   // --- Business calendar ----------------------------------------------------
 
   const refreshCalendar = useCallback(async () => {
@@ -1782,7 +1807,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       completeRequest,
       confirmCompletion,
       payCommission,
-      rescheduleRequest,
       myListings,
       refreshMyListings,
       createListing,
@@ -1790,6 +1814,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       deleteListing,
       uploadCoverPhoto,
       fetchGalleryImages,
+      fetchAvailableSlots,
       addGalleryImage,
       removeGalleryImage,
       businessListings,
@@ -1877,7 +1902,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       completeRequest,
       confirmCompletion,
       payCommission,
-      rescheduleRequest,
       myListings,
       refreshMyListings,
       createListing,
@@ -1885,6 +1909,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       deleteListing,
       uploadCoverPhoto,
       fetchGalleryImages,
+      fetchAvailableSlots,
       addGalleryImage,
       removeGalleryImage,
       businessListings,

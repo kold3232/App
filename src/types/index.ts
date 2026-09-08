@@ -55,6 +55,12 @@ export type Company = {
   // Opt-in. Off means customers ask for a time and the business confirms it;
   // on means customers can take an open slot themselves.
   liveBookingEnabled?: boolean;
+  // Only meaningful when liveBookingEnabled. Days are ISO numbers, 1 = Monday.
+  // Start/end are minutes from midnight local time: 600 = 10:00.
+  bookingDays?: number[];
+  bookingStartMinute?: number;
+  bookingEndMinute?: number;
+  bookingSlotMinutes?: number;
   // Admin-curated position; higher sorts first, ties fall back to rating.
   displayPriority: number;
 };
@@ -201,6 +207,10 @@ export type CompanyProfile = {
   services: ServiceLine[];
   availableNow?: boolean;
   liveBookingEnabled?: boolean;
+  bookingDays?: number[];
+  bookingStartMinute?: number;
+  bookingEndMinute?: number;
+  bookingSlotMinutes?: number;
   coverPhotoUrl?: string;
 };
 

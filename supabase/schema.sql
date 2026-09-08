@@ -1508,3 +1508,105 @@ begin
     grant execute on function public.delete_my_account() to authenticated;
   end if;
 end $$;
+
+-- RockServ — per-listing booking hours
+-- The instant-booking screen was offering four hardcoded times on the next
+-- four days, identical for every business. A listing now carries its own
+-- working days, daily window and slot length, and the slots customers see are
+-- generated from that.
+alter table public.business_listings
+  -- ISO day numbers: 1 = Monday ... 7 = Sunday.
+  add column if not exists booking_days smallint[] not null default '{1,2,3,4,5}',
+  -- Minutes from midnight, local time. 540 = 09:00, 1020 = 17:00.
+  add column if not exists booking_start_minute int not null default 540,
+  add column if not exists booking_end_minute int not null default 1020,
+  add column if not exists booking_slot_minutes int not null default 60,
+  -- How far ahead customers may book.
+  add column if not exists booking_horizon_days int not null default 14;
+
+alter table public.business_listings
+  drop constraint if exists business_listings_booking_window_check;
+alter table public.business_listings
+  add constraint business_listings_booking_window_check
+  check (booking_end_minute > booking_start_minute and booking_slot_minutes between 5 and 480);
+
+-- Which slots are actually free.
+--
+-- Security definer because working it out means reading the business's own
+-- calendar, which customers cannot see and should not: they learn that 11:00
+-- is taken, never who by. It also filters against existing RockServ bookings,
+-- so two customers cannot take the same slot.
+create or replace function public.available_slots(p_listing_id uuid, p_days int default null)
+returns table (slot_at timestamptz)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  l record;
+  d date;
+  horizon int;
+  step interval;
+  day_start timestamptz;
+  day_end timestamptz;
+  t timestamptz;
+begin
+  select business_id, live_booking_enabled, booking_days, booking_start_minute,
+         booking_end_minute, booking_slot_minutes, booking_horizon_days
+    into l
+    from public.business_listings
+   where id = p_listing_id;
+
+  if not found or not l.live_booking_enabled then
+    return;
+  end if;
+  if l.booking_days is null or array_length(l.booking_days, 1) is null then
+    return;
+  end if;
+
+  horizon := least(coalesce(p_days, l.booking_horizon_days), 60);
+  step := make_interval(mins => l.booking_slot_minutes);
+
+  for d in select generate_series(current_date, current_date + horizon, interval '1 day')::date loop
+    if not (extract(isodow from d)::int = any(l.booking_days)) then
+      continue;
+    end if;
+
+    -- Built from local wall-clock minutes so 10:00 stays 10:00 across the
+    -- summer/winter clock change.
+    day_start := (d::timestamp + make_interval(mins => l.booking_start_minute)) at time zone 'Europe/Gibraltar';
+    day_end := (d::timestamp + make_interval(mins => l.booking_end_minute)) at time zone 'Europe/Gibraltar';
+
+    t := day_start;
+    while t + step <= day_end loop
+      if t > now()
+         and not exists (
+           select 1 from public.service_requests r
+            where r.listing_id = p_listing_id
+              and r.scheduled_for is not null
+              and r.status <> 'declined'
+              and tstzrange(r.scheduled_for, r.scheduled_for + step) && tstzrange(t, t + step)
+         )
+         and not exists (
+           select 1 from public.calendar_entries c
+            where c.business_id = l.business_id
+              and tstzrange(c.starts_at, c.ends_at) && tstzrange(t, t + step)
+         )
+      then
+        slot_at := t;
+        return next;
+      end if;
+      t := t + step;
+    end loop;
+  end loop;
+end $$;
+
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then
+    grant execute on function public.available_slots(uuid, int) to authenticated;
+  end if;
+  if exists (select 1 from pg_roles where rolname = 'anon') then
+    grant execute on function public.available_slots(uuid, int) to anon;
+  end if;
+end $$;

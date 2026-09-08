@@ -9,7 +9,6 @@ import { googleMapsUrl, useApp } from '../../context/AppContext';
 import { RequestStatus } from '../../types';
 import { colors, radius, spacing } from '../../theme';
 import { notify } from '../../utils/alert';
-import { generateSlots } from '../../utils/booking';
 
 const SCHEDULE_TIMES = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'];
 
@@ -26,7 +25,6 @@ export default function DashboardScreen() {
     requests: allRequests,
     updateRequestStatus,
     completeRequest,
-    rescheduleRequest,
     myListings,
     businessAccount,
     refreshRequests,
@@ -45,7 +43,6 @@ export default function DashboardScreen() {
   );
   const [completingId, setCompletingId] = useState<string | null>(null);
   const [jobValueInput, setJobValueInput] = useState('');
-  const [reschedulingId, setReschedulingId] = useState<string | null>(null);
   const [chatRequestId, setChatRequestId] = useState<string | null>(null);
   const [assigningId, setAssigningId] = useState<string | null>(null);
   const [assignNotes, setAssignNotes] = useState('');
@@ -53,7 +50,6 @@ export default function DashboardScreen() {
   const [scheduleDate, setScheduleDate] = useState<string | null>(null);
   const [scheduleTime, setScheduleTime] = useState('09:00');
   const activeEmployees = useMemo(() => employees.filter((e) => e.status === 'active'), [employees]);
-  const slots = useMemo(() => generateSlots(), []);
   // A single account can hold both roles, and can now own several listings —
   // only show requests addressed to one of this business's own listings.
   const myListingIds = useMemo(() => new Set(myListings.map((l) => l.id)), [myListings]);
@@ -113,14 +109,6 @@ export default function DashboardScreen() {
   async function handleUnassign(requestId: string) {
     const { error } = await assignRequestToEmployee(requestId, null, { notes: '', mapUrl: '' });
     if (error) notify('Could not unassign', error);
-  }
-
-  function confirmReschedule(id: string, slotId: string) {
-    const slot = slots.find((s) => s.id === slotId);
-    if (!slot) return;
-    rescheduleRequest(id, `${slot.dayLabel} · ${slot.time}`);
-    notify('Booking rescheduled', `Updated to ${slot.dayLabel} at ${slot.time}.`);
-    setReschedulingId(null);
   }
 
   const filtered = useMemo(
@@ -381,28 +369,6 @@ export default function DashboardScreen() {
               <View style={styles.actions}>
                 <Button title="Chat with customer" variant="outline" onPress={() => setChatRequestId(item.id)} />
               </View>
-            )}
-            {item.status === 'accepted' && item.type === 'instant' && completingId !== item.id && (
-              reschedulingId === item.id ? (
-                <View style={styles.completeForm}>
-                  <Text style={styles.completeLabel}>Pick a new slot</Text>
-                  <View style={styles.chipWrap}>
-                    {slots.map((s) => (
-                      <Chip
-                        key={s.id}
-                        label={`${s.dayLabel} · ${s.time}`}
-                        onPress={() => confirmReschedule(item.id, s.id)}
-                      />
-                    ))}
-                  </View>
-                  <View style={{ height: spacing.sm }} />
-                  <Button title="Cancel" variant="outline" onPress={() => setReschedulingId(null)} />
-                </View>
-              ) : (
-                <View style={styles.actions}>
-                  <Button title="Reschedule" variant="outline" onPress={() => setReschedulingId(item.id)} />
-                </View>
-              )
             )}
             {item.status === 'completed' && item.jobValue != null && (
               <View style={styles.completedSummary}>

@@ -1,51 +1,72 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { Button, Card, Chip, SectionLabel } from '../../components/ui';
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { Button, Card, Chip, EmptyState, SectionLabel } from '../../components/ui';
 import { useApp } from '../../context/AppContext';
 import { GIBRALTAR_AREAS } from '../../data/areas';
 import { BrowseStackParamList } from '../../navigation/types';
 import { colors, spacing } from '../../theme';
 import { notify } from '../../utils/alert';
-import { generateSlots } from '../../utils/booking';
 
 type Props = NativeStackScreenProps<BrowseStackParamList, 'InstantBook'>;
 
-// generateSlots builds ids as "YYYY-MM-DD-HH:MM".
-function slotToDate(slotId: string): Date | null {
-  const match = slotId.match(/^(\d{4})-(\d{2})-(\d{2})-(\d{2}):(\d{2})$/);
-  if (!match) return null;
-  const [, y, mo, d, h, mi] = match;
-  return new Date(Number(y), Number(mo) - 1, Number(d), Number(h), Number(mi), 0, 0);
+function dayLabel(iso: string) {
+  return new Date(iso).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' });
+}
+
+function timeLabel(iso: string) {
+  return new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 }
 
 export default function InstantBookScreen({ route, navigation }: Props) {
-  const { addRequest, categories, businessListings } = useApp();
+  const { addRequest, categories, businessListings, fetchAvailableSlots } = useApp();
   const company = businessListings.find((c) => c.id === route.params.companyId);
-  const slots = useMemo(() => generateSlots(), []);
 
-  const days = useMemo(() => {
-    const seen = new Set<string>();
-    const ordered: string[] = [];
-    slots.forEach((s) => {
-      if (!seen.has(s.dayLabel)) {
-        seen.add(s.dayLabel);
-        ordered.push(s.dayLabel);
-      }
-    });
-    return ordered;
-  }, [slots]);
-
-  const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
+  const [slots, setSlots] = useState<string[]>([]);
+  const [loadingSlots, setLoadingSlots] = useState(true);
+  const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [customerName, setCustomerName] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [area, setArea] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  // The free slots are worked out server-side from this listing's own working
+  // days and hours, minus anything already in its calendar.
+  useEffect(() => {
+    let active = true;
+    setLoadingSlots(true);
+    fetchAvailableSlots(route.params.companyId).then((result) => {
+      if (!active) return;
+      setSlots(result);
+      setLoadingSlots(false);
+    });
+    return () => {
+      active = false;
+    };
+  }, [route.params.companyId, fetchAvailableSlots]);
+
+  const byDay = useMemo(() => {
+    const groups = new Map<string, string[]>();
+    slots.forEach((slot) => {
+      const key = dayLabel(slot);
+      groups.set(key, [...(groups.get(key) ?? []), slot]);
+    });
+    return Array.from(groups.entries());
+  }, [slots]);
 
   if (!company) return null;
 
   const categoryName = categories.find((c) => c.id === company.categoryIds[0])?.name ?? '';
-  const selectedSlot = slots.find((s) => s.id === selectedSlotId);
   const canSubmit =
     !!selectedSlot &&
     customerName.trim().length > 0 &&
@@ -54,6 +75,8 @@ export default function InstantBookScreen({ route, navigation }: Props) {
     !!area;
 
   async function handleSubmit() {
+    if (!selectedSlot) return;
+    setSubmitting(true);
     const id = await addRequest({
       companyId: company!.id,
       companyName: company!.name,
@@ -62,22 +85,21 @@ export default function InstantBookScreen({ route, navigation }: Props) {
       area: area ?? '',
       jobDetails: '',
       preferredDate: '',
-      scheduledSlot: `${selectedSlot!.dayLabel} · ${selectedSlot!.time}`,
-      // The slot id carries the real date (YYYY-MM-DD-HH:MM), so the booking
-      // lands on the business's calendar the same as a confirmed quote job.
-      scheduledFor: slotToDate(selectedSlot!.id)?.toISOString(),
+      scheduledSlot: `${dayLabel(selectedSlot)} · ${timeLabel(selectedSlot)}`,
+      scheduledFor: selectedSlot,
       status: 'accepted',
-      contact: {
-        name: customerName.trim(),
-        phone: phone.trim(),
-        address: address.trim(),
-      },
+      contact: { name: customerName.trim(), phone: phone.trim(), address: address.trim() },
     });
+    setSubmitting(false);
     if (!id) {
-      notify('Could not confirm booking', 'Something went wrong sending your booking. Please try again.');
+      // Most likely cause is someone else taking the slot first, so reload
+      // rather than leaving a stale list on screen.
+      notify('That slot has gone', 'Someone booked it first. Pick another time.');
+      setSelectedSlot(null);
+      setSlots(await fetchAvailableSlots(route.params.companyId));
       return;
     }
-    notify('Booking confirmed', `Your booking with ${company!.name} for ${selectedSlot!.dayLabel} at ${selectedSlot!.time} is confirmed.`);
+    notify('Booking confirmed', `${company!.name} is booked for ${dayLabel(selectedSlot)} at ${timeLabel(selectedSlot)}.`);
     navigation.popToTop();
     (navigation as any).getParent()?.navigate('MyRequests');
   }
@@ -91,70 +113,88 @@ export default function InstantBookScreen({ route, navigation }: Props) {
         <Text style={styles.title}>Book a time</Text>
         <Text style={styles.subtitle}>With {company.name} — confirmed instantly</Text>
 
-        {days.map((day) => (
-          <View key={day} style={{ marginBottom: spacing.md }}>
-            <SectionLabel>{day}</SectionLabel>
-            <View style={styles.chipWrap}>
-              {slots
-                .filter((s) => s.dayLabel === day)
-                .map((s) => (
-                  <Chip key={s.id} label={s.time} selected={selectedSlotId === s.id} onPress={() => setSelectedSlotId(s.id)} />
+        {loadingSlots ? (
+          <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} />
+        ) : byDay.length === 0 ? (
+          <EmptyState
+            icon="calendar-outline"
+            title="No times available"
+            subtitle={`${company.name} has nothing free at the moment. Request a quote instead and agree a time with them directly.`}
+          />
+        ) : (
+          byDay.map(([day, times]) => (
+            <View key={day} style={{ marginBottom: spacing.md }}>
+              <SectionLabel>{day}</SectionLabel>
+              <View style={styles.chipWrap}>
+                {times.map((slot) => (
+                  <Chip
+                    key={slot}
+                    label={timeLabel(slot)}
+                    selected={selectedSlot === slot}
+                    onPress={() => setSelectedSlot(slot)}
+                  />
                 ))}
+              </View>
             </View>
-          </View>
-        ))}
+          ))
+        )}
 
-        <Card>
-          <View style={styles.field}>
-            <SectionLabel>Your name</SectionLabel>
-            <TextInput
-              style={styles.input}
-              value={customerName}
-              onChangeText={setCustomerName}
-              placeholder="e.g. John Smith"
-              placeholderTextColor={colors.textFaint}
-              selectionColor={colors.primary}
-            />
-          </View>
-          <View style={[styles.field, styles.fieldBorder]}>
-            <SectionLabel>Phone number</SectionLabel>
-            <TextInput
-              style={styles.input}
-              value={phone}
-              onChangeText={setPhone}
-              placeholder="+350 5400 0000"
-              placeholderTextColor={colors.textFaint}
-              selectionColor={colors.primary}
-              keyboardType="phone-pad"
-            />
-          </View>
-          <View style={[styles.field, styles.fieldBorder]}>
-            <SectionLabel>Your address</SectionLabel>
-            <TextInput
-              style={styles.input}
-              value={address}
-              onChangeText={setAddress}
-              placeholder="Street, block, floor, flat number..."
-              placeholderTextColor={colors.textFaint}
-              selectionColor={colors.primary}
-            />
-          </View>
-          <View style={[styles.field, styles.fieldBorder]}>
-            <SectionLabel>Which area is this in?</SectionLabel>
-            <View style={styles.chipWrap}>
-              {GIBRALTAR_AREAS.map((option) => (
-                <Chip key={option} label={option} selected={area === option} onPress={() => setArea(option)} />
-              ))}
-            </View>
-          </View>
-        </Card>
+        {byDay.length > 0 && (
+          <>
+            <Card>
+              <View style={styles.field}>
+                <SectionLabel>Your name</SectionLabel>
+                <TextInput
+                  style={styles.input}
+                  value={customerName}
+                  onChangeText={setCustomerName}
+                  placeholder="e.g. John Smith"
+                  placeholderTextColor={colors.textFaint}
+                  selectionColor={colors.primary}
+                />
+              </View>
+              <View style={[styles.field, styles.fieldBorder]}>
+                <SectionLabel>Phone number</SectionLabel>
+                <TextInput
+                  style={styles.input}
+                  value={phone}
+                  onChangeText={setPhone}
+                  placeholder="+350 5400 0000"
+                  placeholderTextColor={colors.textFaint}
+                  selectionColor={colors.primary}
+                  keyboardType="phone-pad"
+                />
+              </View>
+              <View style={[styles.field, styles.fieldBorder]}>
+                <SectionLabel>Your address</SectionLabel>
+                <TextInput
+                  style={styles.input}
+                  value={address}
+                  onChangeText={setAddress}
+                  placeholder="Street, block, floor, flat number..."
+                  placeholderTextColor={colors.textFaint}
+                  selectionColor={colors.primary}
+                />
+              </View>
+              <View style={[styles.field, styles.fieldBorder]}>
+                <SectionLabel>Which area is this in?</SectionLabel>
+                <View style={styles.chipWrap}>
+                  {GIBRALTAR_AREAS.map((option) => (
+                    <Chip key={option} label={option} selected={area === option} onPress={() => setArea(option)} />
+                  ))}
+                </View>
+              </View>
+            </Card>
 
-        <View style={{ height: spacing.lg }} />
-        <Button
-          title={selectedSlot ? `Confirm ${selectedSlot.dayLabel} · ${selectedSlot.time}` : 'Select a time slot'}
-          onPress={handleSubmit}
-          disabled={!canSubmit}
-        />
+            <View style={{ height: spacing.lg }} />
+            <Button
+              title={selectedSlot ? `Confirm ${dayLabel(selectedSlot)} · ${timeLabel(selectedSlot)}` : 'Select a time'}
+              onPress={handleSubmit}
+              disabled={!canSubmit}
+              loading={submitting}
+            />
+          </>
+        )}
       </ScrollView>
     </KeyboardAvoidingView>
   );
