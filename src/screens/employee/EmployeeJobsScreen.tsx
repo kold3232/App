@@ -3,6 +3,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useMemo, useState } from 'react';
 import { FlatList, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Button, Card, Chip, EmptyState } from '../../components/ui';
+import { DeleteAccountRow } from '../../components/DeleteAccountRow';
 import { Screen } from '../../components/Screen';
 import { googleMapsUrl, useApp } from '../../context/AppContext';
 import { colors, radius, spacing } from '../../theme';
@@ -85,6 +86,7 @@ export default function EmployeeJobsScreen() {
             subtitle="Jobs your manager assigns to you will show up in this list."
           />
         }
+        ListFooterComponent={<DeleteAccountRow />}
         ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
         renderItem={({ item }) => {
           const mapUrl = item.assignmentMapUrl || (item.contact ? googleMapsUrl(item.contact.address) : '');

@@ -1426,3 +1426,85 @@ alter table public.service_requests
 -- job before committing to a time; fixed-length work like cleaning does not.
 alter table public.business_listings
   add column if not exists live_booking_enabled boolean not null default false;
+
+-- RockServ — account deletion
+-- Apple requires an in-app route to delete an account for any app that lets
+-- people create one, and specifically does not accept "email support to
+-- delete" — which is all the privacy policy currently offers.
+--
+-- Deleting the auth.users row is what actually ends the account: every
+-- profile table hangs off it by foreign key. That needs privileges the app's
+-- anon key does not have, hence security definer — locked to auth.uid() so it
+-- can only ever delete the caller's own account.
+--
+-- Completed jobs are deliberately kept. They are the other party's invoice
+-- and commission record, and a customer closing their account should not
+-- quietly erase a business's books. customer_id becomes null and the display
+-- name becomes "Deleted user", so what survives is a transaction record with
+-- no person attached. The contact row — the real name, phone and address —
+-- is destroyed outright.
+alter table public.service_requests
+  alter column customer_id drop not null;
+
+alter table public.service_requests
+  drop constraint if exists service_requests_customer_id_fkey;
+
+alter table public.service_requests
+  add constraint service_requests_customer_id_fkey
+  foreign key (customer_id) references public.customers (id) on delete set null;
+
+create or replace function public.delete_my_account()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  uid uuid := auth.uid();
+  owed numeric;
+begin
+  if uid is null then
+    raise exception 'You need to be signed in to delete your account.';
+  end if;
+
+  -- Money first. Letting a business delete its way out of commission it owes
+  -- would make the whole billing side voluntary.
+  select coalesce(sum(r.commission), 0) into owed
+    from public.service_requests r
+    join public.business_listings l on l.id = r.listing_id
+   where l.business_id = uid
+     and r.status = 'completed'
+     and r.commission_paid = false;
+  if owed > 0 then
+    raise exception 'There is still % owed in commission. Settle that first, then delete the account.',
+      to_char(owed, 'FM£999999990.00');
+  end if;
+
+  -- Personal data goes now, while the rows are still reachable.
+  delete from public.service_request_contacts c
+   where exists (
+     select 1 from public.service_requests r
+     where r.id = c.request_id and r.customer_id = uid
+   );
+
+  update public.service_requests
+     set customer_display_name = 'Deleted user', area = ''
+   where customer_id = uid;
+
+  -- Staff accounts: business_employees.user_id is already ON DELETE SET NULL,
+  -- so the seat survives as an unclaimed invite rather than vanishing from
+  -- the manager's team list mid-job.
+  delete from public.customers where id = uid;
+  delete from public.businesses where id = uid;
+
+  -- Ends the login. Cascades through auth's own sessions and identities.
+  delete from auth.users where id = uid;
+end $$;
+
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then
+    revoke all on function public.delete_my_account() from public;
+    grant execute on function public.delete_my_account() to authenticated;
+  end if;
+end $$;

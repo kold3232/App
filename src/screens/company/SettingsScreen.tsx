@@ -3,6 +3,7 @@ import { useNavigation } from '@react-navigation/native';
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { DeleteAccountRow } from '../../components/DeleteAccountRow';
 import { LegalTextModal } from '../../components/LegalTextModal';
 import { Button, Card, SectionLabel } from '../../components/ui';
 import { LEGAL_LAST_UPDATED, PRIVACY_SECTIONS, TERMS_SECTIONS } from '../../data/legalContent';
@@ -90,6 +91,7 @@ export default function SettingsScreen() {
         <View style={{ marginTop: spacing.sm }}>
           <Button title="Back to start" onPress={() => setMode(null)} variant="secondary" />
         </View>
+        <DeleteAccountRow />
       </View>
 
       <LegalTextModal

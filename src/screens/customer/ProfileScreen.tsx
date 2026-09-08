@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { CustomerSignUpModal } from '../../components/CustomerSignUpModal';
 import { LegalTextModal } from '../../components/LegalTextModal';
 import { Button, Card, SectionLabel } from '../../components/ui';
+import { DeleteAccountRow } from '../../components/DeleteAccountRow';
 import { useApp } from '../../context/AppContext';
 import { LEGAL_LAST_UPDATED, PRIVACY_SECTIONS, TERMS_SECTIONS } from '../../data/legalContent';
 import { colors, radius, spacing } from '../../theme';
@@ -99,6 +100,7 @@ export default function ProfileScreen() {
           <View style={{ height: spacing.sm }} />
           <Button title="Back to start" onPress={() => setMode(null)} variant="secondary" />
         </View>
+        <DeleteAccountRow />
       </View>
 
       <CustomerSignUpModal visible={showSignUp} onClose={() => setShowSignUp(false)} />

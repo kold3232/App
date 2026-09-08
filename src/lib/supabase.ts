@@ -7,18 +7,6 @@ const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
 export const isSupabaseConfigured = !!supabaseUrl && !!supabaseAnonKey;
 
-// Temporary, visible diagnostic for the "no API key found" TestFlight bug.
-// The earlier version truncated the URL at 24 chars, which left a trailing
-// stray character/quote/whitespace in the env var impossible to rule out —
-// so the full value and its exact length are reported here.
-export const debugEnvInfo = {
-  urlPresent: !!supabaseUrl,
-  url: supabaseUrl ?? 'MISSING',
-  urlLength: supabaseUrl?.length ?? 0,
-  anonKeyPresent: !!supabaseAnonKey,
-  anonKeyLength: supabaseAnonKey?.length ?? 0,
-};
-
 /**
  * Normalizes any of fetch's three accepted header shapes into a plain object,
  * without ever constructing a `Headers` instance.
@@ -90,63 +78,6 @@ const fetchWithApiKey: typeof fetch = (input, init) => {
   }
   return fetch(withApiKeyParam(input), { ...init, headers });
 };
-
-/**
- * Runs the same login request three ways to isolate exactly which parts of a
- * request survive the trip off this device.
- *
- * A (header only) already came back "No API key found" on-device while
- * succeeding from desktop curl — that's what proved headers are being lost
- * below the JS layer. B checks the URL-parameter route now used as the fix.
- * C is the consequence worth knowing: if Authorization is dropped too, then
- * a signed-in user's token never reaches the server either, so every request
- * would silently act as anonymous and RLS would hide their own data.
- */
-export async function runConnectionTest(): Promise<string> {
-  if (!supabaseUrl || !supabaseAnonKey) {
-    return `URL present: ${!!supabaseUrl}\nKey present: ${!!supabaseAnonKey}\n\nEnv vars missing from this build.`;
-  }
-  const base = supabaseUrl.replace(/\/+$/, '');
-  const tokenUrl = `${base}/auth/v1/token?grant_type=password`;
-  const body = JSON.stringify({ email: 'connection-test@example.com', password: 'deliberately-wrong' });
-  const lines: string[] = [`URL (${debugEnvInfo.urlLength} chars):`, supabaseUrl, ''];
-
-  async function attempt(label: string, url: string, headers: Record<string, string>) {
-    try {
-      const response = await fetch(url, { method: 'POST', headers, body });
-      const text = await response.text();
-      lines.push(`${label}: ${response.status} ${text.slice(0, 120)}`, '');
-    } catch (error) {
-      lines.push(`${label}: threw ${String(error).slice(0, 120)}`, '');
-    }
-  }
-
-  await attempt('A header only', tokenUrl, {
-    apikey: supabaseAnonKey,
-    'Content-Type': 'application/json',
-  });
-  await attempt('B url param only', `${tokenUrl}&apikey=${encodeURIComponent(supabaseAnonKey)}`, {
-    'Content-Type': 'application/json',
-  });
-  // Deliberately bogus bearer against a REST read that anon is allowed to do.
-  // Verified against this project: if the Authorization header arrives the
-  // server rejects the malformed JWT ("Expected 3 parts in JWT", 401); if the
-  // header is dropped the same request succeeds as anon and returns rows.
-  // So this distinguishes the two outcomes unambiguously.
-  try {
-    const url = `${base}/rest/v1/business_listings?select=id&limit=1&apikey=${encodeURIComponent(supabaseAnonKey)}`;
-    const response = await fetch(url, { headers: { Authorization: 'Bearer deliberately-invalid-token' } });
-    const text = await response.text();
-    lines.push(`C auth header: ${response.status} ${text.slice(0, 120)}`, '');
-  } catch (error) {
-    lines.push(`C auth header: threw ${String(error).slice(0, 120)}`, '');
-  }
-
-  lines.push('B ok + A failing = headers dropped, url param is the fix.');
-  lines.push('C 401 "Expected 3 parts in JWT" = Authorization arrives, logins will hold.');
-  lines.push('C 200 with rows = Authorization dropped too, sessions need more work.');
-  return lines.join('\n');
-}
 
 export const supabase = createClient(supabaseUrl ?? 'https://placeholder.supabase.co', supabaseAnonKey ?? 'placeholder-anon-key', {
   auth: {

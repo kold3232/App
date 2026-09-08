@@ -188,6 +188,7 @@ type AppContextValue = {
   redeemEmployeeInvite: (code: string) => Promise<{ error?: string }>;
   setEmployeeJobDone: (requestId: string, done: boolean) => Promise<{ error?: string }>;
   signOutEmployee: () => Promise<void>;
+  deleteMyAccount: () => Promise<{ error?: string }>;
   // Admin side.
   employeeAccessRequests: EmployeeAccessRequest[];
   refreshEmployeeAccessRequests: () => Promise<void>;
@@ -1613,6 +1614,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     AsyncStorage.setItem(STORAGE_KEYS.mode, JSON.stringify(null));
   }, []);
 
+  // Apple requires an in-app route to delete an account, and specifically
+  // does not accept "email support". The work happens in a security-definer
+  // function because ending the login means deleting the auth.users row, which
+  // the anon key cannot do. Completed jobs survive as the other party's
+  // invoice record with no person attached — see the schema for why.
+  const deleteMyAccount = useCallback(async () => {
+    const { error } = await supabase.rpc('delete_my_account');
+    if (error) return { error: error.message };
+    await supabase.auth.signOut();
+    setCustomerProfile(null);
+    setBusinessAccount(null);
+    setMyEmployment(null);
+    setAuthEmail(null);
+    setRequests([]);
+    setMessages([]);
+    setModeState(null);
+    AsyncStorage.setItem(STORAGE_KEYS.mode, JSON.stringify(null));
+    return {};
+  }, []);
+
   // --- Multi-account: admin side -------------------------------------------
 
   const refreshEmployeeAccessRequests = useCallback(async () => {
@@ -1822,6 +1843,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       redeemEmployeeInvite,
       setEmployeeJobDone,
       signOutEmployee,
+      deleteMyAccount,
       employeeAccessRequests,
       refreshEmployeeAccessRequests,
       reviewEmployeeAccessRequest,
@@ -1916,6 +1938,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       redeemEmployeeInvite,
       setEmployeeJobDone,
       signOutEmployee,
+      deleteMyAccount,
       employeeAccessRequests,
       refreshEmployeeAccessRequests,
       reviewEmployeeAccessRequest,
