@@ -11,6 +11,14 @@ import { generateSlots } from '../../utils/booking';
 
 type Props = NativeStackScreenProps<BrowseStackParamList, 'InstantBook'>;
 
+// generateSlots builds ids as "YYYY-MM-DD-HH:MM".
+function slotToDate(slotId: string): Date | null {
+  const match = slotId.match(/^(\d{4})-(\d{2})-(\d{2})-(\d{2}):(\d{2})$/);
+  if (!match) return null;
+  const [, y, mo, d, h, mi] = match;
+  return new Date(Number(y), Number(mo) - 1, Number(d), Number(h), Number(mi), 0, 0);
+}
+
 export default function InstantBookScreen({ route, navigation }: Props) {
   const { addRequest, categories, businessListings } = useApp();
   const company = businessListings.find((c) => c.id === route.params.companyId);
@@ -55,6 +63,9 @@ export default function InstantBookScreen({ route, navigation }: Props) {
       jobDetails: '',
       preferredDate: '',
       scheduledSlot: `${selectedSlot!.dayLabel} · ${selectedSlot!.time}`,
+      // The slot id carries the real date (YYYY-MM-DD-HH:MM), so the booking
+      // lands on the business's calendar the same as a confirmed quote job.
+      scheduledFor: slotToDate(selectedSlot!.id)?.toISOString(),
       status: 'accepted',
       contact: {
         name: customerName.trim(),

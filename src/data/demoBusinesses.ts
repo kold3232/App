@@ -65,13 +65,13 @@ const TRADES: Record<string, TradeConfig> = {
     taglines: [
       'Certified wiring, boards and testing',
       'Rewires, faults and EICR reports',
-      'Same-week callouts across Gibraltar',
+      'Same-week visits across Gibraltar',
       'Domestic and commercial electrics',
     ],
     description:
       'Qualified electricians covering rewires, consumer units, fault finding and EICR certification for homes and businesses in Gibraltar.',
     services: [
-      { name: 'Fault finding callout', priceFrom: 65 },
+      { name: 'Fault finding visit', priceFrom: 65 },
       { name: 'Consumer unit replacement', priceFrom: 380 },
       { name: 'Full rewire', priceFrom: 2200 },
       { name: 'EICR certificate', priceFrom: 140 },
@@ -82,13 +82,13 @@ const TRADES: Record<string, TradeConfig> = {
     taglines: [
       'Leaks fixed fast, no mess left behind',
       'Boilers, bathrooms and blockages',
-      'Emergency callouts, seven days',
+      'Emergency cover, seven days',
       'Bathroom fit-outs start to finish',
     ],
     description:
       'Plumbing and heating across Gibraltar — from emergency leaks and blocked drains to full bathroom installations.',
     services: [
-      { name: 'Emergency leak callout', priceFrom: 70 },
+      { name: 'Emergency leak visit', priceFrom: 70 },
       { name: 'Boiler service', priceFrom: 95 },
       { name: 'Bathroom fit-out', priceFrom: 2600 },
       { name: 'Drain unblocking', priceFrom: 85 },

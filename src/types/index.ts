@@ -52,6 +52,9 @@ export type Company = {
   color: string;
   availableNow?: boolean;
   coverPhotoUrl?: string;
+  // Opt-in. Off means customers ask for a time and the business confirms it;
+  // on means customers can take an open slot themselves.
+  liveBookingEnabled?: boolean;
   // Admin-curated position; higher sorts first, ties fall back to rating.
   displayPriority: number;
 };
@@ -90,6 +93,9 @@ export type ServiceRequest = {
   contact?: RequestContact;
   jobDetails: string;
   preferredDate: string;
+  // The same request as a real timestamp, so the business can confirm it in
+  // one tap. preferredDate is only a display label and carries no year.
+  preferredFor?: string;
   scheduledSlot: string;
   status: RequestStatus;
   createdAt: string;
@@ -126,7 +132,11 @@ export type NewServiceRequest = {
   area: string;
   jobDetails: string;
   preferredDate: string;
+  preferredFor?: string;
   scheduledSlot: string;
+  // Set straight away for an instant booking: the customer took a slot, so it
+  // is already agreed and belongs on the business's calendar immediately.
+  scheduledFor?: string;
   status: RequestStatus;
   contact: RequestContact;
 };
@@ -190,6 +200,7 @@ export type CompanyProfile = {
   priceRange: '£' | '££' | '£££';
   services: ServiceLine[];
   availableNow?: boolean;
+  liveBookingEnabled?: boolean;
   coverPhotoUrl?: string;
 };
 

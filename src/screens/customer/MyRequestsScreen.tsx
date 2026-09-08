@@ -85,6 +85,20 @@ export default function MyRequestsScreen() {
                 {item.type === 'instant' && item.scheduledSlot ? `  ·  🗓️ ${item.scheduledSlot}` : ''}
                 {item.type === 'quote' && item.preferredDate ? `  ·  🗓️ ${item.preferredDate}` : ''}
               </Text>
+              {item.scheduledFor ? (
+                <Text style={styles.confirmedSlot}>
+                  ✅ Confirmed for{' '}
+                  {new Date(item.scheduledFor).toLocaleString('en-GB', {
+                    weekday: 'long',
+                    day: 'numeric',
+                    month: 'short',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </Text>
+              ) : item.preferredDate && item.status !== 'declined' ? (
+                <Text style={styles.awaitingSlot}>Waiting for {item.companyName} to confirm a time</Text>
+              ) : null}
               <Text style={styles.date}>{new Date(item.createdAt).toLocaleString()}</Text>
 
               {item.type === 'quote' && item.status !== 'declined' && (
@@ -172,6 +186,8 @@ const styles = StyleSheet.create({
   detail: { fontSize: 13, color: colors.text, marginTop: spacing.sm },
   meta: { fontSize: 12, color: colors.textMuted, marginTop: spacing.sm },
   date: { fontSize: 11, color: colors.textMuted, marginTop: 6 },
+  confirmedSlot: { fontSize: 12.5, color: colors.success, fontWeight: '700', marginTop: 8 },
+  awaitingSlot: { fontSize: 12, color: colors.textMuted, marginTop: 8, fontStyle: 'italic' },
   chatRow: { marginTop: spacing.md, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.border },
   quoteSummary: { fontSize: 12.5, fontWeight: '700', color: colors.primary, marginBottom: spacing.sm },
   reviewSection: { marginTop: spacing.md, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.border },

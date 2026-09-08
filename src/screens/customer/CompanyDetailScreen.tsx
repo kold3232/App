@@ -120,8 +120,19 @@ export default function CompanyDetailScreen({ route, navigation }: Props) {
         )}
       </Card>
 
+      {/* Booking a slot outright is opt-in per business — most price the job
+          first. Where it is off, asking for a quote is the only route. */}
+      {company.liveBookingEnabled && (
+        <View style={{ marginBottom: spacing.sm }}>
+          <Button
+            title="Book a time"
+            onPress={() => navigation.navigate('InstantBook', { companyId: company.id })}
+          />
+        </View>
+      )}
       <Button
         title="Request a quote"
+        variant={company.liveBookingEnabled ? 'outline' : 'primary'}
         onPress={() => navigation.navigate('RequestQuote', { companyId: company.id })}
       />
 

@@ -224,6 +224,7 @@ type BusinessListingRow = {
   price_range: string | null;
   services: ServiceLineRow[] | null;
   available_now: boolean | null;
+  live_booking_enabled: boolean | null;
   cover_photo_url: string | null;
   display_priority: number | null;
 };
@@ -317,6 +318,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           services: l.services ?? [],
           color: colorFromId(l.business_id),
           availableNow: !!l.available_now,
+          liveBookingEnabled: !!l.live_booking_enabled,
           coverPhotoUrl: l.cover_photo_url ?? undefined,
           displayPriority: l.display_priority ?? 0,
         };
@@ -405,7 +407,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
     const { data, error } = await supabase
       .from('business_listings')
-      .select('id, name, phone, category_ids, tagline, description, price_range, services, available_now, cover_photo_url')
+      .select('id, name, phone, category_ids, tagline, description, price_range, services, available_now, live_booking_enabled, cover_photo_url')
       .eq('business_id', userId)
       .order('created_at', { ascending: true });
     if (!error && data) {
@@ -420,6 +422,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           priceRange: (l.price_range ?? '££') as CompanyProfile['priceRange'],
           services: l.services ?? [],
           availableNow: !!l.available_now,
+          liveBookingEnabled: !!l.live_booking_enabled,
           coverPhotoUrl: l.cover_photo_url ?? undefined,
         }))
       );
@@ -430,7 +433,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const [{ data: listingRows, error: listingError }, { data: bizRows }] = await Promise.all([
       supabase
         .from('business_listings')
-        .select('id, business_id, name, phone, category_ids, tagline, description, price_range, services, available_now, cover_photo_url, display_priority'),
+        .select('id, business_id, name, phone, category_ids, tagline, description, price_range, services, available_now, live_booking_enabled, cover_photo_url, display_priority'),
       supabase.from('businesses').select('id, is_approved, business_status'),
     ]);
     if (listingError || !listingRows || !bizRows) return;
@@ -508,6 +511,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       contact,
       jobDetails: row.job_details ?? '',
       preferredDate: row.preferred_date ?? '',
+      preferredFor: row.preferred_for ?? undefined,
       scheduledSlot: row.scheduled_slot ?? '',
       status: row.status,
       createdAt: row.created_at,
@@ -751,6 +755,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           area: input.area,
           job_details: input.jobDetails,
           preferred_date: input.preferredDate,
+          preferred_for: input.preferredFor ?? null,
+          scheduled_for: input.scheduledFor ?? null,
           scheduled_slot: input.scheduledSlot,
           status: input.status,
         })
@@ -973,6 +979,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           price_range: profile.priceRange,
           services: profile.services,
           available_now: !!profile.availableNow,
+          live_booking_enabled: !!profile.liveBookingEnabled,
         })
         .select()
         .single();
@@ -997,6 +1004,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           price_range: profile.priceRange,
           services: profile.services,
           available_now: !!profile.availableNow,
+          live_booking_enabled: !!profile.liveBookingEnabled,
         })
         .eq('id', id);
       if (error) return { error: error.message };

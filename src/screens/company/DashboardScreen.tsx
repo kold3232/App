@@ -105,6 +105,11 @@ export default function DashboardScreen() {
     setScheduleDate(null);
   }
 
+  async function handleConfirmPreferred(requestId: string, preferredFor: string) {
+    const { error } = await setRequestSchedule(requestId, preferredFor);
+    if (error) notify('Could not confirm', error);
+  }
+
   async function handleUnassign(requestId: string) {
     const { error } = await assignRequestToEmployee(requestId, null, { notes: '', mapUrl: '' });
     if (error) notify('Could not unassign', error);
@@ -206,6 +211,42 @@ export default function DashboardScreen() {
                         <Button title="Cancel" variant="outline" onPress={() => setSchedulingId(null)} />
                       </View>
                     </View>
+                  </View>
+                ) : !item.scheduledFor && item.preferredFor ? (
+                  // The default flow: the customer asked for a time, so
+                  // confirming it is one tap. Anything else is a conversation.
+                  <View>
+                    <Text style={styles.assignedTo}>
+                      Customer asked for{' '}
+                      {new Date(item.preferredFor).toLocaleString('en-GB', {
+                        weekday: 'short',
+                        day: 'numeric',
+                        month: 'short',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </Text>
+                    <View style={styles.actions}>
+                      <View style={{ flex: 1 }}>
+                        <Button
+                          title="Confirm that time"
+                          onPress={() => handleConfirmPreferred(item.id, item.preferredFor!)}
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Button
+                          title="Suggest another"
+                          variant="outline"
+                          onPress={() => {
+                            setScheduleDate(null);
+                            setSchedulingId(item.id);
+                          }}
+                        />
+                      </View>
+                    </View>
+                    <Text style={styles.assignedStatus}>
+                      Or talk it through in the chat — nothing is fixed until you set a time here.
+                    </Text>
                   </View>
                 ) : item.scheduledFor ? (
                   <View style={styles.assignedRow}>

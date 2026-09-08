@@ -53,6 +53,14 @@ export default function RequestQuoteScreen({ route, navigation }: Props) {
       ? new Date(preferredIsoDate).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
       : '';
     const preferredDate = dateLabel && preferredTime ? `${dateLabel} · ${preferredTime}` : '';
+    // Also send it as a real timestamp so the business can confirm it in one
+    // tap — the label above has no year in it.
+    let preferredFor: string | undefined;
+    if (preferredIsoDate && preferredTime) {
+      const [y, mo, d] = preferredIsoDate.split('-').map(Number);
+      const [h, mi] = preferredTime.split(':').map(Number);
+      preferredFor = new Date(y, mo - 1, d, h, mi, 0, 0).toISOString();
+    }
     setSubmitting(true);
     const id = await addRequest({
       companyId: company!.id,
@@ -62,6 +70,7 @@ export default function RequestQuoteScreen({ route, navigation }: Props) {
       area: area ?? '',
       jobDetails: jobDetails.trim(),
       preferredDate,
+      preferredFor,
       scheduledSlot: '',
       status: 'pending',
       contact: {

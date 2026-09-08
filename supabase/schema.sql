@@ -1350,3 +1350,79 @@ begin
     alter publication supabase_realtime add table public.service_requests;
   end if;
 end $$;
+
+-- RockServ — keep contact details out of chat
+-- Masking the customer's phone number until a quote is accepted achieves
+-- nothing if either side can simply type it into the chat, so messages that
+-- carry a number or a handle are rejected outright.
+--
+-- In the database rather than the app, for the usual reason: both parties hold
+-- a real session token and can post to the API without going near our screen.
+-- The app runs the same check first so the sender gets a civil explanation
+-- instead of an error.
+--
+-- Deliberately narrow. It catches the obvious ("call me on 54001234",
+-- "whatsapp me") and will not catch someone spelling a number out in words.
+-- The point is to stop the casual route, not to win an arms race.
+create or replace function public.looks_like_contact_details(body text)
+returns boolean
+language plpgsql
+immutable
+as $$
+declare
+  run text;
+  digits text;
+begin
+  if body is null then
+    return false;
+  end if;
+
+  -- Email addresses.
+  if body ~* '[[:alnum:]._%%+-]+@[[:alnum:].-]+\.[a-z]{2,}' then
+    return true;
+  end if;
+
+  -- Messaging apps and social handles, including "@someone".
+  if body ~* '(whats\s*app|wapp|telegram|t\.me|wa\.me|signal|snapchat|instagram|insta\b|messenger|facebook|@[[:alnum:]._]{3,})' then
+    return true;
+  end if;
+
+  -- Any run of digits and separators holding seven or more digits. Seven is
+  -- the length of a local Gibraltar number, and it clears ordinary prices,
+  -- measurements and dates: "1250", "3000 x 600mm" and "26/08" all stay.
+  for run in select (regexp_matches(body, '[0-9][0-9[:space:]()+.-]{4,}[0-9]', 'g'))[1] loop
+    digits := regexp_replace(run, '[^0-9]', '', 'g');
+    if length(digits) >= 7 then
+      return true;
+    end if;
+  end loop;
+
+  return false;
+end $$;
+
+create or replace function public.reject_contact_details_in_chat()
+returns trigger language plpgsql as $$
+begin
+  if new.kind = 'text' and public.looks_like_contact_details(new.text) then
+    raise exception 'Phone numbers and contact handles cannot be sent in RockServ chat.'
+      using errcode = 'check_violation';
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists chat_messages_no_contact_details on public.chat_messages;
+create trigger chat_messages_no_contact_details
+  before insert or update on public.chat_messages
+  for each row execute function public.reject_contact_details_in_chat();
+
+-- RockServ — booking preferences
+-- preferred_for is the customer's requested slot as a real timestamp. The
+-- existing preferred_date is a display label with no year in it, so it could
+-- never be turned back into a date the business could confirm in one tap.
+alter table public.service_requests
+  add column if not exists preferred_for timestamptz;
+
+-- Live-slot booking is off unless a business asks for it. Most trades price a
+-- job before committing to a time; fixed-length work like cleaning does not.
+alter table public.business_listings
+  add column if not exists live_booking_enabled boolean not null default false;

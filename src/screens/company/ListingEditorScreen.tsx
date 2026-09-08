@@ -343,6 +343,23 @@ export default function ListingEditorScreen({ route, navigation }: Props) {
           </View>
         </Card>
 
+        <SectionLabel>Instant booking</SectionLabel>
+        <Card style={styles.availabilityCard}>
+          <View style={styles.availabilityRow}>
+            <Text style={styles.availabilityLabel}>Let customers book an open slot themselves</Text>
+            <Switch
+              value={!!profile.liveBookingEnabled}
+              onValueChange={(v) => setProfile((p) => ({ ...p, liveBookingEnabled: v }))}
+              trackColor={{ false: colors.border, true: colors.primary }}
+            />
+          </View>
+          <Text style={styles.availabilityHint}>
+            Off by default. Leave it off if you price a job before committing to a time — customers ask for a slot
+            and you confirm it. Turn it on for fixed-length work like a standard clean, where the time is the only
+            thing to agree.
+          </Text>
+        </Card>
+
         <SectionLabel>Phone</SectionLabel>
         <TextInput
           style={styles.input}
@@ -430,6 +447,7 @@ const styles = StyleSheet.create({
   availabilityCard: { marginTop: spacing.xs, marginBottom: spacing.md },
   availabilityRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   availabilityLabel: { fontSize: 14, color: colors.text, flex: 1, marginRight: spacing.sm },
+  availabilityHint: { fontSize: 11.5, color: colors.textMuted, marginTop: spacing.sm, lineHeight: 16 },
   upsellText: { fontSize: 12.5, color: colors.textMuted, lineHeight: 18 },
   input: {
     backgroundColor: colors.surface,
