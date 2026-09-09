@@ -5,6 +5,7 @@ import { DEFAULT_CATEGORIES } from '../data/categories';
 import { DEMO_MODE, buildDemoCompanies } from '../data/demoBusinesses';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { uploadBusinessMedia } from '../lib/mediaUpload';
+import { googleMapsUrl } from '../utils/maps';
 import { colorFromId } from '../utils/color';
 import {
   AdminBusiness,
@@ -82,13 +83,6 @@ function generateInviteCode() {
     out += INVITE_ALPHABET.charAt(Math.floor(Math.random() * INVITE_ALPHABET.length));
   }
   return out;
-}
-
-// Deep-linking into the Maps app is deliberately a plain URL rather than an
-// embedded map: react-native-maps would mean a config plugin and per-platform
-// API keys, and all a fitter actually needs is "open this in Maps".
-export function googleMapsUrl(address: string) {
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${address}, Gibraltar`)}`;
 }
 
 type AppContextValue = {

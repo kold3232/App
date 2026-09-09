@@ -17,6 +17,7 @@ import { Screen } from '../../components/Screen';
 import { useApp } from '../../context/AppContext';
 import { colors, radius, spacing } from '../../theme';
 import { confirmAction, notify } from '../../utils/alert';
+import { openInMaps } from '../../utils/maps';
 
 const TIME_OPTIONS = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'];
 const DURATIONS = [1, 2, 4, 8];
@@ -31,7 +32,17 @@ function timeLabel(iso: string) {
 }
 
 type DayItem =
-  | { kind: 'job'; id: string; startsAt: string; endsAt?: string; title: string; subtitle: string; detail: string }
+  | {
+      kind: 'job';
+      id: string;
+      startsAt: string;
+      endsAt?: string;
+      title: string;
+      subtitle: string;
+      detail: string;
+      // False when only the area is known, which is not a routable address.
+      hasExactAddress: boolean;
+    }
   | { kind: 'private'; id: string; startsAt: string; endsAt: string; title: string; notes: string };
 
 export default function CalendarScreen() {
@@ -102,6 +113,7 @@ export default function CalendarScreen() {
           title: r.contact?.name ?? r.customerName,
           subtitle: `Case #${r.caseNumber} · ${r.categoryName}`,
           detail: r.contact?.address ?? r.area,
+          hasExactAddress: !!r.contact?.address,
         })
       );
     calendarEntries
@@ -243,7 +255,17 @@ export default function CalendarScreen() {
                   {item.kind === 'job' ? (
                     <>
                       <Text style={styles.itemMeta}>{item.subtitle}</Text>
-                      {item.detail ? <Text style={styles.itemMeta}>{item.detail}</Text> : null}
+                      {item.detail ? (
+                        item.hasExactAddress ? (
+                          <Pressable onPress={() => openInMaps(item.detail)} hitSlop={6}>
+                            <Text style={styles.itemLink}>
+                              {item.detail} · Open in Maps
+                            </Text>
+                          </Pressable>
+                        ) : (
+                          <Text style={styles.itemMeta}>{item.detail}</Text>
+                        )
+                      ) : null}
                     </>
                   ) : (
                     <>
@@ -328,6 +350,7 @@ const styles = StyleSheet.create({
   itemTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   itemTitle: { fontSize: 14.5, fontWeight: '700', color: colors.text, flex: 1 },
   itemMeta: { fontSize: 12, color: colors.textMuted, marginTop: 3 },
+  itemLink: { fontSize: 12, color: colors.primary, fontWeight: '600', marginTop: 3 },
   tagJob: { fontSize: 9.5, fontWeight: '800', color: colors.primary, textTransform: 'uppercase', letterSpacing: 0.4 },
   tagPrivate: {
     fontSize: 9.5,

@@ -5,9 +5,10 @@ import { FlatList, Linking, Pressable, StyleSheet, Text, View } from 'react-nati
 import { Button, Card, Chip, EmptyState } from '../../components/ui';
 import { DeleteAccountRow } from '../../components/DeleteAccountRow';
 import { Screen } from '../../components/Screen';
-import { googleMapsUrl, useApp } from '../../context/AppContext';
+import { useApp } from '../../context/AppContext';
 import { colors, radius, spacing } from '../../theme';
 import { confirmAction, notify } from '../../utils/alert';
+import { callNumber, googleMapsUrl, openInMaps } from '../../utils/maps';
 
 export default function EmployeeJobsScreen() {
   const { requests, refreshRequests, setEmployeeJobDone, myEmployment, signOutEmployee } = useApp();
@@ -45,14 +46,6 @@ export default function EmployeeJobsScreen() {
       'Mark done',
       () => toggleDone(id, true)
     );
-  }
-
-  async function openMaps(url: string) {
-    try {
-      await Linking.openURL(url);
-    } catch {
-      notify('Could not open Maps', 'No maps app is available on this device.');
-    }
   }
 
   return (
@@ -112,7 +105,7 @@ export default function EmployeeJobsScreen() {
               {item.contact ? (
                 <View style={styles.contactBox}>
                   <Text style={styles.contactLine}>{item.contact.name}</Text>
-                  <Pressable onPress={() => Linking.openURL(`tel:${item.contact!.phone.replace(/\s/g, '')}`)}>
+                  <Pressable onPress={() => callNumber(item.contact!.phone)}>
                     <Text style={styles.contactLink}>{item.contact.phone}</Text>
                   </Pressable>
                   <Text style={styles.contactLine}>{item.contact.address}</Text>
@@ -127,7 +120,7 @@ export default function EmployeeJobsScreen() {
               <View style={styles.actions}>
                 {mapUrl ? (
                   <View style={{ flex: 1 }}>
-                    <Button title="Open in Maps" variant="outline" onPress={() => openMaps(mapUrl)} />
+                    <Button title="Open in Maps" variant="outline" onPress={() => Linking.openURL(mapUrl)} />
                   </View>
                 ) : null}
                 {item.status !== 'completed' && (

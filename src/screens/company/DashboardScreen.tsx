@@ -1,14 +1,15 @@
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useMemo, useState } from 'react';
-import { FlatList, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Button, Card, Chip, EmptyState, StatusBadge } from '../../components/ui';
 import { Screen } from '../../components/Screen';
 import { Calendar } from '../../components/Calendar';
 import { ChatModal } from '../../components/ChatModal';
-import { googleMapsUrl, useApp } from '../../context/AppContext';
+import { useApp } from '../../context/AppContext';
 import { RequestStatus } from '../../types';
 import { colors, radius, spacing } from '../../theme';
 import { notify } from '../../utils/alert';
+import { callNumber, googleMapsUrl, openInMaps } from '../../utils/maps';
 
 const SCHEDULE_TIMES = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'];
 
@@ -150,13 +151,30 @@ export default function DashboardScreen() {
             </Text>
             {myListings.length > 1 && <Text style={styles.forListing}>For {item.companyName}</Text>}
             {item.jobDetails ? <Text style={styles.detail}>{item.jobDetails}</Text> : null}
-            <Text style={styles.meta} numberOfLines={1}>
-              📍 {item.contact ? item.contact.address : item.area || 'Area not given'}
-              {item.type === 'instant' && item.scheduledSlot ? `  ·  🗓️ ${item.scheduledSlot}` : ''}
-              {item.type === 'quote' && item.preferredDate ? `  ·  🗓️ ${item.preferredDate}` : ''}
-            </Text>
+            {/* Once the address is unlocked it becomes a link into the Maps
+                app, which is where a tradesman actually wants it. Before that
+                there is only an area, and nothing to route to. */}
             {item.contact ? (
-              <Text style={styles.meta}>📞 {item.contact.phone}</Text>
+              <Pressable onPress={() => openInMaps(item.contact!.address)} hitSlop={6}>
+                <Text style={styles.metaLink} numberOfLines={2}>
+                  📍 {item.contact.address}
+                  <Text style={styles.linkHint}>  ·  Open in Maps</Text>
+                </Text>
+              </Pressable>
+            ) : (
+              <Text style={styles.meta} numberOfLines={1}>
+                📍 {item.area || 'Area not given'}
+              </Text>
+            )}
+            {(item.scheduledSlot || item.preferredDate) && (
+              <Text style={styles.meta} numberOfLines={1}>
+                🗓️ {item.type === 'instant' ? item.scheduledSlot : item.preferredDate}
+              </Text>
+            )}
+            {item.contact ? (
+              <Pressable onPress={() => callNumber(item.contact!.phone)} hitSlop={6}>
+                <Text style={styles.metaLink}>📞 {item.contact.phone}</Text>
+              </Pressable>
             ) : (
               <Text style={styles.locked}>
                 🔒 {item.customerName}'s full name, phone number and exact address unlock as soon as they accept
@@ -413,6 +431,8 @@ const styles = StyleSheet.create({
   category: { fontSize: 12, color: colors.primary, fontWeight: '700', marginTop: 2 },
   detail: { fontSize: 13, color: colors.text, marginTop: spacing.sm },
   meta: { fontSize: 12, color: colors.textMuted, marginTop: 6 },
+  metaLink: { fontSize: 12, color: colors.primary, fontWeight: '600', marginTop: 6 },
+  linkHint: { fontSize: 11, color: colors.textMuted, fontWeight: '600' },
   forListing: { fontSize: 11.5, color: colors.textMuted, fontWeight: '600', marginTop: 3 },
   locked: { fontSize: 11.5, color: colors.textMuted, marginTop: 8, lineHeight: 17, fontStyle: 'italic' },
   date: { fontSize: 11, color: colors.textMuted, marginTop: 6 },
