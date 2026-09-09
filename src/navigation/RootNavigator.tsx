@@ -10,12 +10,13 @@ import EmployeeNavigator from './EmployeeNavigator';
 import ModeSelectScreen from '../screens/ModeSelectScreen';
 import LegalConsentScreen from '../screens/legal/LegalConsentScreen';
 import AdminLoginScreen from '../screens/admin/AdminLoginScreen';
+import ResetPasswordScreen from '../screens/auth/ResetPasswordScreen';
 import CustomerSignUpScreen from '../screens/customer/CustomerSignUpScreen';
 import BusinessAuthScreen from '../screens/company/BusinessAuthScreen';
 import EmployeeAuthScreen from '../screens/employee/EmployeeAuthScreen';
 
 export default function RootNavigator() {
-  const { isReady, hasAcceptedLegal, mode, isAdminAuthenticated, customerProfile, businessAccount, myEmployment, authLoading } =
+  const { isReady, hasAcceptedLegal, mode, isAdminAuthenticated, customerProfile, businessAccount, myEmployment, passwordRecovery, authLoading } =
     useApp();
 
   if (!isReady || ((mode === 'customer' || mode === 'company' || mode === 'admin' || mode === 'employee') && authLoading)) {
@@ -28,7 +29,12 @@ export default function RootNavigator() {
 
   return (
     <NavigationContainer>
-      {!hasAcceptedLegal ? (
+      {/* A recovery link signs the account in, so this has to come before
+          every other branch — otherwise tapping the email would drop someone
+          straight into the app without setting a password. */}
+      {passwordRecovery ? (
+        <ResetPasswordScreen />
+      ) : !hasAcceptedLegal ? (
         <LegalConsentScreen />
       ) : mode === 'customer' ? (
         customerProfile ? <CustomerNavigator /> : <CustomerSignUpScreen />

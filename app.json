@@ -2,6 +2,7 @@
   "expo": {
     "name": "RockServ",
     "slug": "rockserv",
+    "scheme": "rockserv",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/splash-icon.png",

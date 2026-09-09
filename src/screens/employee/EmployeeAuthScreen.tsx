@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Button, Card, Chip, SectionLabel } from '../../components/ui';
+import { ForgotPasswordLink } from '../../components/ForgotPasswordLink';
 import { useApp } from '../../context/AppContext';
 import { colors, radius, shadow, spacing } from '../../theme';
 import { notify } from '../../utils/alert';
@@ -105,6 +106,7 @@ export default function EmployeeAuthScreen() {
               loading={loading}
               disabled={email.trim().length === 0 || password.length < 6}
             />
+            {mode === 'login' && <ForgotPasswordLink email={email} />}
           </>
         ) : (
           <>

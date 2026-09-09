@@ -6,6 +6,7 @@ import { DEMO_MODE, buildDemoCompanies } from '../data/demoBusinesses';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { uploadBusinessMedia } from '../lib/mediaUpload';
 import { googleMapsUrl } from '../utils/maps';
+import { notify as notifyAlert } from '../utils/alert';
 import { colorFromId } from '../utils/color';
 import {
   AdminBusiness,
@@ -44,6 +45,26 @@ const STORAGE_KEYS = {
 
 // Flat commission structure: 10% on jobs of £500 or less, 5% above £500.
 export const COMMISSION_RATE = (jobValue: number) => (jobValue > 500 ? 0.05 : 0.1);
+
+// Where Supabase sends someone after they tap the reset link in their email.
+// Must also be listed under Authentication -> URL Configuration -> Redirect
+// URLs in the Supabase dashboard, or Supabase ignores it.
+export const RESET_PASSWORD_REDIRECT = 'rockserv://reset-password';
+
+// Supabase returns the recovery tokens in the URL fragment (implicit flow),
+// e.g. rockserv://reset-password#access_token=...&type=recovery. Errors come
+// back the same way when a link has expired.
+function parseAuthParams(url: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  const marker = url.indexOf('#') >= 0 ? '#' : '?';
+  const raw = url.slice(url.indexOf(marker) + 1);
+  if (url.indexOf(marker) < 0) return out;
+  raw.split('&').forEach((pair) => {
+    const [key, value] = pair.split('=');
+    if (key) out[decodeURIComponent(key)] = decodeURIComponent(value ?? '');
+  });
+  return out;
+}
 
 function mapEmployeeRow(row: any): Employee {
   return {
@@ -141,6 +162,12 @@ type AppContextValue = {
   ) => Promise<{ error?: string; needsEmailConfirmation?: boolean }>;
   signInBusiness: (email: string, password: string) => Promise<{ error?: string }>;
   signOutBusiness: () => Promise<void>;
+  // Password reset. passwordRecovery is true only while the app has been
+  // opened by a recovery link and a new password has not been set yet.
+  sendPasswordReset: (email: string) => Promise<{ error?: string }>;
+  passwordRecovery: boolean;
+  updatePassword: (newPassword: string) => Promise<{ error?: string }>;
+  cancelPasswordRecovery: () => Promise<void>;
   notifySignups: NotifySignup[];
   addNotifySignup: (categoryId: string, contact: string) => void;
   categories: Category[];
@@ -247,6 +274,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [calendarEntries, setCalendarEntries] = useState<CalendarEntry[]>([]);
   const [busySummary, setBusySummary] = useState<BusySummaryRow[]>([]);
   const [authEmail, setAuthEmail] = useState<string | null>(null);
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
   const [authLoading, setAuthLoading] = useState(isSupabaseConfigured);
   const [mode, setModeState] = useState<UserMode | null>(null);
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
@@ -601,6 +629,47 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       .order('created_at', { ascending: true });
     if (!error && data) setMessages(data.map(mapMessageRow));
   }, [mapMessageRow]);
+
+
+  // Opening the emailed reset link launches the app with the tokens attached.
+  // detectSessionInUrl is off (it is a browser feature), so the session is
+  // established here by hand, and the recovery flag is set explicitly —
+  // setSession reports SIGNED_IN, not PASSWORD_RECOVERY, so waiting for that
+  // event would never fire and the user would land in the app still not
+  // knowing their password.
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+
+    const handleUrl = async (url: string | null) => {
+      if (!url || !url.includes('reset-password')) return;
+      const params = parseAuthParams(url);
+
+      if (params.error_description || params.error) {
+        notifyAlert(
+          'That link has expired',
+          params.error_description || 'Ask for a new password reset email and try again.'
+        );
+        return;
+      }
+      if (params.type !== 'recovery' || !params.access_token || !params.refresh_token) return;
+
+      const { error } = await supabase.auth.setSession({
+        access_token: params.access_token,
+        refresh_token: params.refresh_token,
+      });
+      if (error) {
+        notifyAlert('Could not open that link', error.message);
+        return;
+      }
+      setPasswordRecovery(true);
+    };
+
+    // Cold start: the app was launched by the link.
+    Linking.getInitialURL().then(handleUrl);
+    // Warm start: the app was already running.
+    const subscription = Linking.addEventListener('url', (event) => handleUrl(event.url));
+    return () => subscription.remove();
+  }, []);
 
   // A single Supabase auth session backs both roles — one account can be a
   // customer, a business, or both, so both profiles are fetched together.
@@ -1189,6 +1258,34 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     },
     [fetchBusinessAccount]
   );
+
+  // Supabase mails the link; RESET_PASSWORD_REDIRECT is where it lands. That
+  // URL has to be on the project's allow list or Supabase silently sends the
+  // user to the site URL instead.
+  const sendPasswordReset = useCallback(async (email: string) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: RESET_PASSWORD_REDIRECT,
+    });
+    // Deliberately not reporting "no such account" upward — telling a stranger
+    // which email addresses are registered is a free user list.
+    if (error) return { error: error.message };
+    return {};
+  }, []);
+
+  const updatePassword = useCallback(async (newPassword: string) => {
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) return { error: error.message };
+    setPasswordRecovery(false);
+    return {};
+  }, []);
+
+  // Backing out of a reset has to end the session as well as clear the flag:
+  // opening the emailed link signs the account in, so leaving it alone would
+  // drop someone into the app without them ever proving they know a password.
+  const cancelPasswordRecovery = useCallback(async () => {
+    setPasswordRecovery(false);
+    await supabase.auth.signOut();
+  }, []);
 
   const signOutBusiness = useCallback(async () => {
     await supabase.auth.signOut();
@@ -1827,6 +1924,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       signUpBusiness,
       signInBusiness,
       signOutBusiness,
+      sendPasswordReset,
+      passwordRecovery,
+      updatePassword,
+      cancelPasswordRecovery,
       notifySignups,
       addNotifySignup,
       categories,
@@ -1922,6 +2023,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       signUpBusiness,
       signInBusiness,
       signOutBusiness,
+      sendPasswordReset,
+      passwordRecovery,
+      updatePassword,
+      cancelPasswordRecovery,
       notifySignups,
       addNotifySignup,
       categories,

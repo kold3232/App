@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Button, Card, Chip, SectionLabel } from '../../components/ui';
 import { useApp } from '../../context/AppContext';
+import { ForgotPasswordLink } from '../../components/ForgotPasswordLink';
 import { colors, radius, shadow, spacing } from '../../theme';
 import { notify } from '../../utils/alert';
 
@@ -138,6 +139,7 @@ export default function BusinessAuthScreen() {
           disabled={!canSubmit}
           loading={loading}
         />
+        {!addingRoleToExistingAccount && mode === 'login' && <ForgotPasswordLink email={email} />}
 
         <Pressable onPress={() => setMode(null)} hitSlop={12} style={styles.cancel}>
           <Text style={styles.cancelText}>Cancel</Text>
