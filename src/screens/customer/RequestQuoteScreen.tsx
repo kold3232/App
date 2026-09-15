@@ -1,6 +1,6 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { Button, Card, Chip, SectionLabel } from '../../components/ui';
 import { Calendar } from '../../components/Calendar';
 import { useApp } from '../../context/AppContext';
@@ -22,6 +22,8 @@ export default function RequestQuoteScreen({ route, navigation }: Props) {
   const [useSavedAddress, setUseSavedAddress] = useState(!!customerProfile?.address);
   const [address, setAddress] = useState('');
   const [area, setArea] = useState<string | null>(null);
+  const [isBusinessCustomer, setIsBusinessCustomer] = useState(false);
+  const [companyName, setCompanyName] = useState('');
   const [jobDetails, setJobDetails] = useState('');
   const [preferredIsoDate, setPreferredIsoDate] = useState<string | null>(null);
   const [preferredTime, setPreferredTime] = useState<string | null>(null);
@@ -36,6 +38,7 @@ export default function RequestQuoteScreen({ route, navigation }: Props) {
     phone.trim().length > 0 &&
     resolvedAddress.length > 0 &&
     !!area &&
+    (!isBusinessCustomer || companyName.trim().length > 0) &&
     jobDetails.trim().length > 0;
 
   function selectDate(isoDate: string) {
@@ -68,6 +71,7 @@ export default function RequestQuoteScreen({ route, navigation }: Props) {
       categoryName,
       type: 'quote',
       area: area ?? '',
+      isBusinessCustomer,
       jobDetails: jobDetails.trim(),
       preferredDate,
       preferredFor,
@@ -75,6 +79,7 @@ export default function RequestQuoteScreen({ route, navigation }: Props) {
       status: 'pending',
       contact: {
         name: customerName.trim(),
+        companyName: isBusinessCustomer ? companyName.trim() : undefined,
         phone: phone.trim(),
         address: resolvedAddress,
       },
@@ -167,6 +172,30 @@ export default function RequestQuoteScreen({ route, navigation }: Props) {
           </View>
 
           <View style={[styles.field, styles.fieldBorder]}>
+            <View style={styles.toggleRow}>
+              <View style={{ flex: 1 }}>
+                <SectionLabel>Booking for a company?</SectionLabel>
+                <Text style={styles.fieldHint}>Adds the company name to the job for invoicing.</Text>
+              </View>
+              <Switch
+                value={isBusinessCustomer}
+                onValueChange={setIsBusinessCustomer}
+                trackColor={{ false: colors.border, true: colors.primary }}
+              />
+            </View>
+            {isBusinessCustomer && (
+              <TextInput
+                style={[styles.input, { marginTop: spacing.sm }]}
+                value={companyName}
+                onChangeText={setCompanyName}
+                placeholder="Company name"
+                placeholderTextColor={colors.textFaint}
+                selectionColor={colors.primary}
+              />
+            )}
+          </View>
+
+          <View style={[styles.field, styles.fieldBorder]}>
             <SectionLabel>Which area is this in?</SectionLabel>
             <Text style={styles.fieldHint}>
               This is all {company.name} sees until you accept their quote.
@@ -235,6 +264,7 @@ const styles = StyleSheet.create({
   },
   multiline: { minHeight: 70, textAlignVertical: 'top' },
   fieldHint: { fontSize: 12, color: colors.textMuted, marginTop: 4, lineHeight: 17 },
+  toggleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   privacyNote: {
     backgroundColor: colors.surface,
     borderWidth: 1,

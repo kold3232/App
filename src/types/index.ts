@@ -80,6 +80,10 @@ export type RequestContact = {
   name: string;
   phone: string;
   address: string;
+  // Set when a company is booking rather than a private customer. Lives with
+  // the contact details because a trading name is a searchable, ringable
+  // identity — showing it before acceptance would undo the masking.
+  companyName?: string;
 };
 
 export type ServiceRequest = {
@@ -94,6 +98,9 @@ export type ServiceRequest = {
   customerName: string;
   // General neighbourhood — what the business sees before acceptance.
   area: string;
+  // Safe to show up front: that this is a company changes how a business
+  // prices and invoices, without naming who.
+  isBusinessCustomer: boolean;
   // Present only when the viewer is allowed the real details: the customer
   // themselves, an admin, or a business whose quote has been accepted.
   contact?: RequestContact;
@@ -136,6 +143,7 @@ export type NewServiceRequest = {
   categoryName: string;
   type: BookingType;
   area: string;
+  isBusinessCustomer?: boolean;
   jobDetails: string;
   preferredDate: string;
   preferredFor?: string;

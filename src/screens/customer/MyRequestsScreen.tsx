@@ -1,6 +1,6 @@
 import { RouteProp, useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { FlatList, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Button, Card, EmptyState, StatusBadge } from '../../components/ui';
 import { Screen } from '../../components/Screen';
 import { ChatModal } from '../../components/ChatModal';
@@ -19,6 +19,7 @@ export default function MyRequestsScreen() {
   const [draftRating, setDraftRating] = useState(0);
   const [draftComment, setDraftComment] = useState('');
   const [chatRequestId, setChatRequestId] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -40,6 +41,12 @@ export default function MyRequestsScreen() {
     }
   }, [route.params?.openRequestId, navigation]);
 
+  async function handlePullToRefresh() {
+    setRefreshing(true);
+    await refreshRequests();
+    setRefreshing(false);
+  }
+
   function openReview(requestId: string) {
     setActiveReviewId(requestId);
     setDraftRating(0);
@@ -58,6 +65,9 @@ export default function MyRequestsScreen() {
         data={requests}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handlePullToRefresh} tintColor={colors.primary} />
+        }
         ListHeaderComponent={<Text style={styles.title}>My requests</Text>}
         ListEmptyComponent={
           <EmptyState

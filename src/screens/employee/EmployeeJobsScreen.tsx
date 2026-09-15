@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useMemo, useState } from 'react';
-import { FlatList, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Linking, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { Button, Card, Chip, EmptyState } from '../../components/ui';
 import { DeleteAccountRow } from '../../components/DeleteAccountRow';
 import { Screen } from '../../components/Screen';
@@ -14,6 +14,7 @@ export default function EmployeeJobsScreen() {
   const { requests, refreshRequests, setEmployeeJobDone, myEmployment, signOutEmployee } = useApp();
   const [filter, setFilter] = useState<'open' | 'done' | 'all'>('open');
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -31,6 +32,12 @@ export default function EmployeeJobsScreen() {
     if (filter === 'done') return sorted.filter((r) => r.employeeDone || r.status === 'completed');
     return sorted;
   }, [requests, filter]);
+
+  async function handlePullToRefresh() {
+    setRefreshing(true);
+    await refreshRequests();
+    setRefreshing(false);
+  }
 
   async function toggleDone(id: string, done: boolean) {
     setBusyId(id);
@@ -54,6 +61,9 @@ export default function EmployeeJobsScreen() {
         data={jobs}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handlePullToRefresh} tintColor={colors.primary} />
+        }
         ListHeaderComponent={
           <View>
             <View style={styles.headerRow}>
@@ -79,7 +89,7 @@ export default function EmployeeJobsScreen() {
             subtitle="Jobs your manager assigns to you will show up in this list."
           />
         }
-        ListFooterComponent={<DeleteAccountRow />}
+        ListFooterComponent={<DeleteAccountRow compact />}
         ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
         renderItem={({ item }) => {
           const mapUrl = item.assignmentMapUrl || (item.contact ? googleMapsUrl(item.contact.address) : '');
@@ -104,7 +114,10 @@ export default function EmployeeJobsScreen() {
 
               {item.contact ? (
                 <View style={styles.contactBox}>
-                  <Text style={styles.contactLine}>{item.contact.name}</Text>
+                  <Text style={styles.contactLine}>
+                    {item.contact.companyName ? `${item.contact.companyName} — ` : ''}
+                    {item.contact.name}
+                  </Text>
                   <Pressable onPress={() => callNumber(item.contact!.phone)}>
                     <Text style={styles.contactLink}>{item.contact.phone}</Text>
                   </Pressable>

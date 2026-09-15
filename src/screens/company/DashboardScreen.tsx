@@ -1,6 +1,6 @@
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useMemo, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Button, Card, Chip, EmptyState, StatusBadge } from '../../components/ui';
 import { Screen } from '../../components/Screen';
 import { Calendar } from '../../components/Calendar';
@@ -35,6 +35,7 @@ export default function DashboardScreen() {
     setRequestSchedule,
   } = useApp();
   const [filter, setFilter] = useState<RequestStatus | 'all'>('all');
+  const [refreshing, setRefreshing] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -102,6 +103,12 @@ export default function DashboardScreen() {
     setScheduleDate(null);
   }
 
+  async function handlePullToRefresh() {
+    setRefreshing(true);
+    await Promise.all([refreshRequests(), refreshEmployees()]);
+    setRefreshing(false);
+  }
+
   async function handleConfirmPreferred(requestId: string, preferredFor: string) {
     const { error } = await setRequestSchedule(requestId, preferredFor);
     if (error) notify('Could not confirm', error);
@@ -123,6 +130,9 @@ export default function DashboardScreen() {
         data={filtered}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handlePullToRefresh} tintColor={colors.primary} />
+        }
         ListHeaderComponent={
           <View>
             <Text style={styles.title}>Incoming requests</Text>
@@ -143,9 +153,14 @@ export default function DashboardScreen() {
         renderItem={({ item }) => (
           <Card>
             <View style={styles.row}>
-              <Text style={styles.customerName}>{item.customerName}</Text>
+              <Text style={styles.customerName}>
+                {item.contact?.companyName ?? item.customerName}
+              </Text>
               <StatusBadge status={item.status} />
             </View>
+            {item.isBusinessCustomer && !item.contact && (
+              <Text style={styles.businessTag}>🏢 Business customer</Text>
+            )}
             <Text style={styles.category}>
               Case #{item.caseNumber} · {item.categoryName} · {item.type === 'instant' ? 'Instant booking' : 'Quote request'}
             </Text>
@@ -434,6 +449,7 @@ const styles = StyleSheet.create({
   metaLink: { fontSize: 12, color: colors.primary, fontWeight: '600', marginTop: 6 },
   linkHint: { fontSize: 11, color: colors.textMuted, fontWeight: '600' },
   forListing: { fontSize: 11.5, color: colors.textMuted, fontWeight: '600', marginTop: 3 },
+  businessTag: { fontSize: 11.5, color: colors.primary, fontWeight: '700', marginTop: 3 },
   locked: { fontSize: 11.5, color: colors.textMuted, marginTop: 8, lineHeight: 17, fontStyle: 'italic' },
   date: { fontSize: 11, color: colors.textMuted, marginTop: 6 },
   actions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },

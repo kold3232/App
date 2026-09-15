@@ -1610,3 +1610,97 @@ begin
     grant execute on function public.available_slots(uuid, int) to anon;
   end if;
 end $$;
+
+-- RockServ — business customers
+-- A company booking a trade is common enough to matter and rare enough not to
+-- justify a separate B2B mode, so a request simply carries an optional company
+-- name instead.
+--
+-- The name itself goes in the contact table, not on the request: "Ocean
+-- Village Marina Ltd" is a searchable, ringable identity, so showing it before
+-- a quote is accepted would reopen exactly the hole the contact masking
+-- closes. What the business sees up front is only that this is a company,
+-- which is what changes how they price and invoice.
+alter table public.service_requests
+  add column if not exists is_business_customer boolean not null default false;
+
+alter table public.service_request_contacts
+  add column if not exists company_name text not null default '';
+
+-- Whether the customer is a company is the customer's own declaration, so the
+-- business must not be able to flip it — it changes what the business is
+-- entitled to see about them.
+create or replace function public.enforce_service_request_field_ownership()
+returns trigger language plpgsql as $$
+declare
+  is_customer boolean;
+  is_business boolean;
+  is_employee boolean;
+  wants_done boolean;
+begin
+  if exists (select 1 from public.admins a where a.id = auth.uid()) then
+    return new;
+  end if;
+
+  is_customer := (auth.uid() = old.customer_id);
+  is_business := exists (
+    select 1 from public.business_listings l
+    where l.id = old.listing_id and l.business_id = auth.uid()
+  );
+  is_employee := exists (
+    select 1 from public.business_employees e
+    where e.id = old.assigned_employee_id and e.user_id = auth.uid() and e.status = 'active'
+  );
+
+  -- An employee may move exactly one flag on their own job and nothing else.
+  if is_employee and not is_business and not is_customer then
+    wants_done := new.employee_done;
+    new := old;
+    new.employee_done := wants_done;
+    new.employee_done_at := case
+      when wants_done and not old.employee_done then now()
+      when not wants_done then null
+      else old.employee_done_at
+    end;
+    return new;
+  end if;
+
+  -- Accepting a quote is what unlocks the contact details, so this is the
+  -- line that matters most. The area and display name are the customer's to
+  -- set too — a business must not be able to rewrite what it was shown.
+  if not is_customer then
+    new.customer_id := old.customer_id;
+    new.quoted_amount := old.quoted_amount;
+    new.quote_accepted := old.quote_accepted;
+    new.quote_accepted_at := old.quote_accepted_at;
+    new.customer_display_name := old.customer_display_name;
+    new.area := old.area;
+    new.is_business_customer := old.is_business_customer;
+    -- A business may clear a confirmation when it re-completes a job, but
+    -- must never be able to confirm on the customer's behalf.
+    if new.customer_confirmed and not old.customer_confirmed then
+      new.customer_confirmed := old.customer_confirmed;
+    end if;
+  end if;
+
+  -- The other direction: job value drives commission, so a customer must not
+  -- be able to zero it, mark it paid, or close the job off themselves. Nor
+  -- can they hand their own job to someone else's employee, or move it in the
+  -- business's diary.
+  if not is_business then
+    new.status := old.status;
+    new.job_value := old.job_value;
+    new.commission := old.commission;
+    new.commission_paid := old.commission_paid;
+    new.scheduled_slot := old.scheduled_slot;
+    new.scheduled_for := old.scheduled_for;
+    new.assigned_employee_id := old.assigned_employee_id;
+    new.assignment_notes := old.assignment_notes;
+    new.assignment_map_url := old.assignment_map_url;
+    new.assigned_at := old.assigned_at;
+    new.employee_done := old.employee_done;
+    new.employee_done_at := old.employee_done_at;
+  end if;
+
+  return new;
+end $$;

@@ -543,6 +543,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       type: row.type,
       customerName: row.customer_display_name || 'Customer',
       area: row.area ?? '',
+      isBusinessCustomer: !!row.is_business_customer,
       contact,
       jobDetails: row.job_details ?? '',
       preferredDate: row.preferred_date ?? '',
@@ -578,10 +579,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     for (let i = 0; i < requestIds.length; i += 200) {
       const { data } = await supabase
         .from('service_request_contacts')
-        .select('request_id, customer_name, phone, address')
+        .select('request_id, customer_name, company_name, phone, address')
         .in('request_id', requestIds.slice(i, i + 200));
       (data ?? []).forEach((row: any) =>
-        found.set(row.request_id, { name: row.customer_name, phone: row.phone, address: row.address })
+        found.set(row.request_id, {
+          name: row.customer_name,
+          phone: row.phone,
+          address: row.address,
+          companyName: row.company_name || undefined,
+        })
       );
     }
     return found;
@@ -720,6 +726,42 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
   }, [fetchCustomerProfile, fetchBusinessAccount, fetchIsAdmin, fetchMyEmployment]);
 
+  // Jobs and messages arriving while a screen is already open.
+  //
+  // service_requests and chat_messages are both in the realtime publication,
+  // but nothing subscribed to them outside an open chat — so a business with
+  // the dashboard on screen saw nothing until it refetched, which only
+  // happened on focus. If the screen was already focused, nothing happened at
+  // all, and the app had to be closed and reopened.
+  //
+  // RLS applies to these events, so each account is only woken for rows it can
+  // already see. The refetch is debounced because a single action can fire
+  // several changes at once.
+  useEffect(() => {
+    if (!isSupabaseConfigured || authLoading) return;
+    if (!customerProfile && !businessAccount && !isAdminUser && !myEmployment) return;
+
+    let pending: ReturnType<typeof setTimeout> | null = null;
+    const scheduleRefresh = () => {
+      if (pending) clearTimeout(pending);
+      pending = setTimeout(() => {
+        pending = null;
+        refreshRequests();
+      }, 300);
+    };
+
+    const channel = supabase
+      .channel('my-work-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'service_requests' }, scheduleRefresh)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, scheduleRefresh)
+      .subscribe();
+
+    return () => {
+      if (pending) clearTimeout(pending);
+      supabase.removeChannel(channel);
+    };
+  }, [customerProfile, businessAccount, isAdminUser, myEmployment, authLoading, refreshRequests]);
+
   // Business listings, reviews and approved categories are public — anyone can
   // browse them regardless of login state.
   useEffect(() => {
@@ -829,6 +871,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           type: input.type,
           customer_display_name: toDisplayName(input.contact.name),
           area: input.area,
+          is_business_customer: !!input.isBusinessCustomer,
           job_details: input.jobDetails,
           preferred_date: input.preferredDate,
           preferred_for: input.preferredFor ?? null,
@@ -847,6 +890,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       await supabase.from('service_request_contacts').insert({
         request_id: data.id,
         customer_name: input.contact.name,
+        company_name: input.contact.companyName ?? '',
         phone: input.contact.phone,
         address: input.contact.address,
       });

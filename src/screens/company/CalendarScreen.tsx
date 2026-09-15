@@ -5,6 +5,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -63,6 +64,7 @@ export default function CalendarScreen() {
   const [startTime, setStartTime] = useState('09:00');
   const [hours, setHours] = useState(2);
   const [busy, setBusy] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -131,6 +133,12 @@ export default function CalendarScreen() {
     return items.sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
   }, [scheduledJobs, calendarEntries, selectedDay]);
 
+  async function handlePullToRefresh() {
+    setRefreshing(true);
+    await Promise.all([refreshCalendar(), refreshRequests()]);
+    setRefreshing(false);
+  }
+
   async function handleAdd() {
     const [h, m] = startTime.split(':').map(Number);
     const [y, mo, d] = selectedDay.split('-').map(Number);
@@ -172,6 +180,9 @@ export default function CalendarScreen() {
       <ScrollView
         style={styles.container}
         contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xl * 2 }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handlePullToRefresh} tintColor={colors.primary} />
+        }
       >
         <Text style={styles.title}>Calendar</Text>
         <Text style={styles.subtitle}>

@@ -1,6 +1,6 @@
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useMemo, useState } from 'react';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { Button, Card, EmptyState } from '../../components/ui';
 import { Screen } from '../../components/Screen';
 import { useApp } from '../../context/AppContext';
@@ -10,6 +10,7 @@ import { notify } from '../../utils/alert';
 export default function InvoicesScreen() {
   const { requests: allRequests, myListings, payCommission, refreshRequests } = useApp();
   const [paying, setPaying] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -41,6 +42,12 @@ export default function InvoicesScreen() {
     [invoices]
   );
 
+  async function handlePullToRefresh() {
+    setRefreshing(true);
+    await refreshRequests();
+    setRefreshing(false);
+  }
+
   async function handlePayCommission() {
     setPaying(true);
     const { error } = await payCommission();
@@ -54,6 +61,9 @@ export default function InvoicesScreen() {
         data={invoices}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handlePullToRefresh} tintColor={colors.primary} />
+        }
         ListHeaderComponent={
           <View>
             <Text style={styles.title}>Invoices</Text>
@@ -89,7 +99,7 @@ export default function InvoicesScreen() {
         renderItem={({ item }) => (
           <Card>
             <View style={styles.row}>
-              <Text style={styles.customerName}>{item.contact?.name ?? item.customerName}</Text>
+              <Text style={styles.customerName}>{item.contact?.companyName ?? item.contact?.name ?? item.customerName}</Text>
               <Text style={styles.date}>{new Date(item.createdAt).toLocaleDateString()}</Text>
             </View>
             <Text style={styles.category}>{item.categoryName}</Text>

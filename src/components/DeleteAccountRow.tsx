@@ -13,7 +13,7 @@ import { confirmAction, notify } from '../utils/alert';
  * Two taps, not one: deletion is irreversible and the row sits next to
  * ordinary settings, so a stray tap should not end someone's account.
  */
-export function DeleteAccountRow() {
+export function DeleteAccountRow({ compact = false }: { compact?: boolean } = {}) {
   const { deleteMyAccount } = useApp();
   const [busy, setBusy] = useState(false);
 
@@ -32,6 +32,17 @@ export function DeleteAccountRow() {
         // from the database already says exactly what is owed.
         if (error) notify('Could not delete your account', error);
       }
+    );
+  }
+
+  // The staff screen puts this directly under the job list, where a thumb
+  // lands after scrolling — so there it is a small plain link set well clear
+  // of the last card, rather than a full-width red target.
+  if (compact) {
+    return (
+      <Pressable onPress={handlePress} disabled={busy} hitSlop={8} style={styles.compactRow}>
+        <Text style={styles.compactLabel}>{busy ? 'Deleting…' : 'Delete my account'}</Text>
+      </Pressable>
     );
   }
 
@@ -60,4 +71,6 @@ const styles = StyleSheet.create({
   },
   label: { fontSize: 14, fontWeight: '700', color: colors.danger },
   hint: { fontSize: 11.5, color: colors.textMuted, marginTop: 3 },
+  compactRow: { alignSelf: 'center', paddingVertical: spacing.sm, marginTop: spacing.xl * 2 },
+  compactLabel: { fontSize: 12, color: colors.textFaint, textDecorationLine: 'underline' },
 });

@@ -6,6 +6,7 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
@@ -38,6 +39,8 @@ export default function InstantBookScreen({ route, navigation }: Props) {
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [area, setArea] = useState<string | null>(null);
+  const [isBusinessCustomer, setIsBusinessCustomer] = useState(false);
+  const [companyName, setCompanyName] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   // The free slots are worked out server-side from this listing's own working
@@ -72,7 +75,8 @@ export default function InstantBookScreen({ route, navigation }: Props) {
     customerName.trim().length > 0 &&
     phone.trim().length > 0 &&
     address.trim().length > 0 &&
-    !!area;
+    !!area &&
+    (!isBusinessCustomer || companyName.trim().length > 0);
 
   async function handleSubmit() {
     if (!selectedSlot) return;
@@ -83,12 +87,18 @@ export default function InstantBookScreen({ route, navigation }: Props) {
       categoryName,
       type: 'instant',
       area: area ?? '',
+      isBusinessCustomer,
       jobDetails: '',
       preferredDate: '',
       scheduledSlot: `${dayLabel(selectedSlot)} · ${timeLabel(selectedSlot)}`,
       scheduledFor: selectedSlot,
       status: 'accepted',
-      contact: { name: customerName.trim(), phone: phone.trim(), address: address.trim() },
+      contact: {
+        name: customerName.trim(),
+        companyName: isBusinessCustomer ? companyName.trim() : undefined,
+        phone: phone.trim(),
+        address: address.trim(),
+      },
     });
     setSubmitting(false);
     if (!id) {
@@ -177,6 +187,29 @@ export default function InstantBookScreen({ route, navigation }: Props) {
                 />
               </View>
               <View style={[styles.field, styles.fieldBorder]}>
+                <View style={styles.toggleRow}>
+                  <View style={{ flex: 1 }}>
+                    <SectionLabel>Booking for a company?</SectionLabel>
+                  </View>
+                  <Switch
+                    value={isBusinessCustomer}
+                    onValueChange={setIsBusinessCustomer}
+                    trackColor={{ false: colors.border, true: colors.primary }}
+                  />
+                </View>
+                {isBusinessCustomer && (
+                  <TextInput
+                    style={[styles.input, { marginTop: spacing.sm }]}
+                    value={companyName}
+                    onChangeText={setCompanyName}
+                    placeholder="Company name"
+                    placeholderTextColor={colors.textFaint}
+                    selectionColor={colors.primary}
+                  />
+                )}
+              </View>
+
+              <View style={[styles.field, styles.fieldBorder]}>
                 <SectionLabel>Which area is this in?</SectionLabel>
                 <View style={styles.chipWrap}>
                   {GIBRALTAR_AREAS.map((option) => (
@@ -208,4 +241,5 @@ const styles = StyleSheet.create({
   field: { paddingVertical: spacing.sm },
   fieldBorder: { borderTopWidth: 1, borderTopColor: colors.border, marginTop: 2 },
   input: { fontSize: 15, color: colors.text, marginTop: 6, padding: 0 },
+  toggleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
 });
