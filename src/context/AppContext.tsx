@@ -1304,6 +1304,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         .from('businesses')
         .insert({ id: userId, email: sessionEmail, name: account.name, phone: account.phone });
       if (insertError) return { error: insertError.message };
+      sendPushForEvent(null, 'business_applied');
       await fetchBusinessAccount(userId);
       refreshBusinessListings();
       return {};
@@ -1415,6 +1416,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (error.code === '23505') return { error: 'That category has already been suggested.' };
         return { error: error.message };
       }
+      sendPushForEvent(null, 'category_proposed');
       await refreshProposedCategories();
       return {};
     },
@@ -1694,6 +1696,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (!userId) return { error: 'Not signed in.' };
       const { error } = await supabase.from('employee_access_requests').insert({ business_id: userId, note });
       if (error) return { error: error.message };
+      sendPushForEvent(null, 'employee_access_requested');
       await refreshEmployees();
       return {};
     },

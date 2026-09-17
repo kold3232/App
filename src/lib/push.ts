@@ -92,7 +92,12 @@ export type PushEvent =
   | 'request_declined'
   | 'time_confirmed'
   | 'job_assigned'
-  | 'job_completed';
+  | 'job_completed'
+  // No job attached — these land in the admin queue and only admins hear
+  // about them.
+  | 'business_applied'
+  | 'employee_access_requested'
+  | 'category_proposed';
 
 /**
  * Asks the server to notify whoever the other party is.
@@ -104,7 +109,7 @@ export type PushEvent =
  * Deliberately fire-and-forget: a failed notification must never fail the
  * action that triggered it.
  */
-export async function sendPushForEvent(requestId: string, event: PushEvent) {
+export async function sendPushForEvent(requestId: string | null, event: PushEvent) {
   try {
     await supabase.functions.invoke('send-push', { body: { requestId, event } });
   } catch {

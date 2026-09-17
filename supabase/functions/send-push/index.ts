@@ -13,7 +13,8 @@ import { corsHeaders } from '../_shared/cors.ts';
 
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 
-type PushEvent =
+// Events about one job. Admins get a copy of every one of these.
+type JobEvent =
   | 'new_request'
   | 'new_message'
   | 'quote_sent'
@@ -24,11 +25,65 @@ type PushEvent =
   | 'job_assigned'
   | 'job_completed';
 
+// Events with no job attached — things that land in the admin queue. Only
+// admins are told, and the text is derived from the caller's own record
+// rather than anything they send, so this cannot be used to push arbitrary
+// messages at the RockServ team.
+type AdminEvent = 'business_applied' | 'employee_access_requested' | 'category_proposed';
+
+type PushEvent = JobEvent | AdminEvent;
+
+const ADMIN_EVENTS: AdminEvent[] = ['business_applied', 'employee_access_requested', 'category_proposed'];
+
+type Recipient = { userId: string; title: string; body: string };
+
 function ok(body: unknown = { ok: true }) {
   return new Response(JSON.stringify(body), {
     status: 200,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
+}
+
+async function deliver(admin: any, recipients: Recipient[], data: Record<string, unknown>) {
+  const byUser = new Map<string, Recipient>();
+  // One notification per person, even if they are both a party and an admin.
+  recipients.forEach((r) => {
+    if (!byUser.has(r.userId)) byUser.set(r.userId, r);
+  });
+  const userIds = Array.from(byUser.keys());
+  if (userIds.length === 0) return 0;
+
+  const { data: tokenRows } = await admin
+    .from('push_tokens')
+    .select('token, user_id')
+    .in('user_id', userIds);
+  const rows = (tokenRows ?? []) as { token: string; user_id: string }[];
+  if (rows.length === 0) return 0;
+
+  const messages = rows.map((row) => {
+    const r = byUser.get(row.user_id)!;
+    return { to: row.token, title: r.title, body: r.body, sound: 'default', data };
+  });
+
+  const response = await fetch(EXPO_PUSH_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(messages),
+  });
+  const result = await response.json();
+
+  // Expo reports per-message errors in the body, not the status code. A token
+  // belonging to an app that has been uninstalled comes back as
+  // DeviceNotRegistered and will never work again, so drop it.
+  const dead: string[] = [];
+  (result?.data ?? []).forEach((entry: any, index: number) => {
+    if (entry?.status === 'error' && entry?.details?.error === 'DeviceNotRegistered') {
+      dead.push(rows[index].token);
+    }
+  });
+  if (dead.length > 0) await admin.from('push_tokens').delete().in('token', dead);
+
+  return rows.length - dead.length;
 }
 
 Deno.serve(async (req) => {
@@ -51,9 +106,45 @@ Deno.serve(async (req) => {
     if (!callerId) return ok({ ok: false, reason: 'not authenticated' });
 
     const { requestId, event } = (await req.json()) as { requestId?: string; event?: PushEvent };
-    if (!requestId || !event) return ok({ ok: false, reason: 'missing arguments' });
+    if (!event) return ok({ ok: false, reason: 'missing arguments' });
 
     const admin = createClient(supabaseUrl, serviceRoleKey);
+
+    const { data: adminRows } = await admin.from('admins').select('id');
+    const adminIds = ((adminRows ?? []) as { id: string }[]).map((a) => a.id);
+
+    // Queue events: no job attached, and the text comes from the caller's own
+    // record rather than anything they sent.
+    if (ADMIN_EVENTS.includes(event as AdminEvent)) {
+      const { data: business } = await admin
+        .from('businesses')
+        .select('name, email')
+        .eq('id', callerId)
+        .maybeSingle();
+      const who = business?.name || business?.email || 'A business';
+
+      let title = '';
+      let body = '';
+      if (event === 'business_applied') {
+        title = 'New business signed up';
+        body = `${who} is waiting for approval.`;
+      } else if (event === 'employee_access_requested') {
+        title = 'Employee access requested';
+        body = `${who} has asked for staff accounts.`;
+      } else {
+        title = 'New category suggested';
+        body = `${who} suggested a category for review.`;
+      }
+
+      const sent = await deliver(
+        admin,
+        adminIds.filter((id) => id !== callerId).map((id) => ({ userId: id, title, body })),
+        { event }
+      );
+      return ok({ ok: true, sent });
+    }
+
+    if (!requestId) return ok({ ok: false, reason: 'missing arguments' });
 
     const { data: request } = await admin
       .from('service_requests')
@@ -163,49 +254,21 @@ Deno.serve(async (req) => {
         return ok({ ok: false, reason: 'unknown event' });
     }
 
-    // Nobody to tell — an unclaimed staff invite, or a deleted customer.
-    if (!recipientId) return ok({ ok: true, sent: 0 });
-    // Never notify someone about their own action.
-    if (recipientId === callerId) return ok({ ok: true, sent: 0 });
-
-    const { data: tokenRows } = await admin
-      .from('push_tokens')
-      .select('token')
-      .eq('user_id', recipientId);
-    const tokens = (tokenRows ?? []).map((t) => t.token as string);
-    if (tokens.length === 0) return ok({ ok: true, sent: 0 });
-
-    // data rides along so tapping the notification can open the right job
-    // once that is wired up.
-    const messages = tokens.map((to) => ({
-      to,
-      title,
-      body,
-      sound: 'default',
-      data: { requestId, event },
-    }));
-
-    const response = await fetch(EXPO_PUSH_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify(messages),
-    });
-    const result = await response.json();
-
-    // Expo reports per-message errors in the body, not the status code. A
-    // token belonging to an app that has been uninstalled comes back as
-    // DeviceNotRegistered and will never work again, so drop it.
-    const dead: string[] = [];
-    (result?.data ?? []).forEach((entry: any, index: number) => {
-      if (entry?.status === 'error' && entry?.details?.error === 'DeviceNotRegistered') {
-        dead.push(tokens[index]);
-      }
-    });
-    if (dead.length > 0) {
-      await admin.from('push_tokens').delete().in('token', dead);
+    // Admins see everything. They get their own wording, because "New
+    // message" without saying whose is useless for oversight.
+    const adminBody = `${customerLabel} ↔ ${listingName} · ${caseLabel}: ${title.toLowerCase()}`;
+    const recipients: Recipient[] = [];
+    // Nobody hears about their own action, and an unclaimed staff invite or a
+    // deleted customer leaves no one to tell.
+    if (recipientId && recipientId !== callerId) {
+      recipients.push({ userId: recipientId, title, body });
     }
+    adminIds
+      .filter((id) => id !== callerId)
+      .forEach((id) => recipients.push({ userId: id, title: 'RockServ activity', body: adminBody }));
 
-    return ok({ ok: true, sent: tokens.length - dead.length });
+    const sent = await deliver(admin, recipients, { requestId, event });
+    return ok({ ok: true, sent });
   } catch (err) {
     console.error('send-push error', err);
     return ok({ ok: false, reason: 'unexpected error' });
