@@ -6,6 +6,7 @@ import { DEMO_MODE, buildDemoCompanies } from '../data/demoBusinesses';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { uploadBusinessMedia } from '../lib/mediaUpload';
 import { googleMapsUrl } from '../utils/maps';
+import { registerForPushNotifications, sendPushForEvent, unregisterPushToken } from '../lib/push';
 import { notify as notifyAlert } from '../utils/alert';
 import { colorFromId } from '../utils/color';
 import {
@@ -694,6 +695,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           fetchIsAdmin(session.user.id),
           fetchMyEmployment(session.user.id),
         ]);
+        // Deliberately not awaited: a refused permission prompt or a missing
+        // APNs key must not hold up the app opening.
+        registerForPushNotifications(session.user.id);
       } else {
         setAuthEmail(null);
         setCustomerProfile(null);
@@ -895,6 +899,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         address: input.contact.address,
       });
 
+      sendPushForEvent(data.id as string, 'new_request');
       setRequests((prev) => [mapRequestRow(data, input.contact), ...prev]);
       return data.id as string;
     },
@@ -903,7 +908,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const updateRequestStatus = useCallback(async (id: string, status: ServiceRequest['status']) => {
     const { error } = await supabase.from('service_requests').update({ status }).eq('id', id);
-    if (!error) setRequests((prev) => prev.map((r) => (r.id === id ? { ...r, status } : r)));
+    if (!error) {
+      if (status === 'accepted') sendPushForEvent(id, 'request_accepted');
+      if (status === 'declined') sendPushForEvent(id, 'request_declined');
+      setRequests((prev) => prev.map((r) => (r.id === id ? { ...r, status } : r)));
+    }
   }, []);
 
   const completeRequest = useCallback(async (id: string, jobValue: number) => {
@@ -913,6 +922,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       .update({ status: 'completed', job_value: jobValue, commission, customer_confirmed: false })
       .eq('id', id);
     if (!error) {
+      sendPushForEvent(id, 'job_completed');
       setRequests((prev) =>
         prev.map((r) =>
           r.id === id ? { ...r, status: 'completed' as const, jobValue, commission, customerConfirmed: false } : r
@@ -974,7 +984,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         .insert({ request_id: requestId, sender, kind: 'text', text })
         .select()
         .single();
-      if (!error && data) setMessages((prev) => [...prev, mapMessageRow(data)]);
+      if (!error && data) {
+        sendPushForEvent(requestId, 'new_message');
+        setMessages((prev) => [...prev, mapMessageRow(data)]);
+      }
     },
     [mapMessageRow]
   );
@@ -986,7 +999,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         .insert({ request_id: requestId, sender: 'business', kind: 'quote', amount })
         .select()
         .single();
-      if (!error && data) setMessages((prev) => [...prev, mapMessageRow(data)]);
+      if (!error && data) {
+        sendPushForEvent(requestId, 'quote_sent');
+        setMessages((prev) => [...prev, mapMessageRow(data)]);
+      }
     },
     [mapMessageRow]
   );
@@ -1070,6 +1086,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       .update({ quoted_amount: amount, quote_accepted: true, quote_accepted_at: acceptedAt })
       .eq('id', requestId);
     if (!error) {
+      sendPushForEvent(requestId, 'quote_accepted');
       setRequests((prev) =>
         prev.map((r) =>
           r.id === requestId ? { ...r, quotedAmount: amount, quoteAccepted: true, quoteAcceptedAt: acceptedAt } : r
@@ -1245,6 +1262,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [fetchCustomerProfile]);
 
   const signOutCustomer = useCallback(async () => {
+    await unregisterPushToken();
     await supabase.auth.signOut();
     setCustomerProfile(null);
     setBusinessAccount(null);
@@ -1332,6 +1350,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signOutBusiness = useCallback(async () => {
+    await unregisterPushToken();
     await supabase.auth.signOut();
     setBusinessAccount(null);
     setCustomerProfile(null);
@@ -1700,6 +1719,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           };
       const { error } = await supabase.from('service_requests').update(patch).eq('id', requestId);
       if (error) return { error: error.message };
+      if (employeeId) sendPushForEvent(requestId, 'job_assigned');
       await refreshRequests();
       return {};
     },
@@ -1758,6 +1778,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   );
 
   const signOutEmployee = useCallback(async () => {
+    await unregisterPushToken();
     await supabase.auth.signOut();
     setMyEmployment(null);
     setAuthEmail(null);
@@ -1897,6 +1918,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         .update({ scheduled_for: scheduledFor })
         .eq('id', requestId);
       if (error) return { error: error.message };
+      if (scheduledFor) sendPushForEvent(requestId, 'time_confirmed');
       await refreshRequests();
       return {};
     },

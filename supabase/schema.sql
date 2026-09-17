@@ -1704,3 +1704,65 @@ begin
 
   return new;
 end $$;
+
+-- RockServ — push notification tokens
+-- One row per device per account: people sign in on a phone and a tablet, and
+-- a business owner might have the app on two handsets.
+--
+-- Nobody can read anyone else's tokens. A push token is not a secret in the
+-- credential sense, but it does identify a device, and there is no reason for
+-- one account to enumerate another's. Sending is done by the send-push Edge
+-- Function using the service role, which bypasses these policies.
+create table if not exists public.push_tokens (
+  token text primary key,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  platform text not null default 'ios',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.push_tokens enable row level security;
+
+create policy "Users can see their own push tokens"
+  on public.push_tokens for select
+  using (auth.uid() = user_id);
+
+create policy "Users can remove their own push token"
+  on public.push_tokens for delete
+  using (auth.uid() = user_id);
+
+create index if not exists push_tokens_user_id_idx on public.push_tokens (user_id);
+
+-- Registering goes through a function rather than an upsert, because a handed
+-- down or shared handset keeps the same token and the row has to follow
+-- whoever is signed in now. A plain upsert cannot do that: ON CONFLICT DO
+-- UPDATE has to see the conflicting row first, and the select policy above
+-- correctly hides the previous owner's row from the new account. Widening
+-- that policy to make the upsert work would let anyone test whether a token
+-- exists, so the write is done here instead — always for auth.uid(), never
+-- for an id the caller supplies.
+create or replace function public.register_push_token(p_token text, p_platform text default 'ios')
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.uid() is null then
+    raise exception 'Not signed in.';
+  end if;
+  insert into public.push_tokens (token, user_id, platform)
+  values (p_token, auth.uid(), coalesce(p_platform, 'ios'))
+  on conflict (token) do update
+    set user_id = auth.uid(),
+        platform = coalesce(p_platform, 'ios'),
+        updated_at = now();
+end $$;
+
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then
+    revoke all on function public.register_push_token(text, text) from public;
+    grant execute on function public.register_push_token(text, text) to authenticated;
+  end if;
+end $$;
