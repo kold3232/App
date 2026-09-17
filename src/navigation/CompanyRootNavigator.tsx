@@ -2,6 +2,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import React from 'react';
 import ListingEditorScreen from '../screens/company/ListingEditorScreen';
 import TeamScreen from '../screens/company/TeamScreen';
+import VerificationScreen from '../screens/company/VerificationScreen';
 import { colors } from '../theme';
 import CompanyNavigator from './CompanyNavigator';
 import { HeaderBackButton } from './HeaderBackButton';
@@ -34,6 +35,7 @@ export default function CompanyRootNavigator() {
         options={({ route }) => ({ title: route.params?.listingId ? 'Edit listing' : 'New listing' })}
       />
       <Stack.Screen name="Team" component={TeamScreen} options={{ title: 'Your team' }} />
+      <Stack.Screen name="Verification" component={VerificationScreen} options={{ title: 'Verification' }} />
     </Stack.Navigator>
   );
 }

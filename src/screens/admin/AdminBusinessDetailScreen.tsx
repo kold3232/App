@@ -1,8 +1,9 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Button, Card, SectionLabel } from '../../components/ui';
 import { useApp } from '../../context/AppContext';
+import { BusinessDocument } from '../../types';
 import { AdminBusinessesStackParamList } from '../../navigation/types';
 import { colors, radius, spacing } from '../../theme';
 import { notify } from '../../utils/alert';
@@ -10,9 +11,54 @@ import { notify } from '../../utils/alert';
 type Props = NativeStackScreenProps<AdminBusinessesStackParamList, 'BusinessDetail'>;
 
 export default function AdminBusinessDetailScreen({ route }: Props) {
-  const { adminBusinesses, categories, suspendBusiness, reinstateBusiness, addComplaintFlag, markCommissionPaid } = useApp();
+  const {
+    adminBusinesses,
+    categories,
+    suspendBusiness,
+    reinstateBusiness,
+    addComplaintFlag,
+    markCommissionPaid,
+    documentsForBusiness,
+    openDocument,
+    setVerificationStatus,
+  } = useApp();
   const business = adminBusinesses.find((b) => b.id === route.params.businessId);
   const [flagNote, setFlagNote] = useState('');
+  const [documents, setDocuments] = useState<BusinessDocument[]>([]);
+  const [verifyNote, setVerifyNote] = useState('');
+  const businessId = route.params.businessId;
+
+  const loadDocuments = useCallback(async () => {
+    setDocuments(await documentsForBusiness(businessId));
+  }, [businessId, documentsForBusiness]);
+
+  useEffect(() => {
+    loadDocuments();
+  }, [loadDocuments]);
+
+  async function handleOpenDocument(filePath: string) {
+    // Private bucket, so this is a link that expires rather than a public URL.
+    const url = await openDocument(filePath);
+    if (!url) {
+      notify('Could not open it', 'The file may have been removed.');
+      return;
+    }
+    Linking.openURL(url);
+  }
+
+  async function handleVerify(status: 'verified' | 'rejected') {
+    const { error } = await setVerificationStatus(businessId, status, verifyNote.trim());
+    if (error) {
+      notify('Could not save', error);
+      return;
+    }
+    setVerifyNote('');
+    await loadDocuments();
+    notify(
+      status === 'verified' ? 'Verified' : 'Rejected',
+      status === 'verified' ? 'They now carry the verified badge.' : 'They have been told to send replacements.'
+    );
+  }
 
   if (!business) return null;
 
@@ -44,6 +90,49 @@ export default function AdminBusinessDetailScreen({ route }: Props) {
     <ScrollView style={styles.container} contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xl * 2 }}>
       <Text style={styles.title}>{business.businessName}</Text>
       <Text style={styles.subtitle}>{categoryNames}</Text>
+
+      <Card style={{ marginTop: spacing.md }}>
+        <SectionLabel>Verification</SectionLabel>
+        <Text style={styles.verifyStatus}>
+          {business.verificationStatus === 'verified'
+            ? '✓ Verified'
+            : business.verificationStatus === 'pending'
+            ? '● Documents awaiting review'
+            : business.verificationStatus === 'rejected'
+            ? '✕ Rejected'
+            : 'Not verified'}
+        </Text>
+        {business.verificationNote ? <Text style={styles.line}>{business.verificationNote}</Text> : null}
+
+        {documents.length === 0 ? (
+          <Text style={styles.verifyEmpty}>Nothing uploaded yet.</Text>
+        ) : (
+          documents.map((doc) => (
+            <Pressable key={doc.id} onPress={() => handleOpenDocument(doc.filePath)} style={styles.verifyDocRow}>
+              <Text style={styles.verifyDocLink}>
+                {doc.kind.replace(/_/g, ' ')} · {new Date(doc.uploadedAt).toLocaleDateString()}
+              </Text>
+            </Pressable>
+          ))
+        )}
+
+        <TextInput
+          style={styles.input}
+          value={verifyNote}
+          onChangeText={setVerifyNote}
+          placeholder="Note back to them (optional)"
+          placeholderTextColor={colors.textFaint}
+          selectionColor={colors.primary}
+        />
+        <View style={styles.actions}>
+          <View style={{ flex: 1 }}>
+            <Button title="Verify" onPress={() => handleVerify('verified')} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Button title="Reject" variant="danger" onPress={() => handleVerify('rejected')} />
+          </View>
+        </View>
+      </Card>
 
       <Card style={{ marginTop: spacing.md }}>
         <SectionLabel>Contact</SectionLabel>
@@ -113,6 +202,11 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: '800', color: colors.text, letterSpacing: 0.1 },
   subtitle: { fontSize: 13, color: colors.primary, fontWeight: '600', marginTop: 4 },
   line: { fontSize: 14, color: colors.text, marginTop: spacing.sm },
+  verifyStatus: { fontSize: 14.5, fontWeight: '700', color: colors.text, marginTop: spacing.sm },
+  verifyEmpty: { fontSize: 12.5, color: colors.textMuted, marginTop: spacing.sm, fontStyle: 'italic' },
+  verifyDocRow: { paddingVertical: 6 },
+  verifyDocLink: { fontSize: 13.5, color: colors.primary, fontWeight: '600', textTransform: 'capitalize' },
+  actions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
   docRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: spacing.sm },
   docLabel: { fontSize: 13.5, color: colors.text, flex: 1 },
   docExpiry: { fontSize: 11.5, color: colors.textMuted },

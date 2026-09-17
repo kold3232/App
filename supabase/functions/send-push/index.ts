@@ -29,11 +29,20 @@ type JobEvent =
 // admins are told, and the text is derived from the caller's own record
 // rather than anything they send, so this cannot be used to push arbitrary
 // messages at the RockServ team.
-type AdminEvent = 'business_applied' | 'employee_access_requested' | 'category_proposed';
+type AdminEvent =
+  | 'business_applied'
+  | 'employee_access_requested'
+  | 'category_proposed'
+  | 'documents_submitted';
 
 type PushEvent = JobEvent | AdminEvent;
 
-const ADMIN_EVENTS: AdminEvent[] = ['business_applied', 'employee_access_requested', 'category_proposed'];
+const ADMIN_EVENTS: AdminEvent[] = [
+  'business_applied',
+  'employee_access_requested',
+  'category_proposed',
+  'documents_submitted',
+];
 
 type Recipient = { userId: string; title: string; body: string };
 
@@ -131,6 +140,9 @@ Deno.serve(async (req) => {
       } else if (event === 'employee_access_requested') {
         title = 'Employee access requested';
         body = `${who} has asked for staff accounts.`;
+      } else if (event === 'documents_submitted') {
+        title = 'Verification documents submitted';
+        body = `${who} has uploaded documents for review.`;
       } else {
         title = 'New category suggested';
         body = `${who} suggested a category for review.`;

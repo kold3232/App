@@ -66,6 +66,11 @@ export default function SettingsScreen() {
             <Text style={styles.legalText}>Your team</Text>
             <Ionicons name="chevron-forward" size={16} color={colors.textFaint} />
           </Pressable>
+          <View style={styles.legalDivider} />
+          <Pressable style={styles.legalRow} onPress={() => navigation.navigate('Verification')}>
+            <Text style={styles.legalText}>Verification</Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.textFaint} />
+          </Pressable>
         </Card>
 
         <Card style={{ marginTop: spacing.md }}>

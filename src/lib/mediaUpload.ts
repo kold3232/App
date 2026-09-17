@@ -21,3 +21,36 @@ export async function uploadBusinessMedia(
     return { error: e instanceof Error ? e.message : 'Upload failed.' };
   }
 }
+
+/**
+ * Uploads a verification document to the private business-documents bucket.
+ *
+ * Unlike uploadBusinessMedia this returns a storage path, not a URL: the
+ * bucket is private, so there is no public URL to hand out. Insurance
+ * certificates and IDs have no business sitting on a guessable address.
+ */
+export async function uploadBusinessDocument(
+  businessId: string,
+  localUri: string,
+  fileName: string,
+  contentType: string
+): Promise<{ path?: string; error?: string }> {
+  try {
+    const base64 = await FileSystem.readAsStringAsync(localUri, { encoding: FileSystem.EncodingType.Base64 });
+    const fullPath = `${businessId}/${Date.now()}-${fileName}`;
+    const { error } = await supabase.storage
+      .from('business-documents')
+      .upload(fullPath, decode(base64), { contentType, upsert: false });
+    if (error) return { error: error.message };
+    return { path: fullPath };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Upload failed.' };
+  }
+}
+
+/** Short-lived link so an admin can open a private document. */
+export async function signedDocumentUrl(path: string): Promise<string | null> {
+  const { data, error } = await supabase.storage.from('business-documents').createSignedUrl(path, 60 * 5);
+  if (error || !data) return null;
+  return data.signedUrl;
+}

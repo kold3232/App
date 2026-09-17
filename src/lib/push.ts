@@ -97,7 +97,8 @@ export type PushEvent =
   // about them.
   | 'business_applied'
   | 'employee_access_requested'
-  | 'category_proposed';
+  | 'category_proposed'
+  | 'documents_submitted';
 
 /**
  * Asks the server to notify whoever the other party is.

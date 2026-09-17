@@ -1766,3 +1766,108 @@ begin
     grant execute on function public.register_push_token(text, text) to authenticated;
   end if;
 end $$;
+
+-- RockServ — business verification documents
+-- The admin queue has always said document verification wasn't wired up, so
+-- tradespeople were being approved on the strength of a typed-in profile.
+--
+-- The bucket is private, unlike business-media. These are insurance
+-- certificates, trade qualifications and company registrations — a public
+-- bucket would put them on a guessable URL. Admins read them through a signed
+-- link that expires.
+insert into storage.buckets (id, name, public)
+values ('business-documents', 'business-documents', false)
+on conflict (id) do nothing;
+
+-- Businesses write into a folder named after their own id, and can see only
+-- that folder. Same shape as the business-media policies, minus public read.
+create policy "Businesses can upload their own documents"
+  on storage.objects for insert
+  with check (bucket_id = 'business-documents' and (storage.foldername(name))[1] = auth.uid()::text);
+
+create policy "Businesses can view their own documents"
+  on storage.objects for select
+  using (bucket_id = 'business-documents' and (storage.foldername(name))[1] = auth.uid()::text);
+
+create policy "Businesses can replace their own documents"
+  on storage.objects for update
+  using (bucket_id = 'business-documents' and (storage.foldername(name))[1] = auth.uid()::text);
+
+create policy "Businesses can delete their own documents"
+  on storage.objects for delete
+  using (bucket_id = 'business-documents' and (storage.foldername(name))[1] = auth.uid()::text);
+
+create policy "Admins can view every document"
+  on storage.objects for select
+  using (
+    bucket_id = 'business-documents'
+    and exists (select 1 from public.admins a where a.id = auth.uid())
+  );
+
+alter table public.businesses
+  add column if not exists verification_status text not null default 'unverified'
+    check (verification_status in ('unverified', 'pending', 'verified', 'rejected')),
+  add column if not exists verification_note text not null default '',
+  add column if not exists verified_at timestamptz;
+
+create table if not exists public.business_documents (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid not null references public.businesses (id) on delete cascade,
+  kind text not null check (kind in ('insurance', 'trade_certificate', 'company_registration', 'identity', 'other')),
+  file_path text not null,
+  original_name text not null default '',
+  status text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
+  admin_note text not null default '',
+  uploaded_at timestamptz not null default now(),
+  reviewed_at timestamptz
+);
+
+alter table public.business_documents enable row level security;
+
+create policy "Businesses can view their own documents record"
+  on public.business_documents for select
+  using (auth.uid() = business_id);
+
+create policy "Businesses can submit documents"
+  on public.business_documents for insert
+  with check (auth.uid() = business_id);
+
+create policy "Businesses can withdraw their own documents"
+  on public.business_documents for delete
+  using (auth.uid() = business_id);
+
+create policy "Admins can view all documents"
+  on public.business_documents for select
+  using (exists (select 1 from public.admins a where a.id = auth.uid()));
+
+create policy "Admins can review documents"
+  on public.business_documents for update
+  using (exists (select 1 from public.admins a where a.id = auth.uid()));
+
+create index if not exists business_documents_business_id_idx on public.business_documents (business_id);
+create index if not exists business_documents_status_idx on public.business_documents (status);
+
+-- A business must not be able to mark itself verified — that badge is the
+-- whole point of the exercise. Submitting a document moves them to 'pending';
+-- only an admin moves them past it.
+create or replace function public.enforce_verification_status_ownership()
+returns trigger language plpgsql as $$
+begin
+  if exists (select 1 from public.admins a where a.id = auth.uid()) then
+    return new;
+  end if;
+  if new.verification_status is distinct from old.verification_status then
+    -- The one transition a business may make itself: submitting for review.
+    if not (old.verification_status in ('unverified', 'rejected') and new.verification_status = 'pending') then
+      new.verification_status := old.verification_status;
+    end if;
+  end if;
+  new.verification_note := old.verification_note;
+  new.verified_at := old.verified_at;
+  return new;
+end $$;
+
+drop trigger if exists businesses_verification_ownership on public.businesses;
+create trigger businesses_verification_ownership
+  before update on public.businesses
+  for each row execute function public.enforce_verification_status_ownership();

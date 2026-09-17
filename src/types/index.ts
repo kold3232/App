@@ -259,6 +259,20 @@ export type NotifySignup = {
   createdAt: string;
 };
 
+export type DocumentKind = 'insurance' | 'trade_certificate' | 'company_registration' | 'identity' | 'other';
+export type VerificationStatus = 'unverified' | 'pending' | 'verified' | 'rejected';
+
+export type BusinessDocument = {
+  id: string;
+  businessId: string;
+  kind: DocumentKind;
+  filePath: string;
+  originalName: string;
+  status: 'pending' | 'approved' | 'rejected';
+  adminNote: string;
+  uploadedAt: string;
+};
+
 export type ApplicationStatus = 'not_started' | 'pending' | 'approved' | 'rejected';
 
 export type AdminBusinessStatus = 'active' | 'suspended';
@@ -288,6 +302,8 @@ export type AdminBusiness = {
   businessStatus: AdminBusinessStatus;
   submittedAt: string;
   rejectionReason: string;
+  verificationStatus: VerificationStatus;
+  verificationNote: string;
   jobsCompleted: number;
   commissionOwed: number;
   commissionPaid: number;

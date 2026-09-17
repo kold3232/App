@@ -4,7 +4,7 @@ import { Linking } from 'react-native';
 import { DEFAULT_CATEGORIES } from '../data/categories';
 import { DEMO_MODE, buildDemoCompanies } from '../data/demoBusinesses';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
-import { uploadBusinessMedia } from '../lib/mediaUpload';
+import { signedDocumentUrl, uploadBusinessDocument, uploadBusinessMedia } from '../lib/mediaUpload';
 import { googleMapsUrl } from '../utils/maps';
 import { registerForPushNotifications, sendPushForEvent, unregisterPushToken } from '../lib/push';
 import { notify as notifyAlert } from '../utils/alert';
@@ -14,9 +14,11 @@ import {
   AdminBusinessStatus,
   ApplicationStatus,
   BusinessAccount,
+  BusinessDocument,
   BusySummaryRow,
   CalendarEntry,
   Category,
+  DocumentKind,
   CategoryGroupId,
   Employee,
   EmployeeAccessRequest,
@@ -34,6 +36,7 @@ import {
   Review,
   ServiceRequest,
   UserMode,
+  VerificationStatus,
 } from '../types';
 import { toDisplayName } from '../utils/name';
 
@@ -189,6 +192,24 @@ type AppContextValue = {
   reinstateBusiness: (id: string) => Promise<void>;
   addComplaintFlag: (id: string, note: string) => Promise<void>;
   markCommissionPaid: (id: string) => Promise<void>;
+  // Verification documents.
+  myDocuments: BusinessDocument[];
+  myVerificationStatus: VerificationStatus;
+  refreshMyDocuments: () => Promise<void>;
+  submitDocument: (
+    kind: DocumentKind,
+    localUri: string,
+    fileName: string,
+    contentType: string
+  ) => Promise<{ error?: string }>;
+  removeDocument: (id: string) => Promise<{ error?: string }>;
+  documentsForBusiness: (businessId: string) => Promise<BusinessDocument[]>;
+  openDocument: (filePath: string) => Promise<string | null>;
+  setVerificationStatus: (
+    businessId: string,
+    status: VerificationStatus,
+    note: string
+  ) => Promise<{ error?: string }>;
   // Manager side of the multi-account system.
   employees: Employee[];
   employeeSeats: number;
@@ -273,6 +294,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [myEmployeeAccessRequest, setMyEmployeeAccessRequest] = useState<EmployeeAccessRequest | null>(null);
   const [employeeAccessRequests, setEmployeeAccessRequests] = useState<EmployeeAccessRequest[]>([]);
   const [calendarEntries, setCalendarEntries] = useState<CalendarEntry[]>([]);
+  const [myDocuments, setMyDocuments] = useState<BusinessDocument[]>([]);
+  const [myVerificationStatus, setMyVerificationStatus] = useState<VerificationStatus>('unverified');
   const [busySummary, setBusySummary] = useState<BusySummaryRow[]>([]);
   const [authEmail, setAuthEmail] = useState<string | null>(null);
   const [passwordRecovery, setPasswordRecovery] = useState(false);
@@ -1511,7 +1534,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       await Promise.all([
         supabase
           .from('businesses')
-          .select('id, name, email, phone, application_status, business_status, rejection_reason, created_at')
+          .select('id, name, email, phone, application_status, business_status, rejection_reason, created_at, verification_status, verification_note')
           .order('created_at', { ascending: false }),
         supabase.from('business_listings').select('id, business_id, category_ids'),
         supabase.from('service_requests').select('listing_id, status, commission, commission_paid'),
@@ -1541,6 +1564,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           contactPhone: b.phone,
           categoryIds,
           applicationStatus: b.application_status as ApplicationStatus,
+          verificationStatus: (b.verification_status as VerificationStatus) ?? 'unverified',
+          verificationNote: b.verification_note ?? '',
           businessStatus: b.business_status as AdminBusinessStatus,
           rejectionReason: b.rejection_reason ?? '',
           submittedAt: b.created_at,
@@ -1944,6 +1969,112 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // --- Verification documents ------------------------------------------------
+
+  const mapDocumentRow = useCallback(
+    (row: any): BusinessDocument => ({
+      id: row.id,
+      businessId: row.business_id,
+      kind: row.kind,
+      filePath: row.file_path,
+      originalName: row.original_name ?? '',
+      status: row.status,
+      adminNote: row.admin_note ?? '',
+      uploadedAt: row.uploaded_at,
+    }),
+    []
+  );
+
+  const refreshMyDocuments = useCallback(async () => {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData.session?.user.id;
+    if (!userId) {
+      setMyDocuments([]);
+      return;
+    }
+    const [{ data: docs }, { data: biz }] = await Promise.all([
+      supabase.from('business_documents').select('*').eq('business_id', userId).order('uploaded_at'),
+      supabase.from('businesses').select('verification_status').eq('id', userId).maybeSingle(),
+    ]);
+    setMyDocuments((docs ?? []).map(mapDocumentRow));
+    setMyVerificationStatus((biz?.verification_status as VerificationStatus) ?? 'unverified');
+  }, [mapDocumentRow]);
+
+  const submitDocument = useCallback(
+    async (kind: DocumentKind, localUri: string, fileName: string, contentType: string) => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const userId = sessionData.session?.user.id;
+      if (!userId) return { error: 'Not signed in.' };
+
+      const { path, error: uploadError } = await uploadBusinessDocument(userId, localUri, fileName, contentType);
+      if (uploadError || !path) return { error: uploadError ?? 'Upload failed.' };
+
+      const { error } = await supabase.from('business_documents').insert({
+        business_id: userId,
+        kind,
+        file_path: path,
+        original_name: fileName,
+      });
+      if (error) return { error: error.message };
+
+      // Submitting is the one verification move a business may make itself;
+      // the trigger on businesses rejects anything further.
+      await supabase.from('businesses').update({ verification_status: 'pending' }).eq('id', userId);
+      sendPushForEvent(null, 'documents_submitted');
+      await refreshMyDocuments();
+      return {};
+    },
+    [refreshMyDocuments]
+  );
+
+  const removeDocument = useCallback(
+    async (id: string) => {
+      const { error } = await supabase.from('business_documents').delete().eq('id', id);
+      if (error) return { error: error.message };
+      await refreshMyDocuments();
+      return {};
+    },
+    [refreshMyDocuments]
+  );
+
+  const documentsForBusiness = useCallback(
+    async (businessId: string) => {
+      const { data } = await supabase
+        .from('business_documents')
+        .select('*')
+        .eq('business_id', businessId)
+        .order('uploaded_at');
+      return (data ?? []).map(mapDocumentRow);
+    },
+    [mapDocumentRow]
+  );
+
+  // The bucket is private, so opening a document means a short-lived signed
+  // link rather than a public URL.
+  const openDocument = useCallback(async (filePath: string) => signedDocumentUrl(filePath), []);
+
+  const setVerificationStatus = useCallback(
+    async (businessId: string, status: VerificationStatus, note: string) => {
+      const { error } = await supabase
+        .from('businesses')
+        .update({
+          verification_status: status,
+          verification_note: note,
+          verified_at: status === 'verified' ? new Date().toISOString() : null,
+        })
+        .eq('id', businessId);
+      if (error) return { error: error.message };
+      await supabase
+        .from('business_documents')
+        .update({ status: status === 'verified' ? 'approved' : 'rejected', reviewed_at: new Date().toISOString() })
+        .eq('business_id', businessId)
+        .eq('status', 'pending');
+      await refreshAdminBusinesses();
+      return {};
+    },
+    [refreshAdminBusinesses]
+  );
+
   const value = useMemo(
     () => ({
       isReady,
@@ -2017,6 +2148,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       reinstateBusiness,
       addComplaintFlag,
       markCommissionPaid,
+      myDocuments,
+      myVerificationStatus,
+      refreshMyDocuments,
+      submitDocument,
+      removeDocument,
+      documentsForBusiness,
+      openDocument,
+      setVerificationStatus,
       employees,
       employeeSeats,
       refreshEmployees,
@@ -2116,6 +2255,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       reinstateBusiness,
       addComplaintFlag,
       markCommissionPaid,
+      myDocuments,
+      myVerificationStatus,
+      refreshMyDocuments,
+      submitDocument,
+      removeDocument,
+      documentsForBusiness,
+      openDocument,
+      setVerificationStatus,
       employees,
       employeeSeats,
       refreshEmployees,
