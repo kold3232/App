@@ -1871,3 +1871,27 @@ drop trigger if exists businesses_verification_ownership on public.businesses;
 create trigger businesses_verification_ownership
   before update on public.businesses
   for each row execute function public.enforce_verification_status_ownership();
+
+-- RockServ — the job description as the opening chat message
+-- The description was a cramped line above the thread. It is the single most
+-- important thing the business reads, so it now opens the conversation
+-- instead, sent as a message from the customer.
+--
+-- That exposed a gap. The contact filter only ever covered chat_messages, so
+-- "call me on 54001234" typed into the job description reached the business
+-- immediately, before any quote — straight past the masking the filter exists
+-- to protect. The same rule now applies to job_details.
+create or replace function public.reject_contact_details_in_request()
+returns trigger language plpgsql as $$
+begin
+  if public.looks_like_contact_details(new.job_details) then
+    raise exception 'Phone numbers and contact handles cannot be sent in a job description.'
+      using errcode = 'check_violation';
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists service_requests_no_contact_details on public.service_requests;
+create trigger service_requests_no_contact_details
+  before insert or update of job_details on public.service_requests
+  for each row execute function public.reject_contact_details_in_request();

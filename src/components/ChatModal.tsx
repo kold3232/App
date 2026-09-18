@@ -148,7 +148,7 @@ export function ChatModal({
           <View style={{ flex: 1 }}>
             <Text style={styles.title}>{otherPartyName}</Text>
             <Text style={styles.subtitle}>
-              Case #{request.caseNumber} · {request.categoryName} · {request.jobDetails || 'Job enquiry'}
+              Case #{request.caseNumber} · {request.categoryName}
             </Text>
             {readOnly && <Text style={styles.readOnlyBadge}>Admin view — read only</Text>}
           </View>
@@ -176,7 +176,7 @@ export function ChatModal({
             onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
           >
             {thread.length === 0 && (
-              <Text style={styles.emptyText}>No messages yet. Say hello and discuss the job specs.</Text>
+              <Text style={styles.emptyText}>No messages yet. Say hello and discuss the job.</Text>
             )}
             {thread.map((m) => {
               const isMine = m.sender === perspective;

@@ -922,6 +922,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         address: input.contact.address,
       });
 
+      // The job description opens the thread rather than sitting in a cramped
+      // line above it. Sent as the customer, because that is who wrote it.
+      if (input.jobDetails.trim()) {
+        await supabase.from('chat_messages').insert({
+          request_id: data.id,
+          sender: 'customer',
+          kind: 'text',
+          text: input.jobDetails.trim(),
+        });
+      }
+
       sendPushForEvent(data.id as string, 'new_request');
       setRequests((prev) => [mapRequestRow(data, input.contact), ...prev]);
       return data.id as string;

@@ -8,6 +8,7 @@ import { GIBRALTAR_AREAS } from '../../data/areas';
 import { BrowseStackParamList } from '../../navigation/types';
 import { colors, radius, spacing } from '../../theme';
 import { notify } from '../../utils/alert';
+import { CONTACT_BLOCKED_MESSAGE, containsContactDetails } from '../../utils/contactFilter';
 
 type Props = NativeStackScreenProps<BrowseStackParamList, 'RequestQuote'>;
 
@@ -52,6 +53,13 @@ export default function RequestQuoteScreen({ route, navigation }: Props) {
   }
 
   async function handleSubmit() {
+    // The description opens the chat thread, so it carries the same rule as a
+    // message — and the database rejects it either way. Catching it here
+    // explains why instead of failing the whole request.
+    if (containsContactDetails(jobDetails)) {
+      notify('Leave your number out', CONTACT_BLOCKED_MESSAGE);
+      return;
+    }
     const dateLabel = preferredIsoDate
       ? new Date(preferredIsoDate).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
       : '';
@@ -213,7 +221,7 @@ export default function RequestQuoteScreen({ route, navigation }: Props) {
               style={[styles.input, styles.multiline]}
               value={jobDetails}
               onChangeText={setJobDetails}
-              placeholder="Describe the job..."
+              placeholder="Describe the job — this is the first thing they'll read"
               placeholderTextColor={colors.textFaint}
               selectionColor={colors.primary}
               multiline
