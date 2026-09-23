@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text } from 'react-native';
 import { useApp } from '../context/AppContext';
-import { colors, radius, spacing } from '../theme';
+import { colors, spacing } from '../theme';
 import { confirmAction, notify } from '../utils/alert';
 
 /**
@@ -10,10 +10,12 @@ import { confirmAction, notify } from '../utils/alert';
  * all the privacy policy offers. Shared by the customer, business and staff
  * settings screens so all three routes behave identically.
  *
- * Two taps, not one: deletion is irreversible and the row sits next to
- * ordinary settings, so a stray tap should not end someone's account.
+ * A small plain link rather than a full-width red button: it sits below
+ * ordinary settings where a thumb lands, and a target that size was getting
+ * hit by accident. The confirm step is the real safeguard, but the best
+ * outcome is the tap never happening.
  */
-export function DeleteAccountRow({ compact = false }: { compact?: boolean } = {}) {
+export function DeleteAccountRow() {
   const { deleteMyAccount } = useApp();
   const [busy, setBusy] = useState(false);
 
@@ -35,42 +37,16 @@ export function DeleteAccountRow({ compact = false }: { compact?: boolean } = {}
     );
   }
 
-  // The staff screen puts this directly under the job list, where a thumb
-  // lands after scrolling — so there it is a small plain link set well clear
-  // of the last card, rather than a full-width red target.
-  if (compact) {
-    return (
-      <Pressable onPress={handlePress} disabled={busy} hitSlop={8} style={styles.compactRow}>
-        <Text style={styles.compactLabel}>{busy ? 'Deleting…' : 'Delete my account'}</Text>
-      </Pressable>
-    );
-  }
-
   return (
-    <Pressable onPress={handlePress} disabled={busy} style={styles.row}>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.label}>Delete my account</Text>
-        <Text style={styles.hint}>Permanently erases your login and personal details.</Text>
-      </View>
-      {busy && <ActivityIndicator size="small" color={colors.danger} />}
+    <Pressable onPress={handlePress} disabled={busy} hitSlop={8} style={styles.row}>
+      <Text style={styles.label}>{busy ? 'Deleting…' : 'Delete my account'}</Text>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginTop: spacing.lg,
-    padding: spacing.md,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.danger,
-    backgroundColor: colors.surface,
-  },
-  label: { fontSize: 14, fontWeight: '700', color: colors.danger },
-  hint: { fontSize: 11.5, color: colors.textMuted, marginTop: 3 },
-  compactRow: { alignSelf: 'center', paddingVertical: spacing.sm, marginTop: spacing.xl * 2 },
-  compactLabel: { fontSize: 12, color: colors.textFaint, textDecorationLine: 'underline' },
+  // Clear of whatever sits above without being so far down that it falls off a
+  // small screen — the profile and settings screens do not scroll.
+  row: { alignSelf: 'center', paddingVertical: spacing.sm, marginTop: spacing.xl },
+  label: { fontSize: 12, color: colors.textFaint, textDecorationLine: 'underline' },
 });

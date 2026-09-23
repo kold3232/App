@@ -89,7 +89,7 @@ export default function EmployeeJobsScreen() {
             subtitle="Jobs your manager assigns to you will show up in this list."
           />
         }
-        ListFooterComponent={<DeleteAccountRow compact />}
+        ListFooterComponent={<DeleteAccountRow />}
         ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
         renderItem={({ item }) => {
           const mapUrl = item.assignmentMapUrl || (item.contact ? googleMapsUrl(item.contact.address) : '');
