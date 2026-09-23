@@ -44,3 +44,7 @@ supabase/.temp/
 # generated native folders
 /ios
 /android
+
+# git bundles used to hand commits over by hand — they hold this repo's own
+# history, so committing one back into it serves no purpose
+*.bundle
