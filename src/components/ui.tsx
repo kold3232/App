@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import React from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { colors, radius, shadow, spacing } from '../theme';
 
 export function Button({
@@ -137,6 +137,77 @@ export function SectionLabel({ children }: { children: React.ReactNode }) {
   return <Text style={styles.sectionLabel}>{children}</Text>;
 }
 
+/**
+ * A single-choice field that opens a sheet rather than spreading every option
+ * across the form. Chips are good for four or five choices; past that they
+ * become a wall the eye has to scan, which is what Gibraltar's area list had
+ * turned into.
+ *
+ * Built on Modal rather than a picker library because the two native pickers
+ * look nothing like each other, and this has to sit in the middle of our own
+ * form without looking borrowed.
+ */
+export function Select({
+  value,
+  options,
+  onSelect,
+  placeholder = 'Choose one',
+  title,
+}: {
+  value: string | null;
+  options: readonly string[];
+  onSelect: (option: string) => void;
+  placeholder?: string;
+  title?: string;
+}) {
+  const [open, setOpen] = useState(false);
+
+  function choose(option: string) {
+    onSelect(option);
+    setOpen(false);
+  }
+
+  return (
+    <>
+      <Pressable
+        onPress={() => setOpen(true)}
+        style={({ pressed }) => [styles.selectField, pressed && styles.buttonPressed]}
+      >
+        <Text style={[styles.selectValue, !value && styles.selectPlaceholder]}>{value ?? placeholder}</Text>
+        <Ionicons name="chevron-down" size={16} color={colors.textFaint} />
+      </Pressable>
+
+      <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
+        {/* Tapping the dimmed area closes, which is what people expect of a
+            sheet and saves hunting for a cancel button. */}
+        <Pressable style={styles.selectBackdrop} onPress={() => setOpen(false)}>
+          <Pressable style={styles.selectSheet} onPress={() => {}}>
+            <View style={styles.selectGrabber} />
+            {title ? <Text style={styles.selectTitle}>{title}</Text> : null}
+            <ScrollView bounces={false}>
+              {options.map((option) => {
+                const selected = option === value;
+                return (
+                  <Pressable
+                    key={option}
+                    onPress={() => choose(option)}
+                    style={({ pressed }) => [styles.selectOption, pressed && styles.selectOptionPressed]}
+                  >
+                    <Text style={[styles.selectOptionText, selected && styles.selectOptionTextSelected]}>
+                      {option}
+                    </Text>
+                    {selected && <Ionicons name="checkmark" size={18} color={colors.primary} />}
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </>
+  );
+}
+
 const styles = StyleSheet.create({
   button: {
     paddingVertical: 16,
@@ -197,4 +268,49 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.6,
   },
+  selectField: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+    paddingVertical: 12,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+  },
+  selectValue: { fontSize: 15, color: colors.text, flex: 1 },
+  selectPlaceholder: { color: colors.textFaint },
+  selectBackdrop: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.45)', justifyContent: 'flex-end' },
+  selectSheet: {
+    maxHeight: '70%',
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xl,
+    paddingTop: spacing.sm,
+  },
+  selectGrabber: {
+    width: 38,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.border,
+    alignSelf: 'center',
+    marginBottom: spacing.md,
+  },
+  selectTitle: { fontSize: 16, fontWeight: '800', color: colors.text, marginBottom: spacing.sm },
+  selectOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  selectOptionPressed: { opacity: 0.6 },
+  selectOptionText: { fontSize: 15, color: colors.text },
+  selectOptionTextSelected: { fontWeight: '700', color: colors.primary },
 });

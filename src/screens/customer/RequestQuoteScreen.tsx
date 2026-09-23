@@ -1,7 +1,7 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
-import { Button, Card, Chip, SectionLabel } from '../../components/ui';
+import { Button, Card, Chip, SectionLabel, Select } from '../../components/ui';
 import { Calendar } from '../../components/Calendar';
 import { useApp } from '../../context/AppContext';
 import { GIBRALTAR_AREAS } from '../../data/areas';
@@ -208,11 +208,13 @@ export default function RequestQuoteScreen({ route, navigation }: Props) {
             <Text style={styles.fieldHint}>
               This is all {company.name} sees until you accept their quote.
             </Text>
-            <View style={styles.chipWrap}>
-              {GIBRALTAR_AREAS.map((option) => (
-                <Chip key={option} label={option} selected={area === option} onPress={() => setArea(option)} />
-              ))}
-            </View>
+            <Select
+              value={area}
+              options={GIBRALTAR_AREAS}
+              onSelect={setArea}
+              placeholder="Choose an area"
+              title="Which area is it in?"
+            />
           </View>
 
           <View style={[styles.field, styles.fieldBorder]}>

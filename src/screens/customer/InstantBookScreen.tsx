@@ -11,7 +11,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Button, Card, Chip, EmptyState, SectionLabel } from '../../components/ui';
+import { Button, Card, Chip, EmptyState, SectionLabel, Select } from '../../components/ui';
 import { useApp } from '../../context/AppContext';
 import { GIBRALTAR_AREAS } from '../../data/areas';
 import { BrowseStackParamList } from '../../navigation/types';
@@ -211,11 +211,13 @@ export default function InstantBookScreen({ route, navigation }: Props) {
 
               <View style={[styles.field, styles.fieldBorder]}>
                 <SectionLabel>Which area is this in?</SectionLabel>
-                <View style={styles.chipWrap}>
-                  {GIBRALTAR_AREAS.map((option) => (
-                    <Chip key={option} label={option} selected={area === option} onPress={() => setArea(option)} />
-                  ))}
-                </View>
+                <Select
+                  value={area}
+                  options={GIBRALTAR_AREAS}
+                  onSelect={setArea}
+                  placeholder="Choose an area"
+                  title="Which area is it in?"
+                />
               </View>
             </Card>
 
