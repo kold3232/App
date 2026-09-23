@@ -19,7 +19,7 @@ import { useApp } from '../context/AppContext';
 import { ChatMessageSender, ServiceRequest } from '../types';
 import { colors, radius, spacing } from '../theme';
 import { notify } from '../utils/alert';
-import { CONTACT_BLOCKED_MESSAGE, containsContactDetails } from '../utils/contactFilter';
+import { blockedMessageFor } from '../utils/contactFilter';
 import { Button } from './ui';
 
 export function ChatModal({
@@ -86,8 +86,9 @@ export function ChatModal({
     if (!body) return;
     // The database rejects these outright; catching it here turns what would
     // be a failed insert into an explanation of why.
-    if (containsContactDetails(body)) {
-      notify('Keep it in the app', CONTACT_BLOCKED_MESSAGE);
+    const blocked = blockedMessageFor(body);
+    if (blocked) {
+      notify('Keep it in the app', blocked);
       return;
     }
     sendMessage(request.id, perspective, body);

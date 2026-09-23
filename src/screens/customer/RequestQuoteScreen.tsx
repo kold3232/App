@@ -8,7 +8,7 @@ import { GIBRALTAR_AREAS } from '../../data/areas';
 import { BrowseStackParamList } from '../../navigation/types';
 import { colors, radius, spacing } from '../../theme';
 import { notify } from '../../utils/alert';
-import { CONTACT_BLOCKED_MESSAGE, containsContactDetails } from '../../utils/contactFilter';
+import { blockedMessageFor } from '../../utils/contactFilter';
 
 type Props = NativeStackScreenProps<BrowseStackParamList, 'RequestQuote'>;
 
@@ -56,8 +56,9 @@ export default function RequestQuoteScreen({ route, navigation }: Props) {
     // The description opens the chat thread, so it carries the same rule as a
     // message — and the database rejects it either way. Catching it here
     // explains why instead of failing the whole request.
-    if (containsContactDetails(jobDetails)) {
-      notify('Leave your number out', CONTACT_BLOCKED_MESSAGE);
+    const blocked = blockedMessageFor(jobDetails);
+    if (blocked) {
+      notify('Keep it in the app', blocked);
       return;
     }
     const dateLabel = preferredIsoDate

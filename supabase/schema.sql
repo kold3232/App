@@ -1895,3 +1895,90 @@ drop trigger if exists service_requests_no_contact_details on public.service_req
 create trigger service_requests_no_contact_details
   before insert or update of job_details on public.service_requests
   for each row execute function public.reject_contact_details_in_request();
+
+-- RockServ — blocking the off-app payout
+-- Masking contact details stops the casual swap of phone numbers. It does not
+-- stop the other half of the same move: "send it to my Revolut" or "cash in
+-- hand and we skip the app". That is where the commission is lost, so those
+-- go the same way as a phone number.
+--
+-- Split from looks_like_contact_details on purpose. It is a different
+-- offence and deserves a different explanation to the person who typed it,
+-- and keeping the two lists apart means neither has to be loosened to fix
+-- the other.
+--
+-- Bare mentions of cash are deliberately NOT here. Until RockServ takes
+-- payment in the app, "can I pay cash on the day?" is an ordinary question
+-- with no in-app answer, and blocking it would punish people for using the
+-- app correctly. Only the phrasings that mean evasion are caught.
+create or replace function public.looks_like_payment_evasion(body text)
+returns boolean
+language plpgsql
+immutable
+as $$
+begin
+  if body is null then
+    return false;
+  end if;
+
+  -- Money apps and bank details. Revolut in particular is how this would
+  -- actually happen in Gibraltar.
+  if body ~* '(revolut|pay\s*pal|venmo|zelle|cash\s*app\M|bizum|monzo|starling|transferwise|wise\.com|\miban\M|sort\s*code|bank\s*transfer|bank\s*details|account\s*(number|details)|swift\s*code)' then
+    return true;
+  end if;
+
+  -- Taking it off the platform, said plainly. The trailing \M keeps "apple"
+  -- and "apply" out of it.
+  if body ~* '(off|outside|outside\s+of|away\s+from|without|bypass|bypassing|skip|skipping|avoid|avoiding|not\s+through)\s+(the\s+|this\s+)?app\M' then
+    return true;
+  end if;
+  if body ~* 'off[\s-]*platform' then
+    return true;
+  end if;
+
+  -- Cash, but only where the phrase itself is the evasion.
+  if body ~* '(cash\s*in\s*hand|cash\s*job|cash\s+deal|under\s+the\s+table|off\s+the\s+books)' then
+    return true;
+  end if;
+
+  -- Dealing directly. Narrow on purpose: "between us" and "go direct" are
+  -- ordinary English ("I will go directly to the merchant for the tiles"), so
+  -- only phrasings that name the payment or the deal count.
+  if body ~* '(pay\s+(me|you)\s+direct(ly)?|deal\s+direct(ly)?|keep\s+it\s+between\s+us)' then
+    return true;
+  end if;
+
+  return false;
+end $$;
+
+-- Both rules now run on chat messages and on the job description, each with
+-- its own message so the sender is told which line they crossed.
+create or replace function public.reject_contact_details_in_chat()
+returns trigger language plpgsql as $$
+begin
+  if new.kind = 'text' then
+    if public.looks_like_contact_details(new.text) then
+      raise exception 'Phone numbers and contact handles cannot be sent in RockServ chat.'
+        using errcode = 'check_violation';
+    end if;
+    if public.looks_like_payment_evasion(new.text) then
+      raise exception 'Payment details and arrangements outside RockServ cannot be sent in chat.'
+        using errcode = 'check_violation';
+    end if;
+  end if;
+  return new;
+end $$;
+
+create or replace function public.reject_contact_details_in_request()
+returns trigger language plpgsql as $$
+begin
+  if public.looks_like_contact_details(new.job_details) then
+    raise exception 'Phone numbers and contact handles cannot be sent in a job description.'
+      using errcode = 'check_violation';
+  end if;
+  if public.looks_like_payment_evasion(new.job_details) then
+    raise exception 'Payment details and arrangements outside RockServ cannot be sent in a job description.'
+      using errcode = 'check_violation';
+  end if;
+  return new;
+end $$;
