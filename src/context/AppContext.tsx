@@ -1,4 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useStripe } from '@stripe/stripe-react-native';
+import { createURL } from 'expo-linking';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Linking } from 'react-native';
 import { DEFAULT_CATEGORIES } from '../data/categories';
@@ -29,8 +31,10 @@ import {
   CompanyProfile,
   CustomerProfile,
   GalleryImage,
+  JobPayment,
   NotifySignup,
   NewServiceRequest,
+  PaymentAccountStatus,
   ProposedCategory,
   RequestContact,
   Review,
@@ -132,6 +136,17 @@ type AppContextValue = {
   completeRequest: (id: string, jobValue: number) => Promise<void>;
   confirmCompletion: (id: string) => Promise<void>;
   payCommission: () => Promise<{ error?: string }>;
+  // In-app payment (Stripe Connect). The business onboards once; after that
+  // customers pay through the app and RockServ's commission comes out of the
+  // payment rather than being invoiced afterwards.
+  paymentAccount: PaymentAccountStatus;
+  startPaymentSetup: () => Promise<{ error?: string }>;
+  refreshPaymentAccount: () => Promise<void>;
+  requestDeposit: (requestId: string, amount: number) => Promise<{ error?: string }>;
+  cancelDepositRequest: (requestId: string) => Promise<{ error?: string }>;
+  fetchJobPayments: (requestId: string) => Promise<JobPayment[]>;
+  payForJob: (requestId: string, kind: 'deposit' | 'final') => Promise<{ error?: string; cancelled?: boolean }>;
+  refundJobPayment: (paymentId: string) => Promise<{ error?: string }>;
   myListings: CompanyProfile[];
   refreshMyListings: () => Promise<void>;
   createListing: (profile: Omit<CompanyProfile, 'id'>) => Promise<{ error?: string; id?: string }>;
@@ -279,7 +294,36 @@ type BusinessListingRow = {
 
 const AppContext = createContext<AppContextValue | undefined>(undefined);
 
+const NO_PAYMENT_ACCOUNT: PaymentAccountStatus = {
+  connected: false,
+  chargesEnabled: false,
+  payoutsEnabled: false,
+  detailsSubmitted: false,
+};
+
+/**
+ * Edge functions return their real explanation in the response body, which
+ * supabase-js hides behind a generic "non-2xx status code". Digging it out
+ * turns "Edge Function returned a non-2xx status code" into "This business has
+ * not finished setting up payments yet" — which is the difference between a
+ * person knowing what to do next and not.
+ */
+async function edgeFunctionError(error: unknown, fallback: string): Promise<string> {
+  const context = (error as { context?: Response }).context;
+  if (context) {
+    try {
+      const body = await context.json();
+      if (body?.error) return body.error as string;
+    } catch {
+      // context wasn't JSON — fall back to the generic message
+    }
+  }
+  return fallback;
+}
+
 export function AppProvider({ children }: { children: React.ReactNode }) {
+  const { initPaymentSheet, presentPaymentSheet } = useStripe();
+  const [paymentAccount, setPaymentAccount] = useState<PaymentAccountStatus>(NO_PAYMENT_ACCOUNT);
   const [isReady, setIsReady] = useState(false);
   const [hasAcceptedLegal, setHasAcceptedLegal] = useState(false);
   const [isAdminUser, setIsAdminUser] = useState(false);
@@ -589,6 +633,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       assignedAt: row.assigned_at ?? undefined,
       employeeDone: !!row.employee_done,
       employeeDoneAt: row.employee_done_at ?? undefined,
+      depositAmount: row.deposit_amount ?? undefined,
+      depositRequestedAt: row.deposit_requested_at ?? undefined,
     }),
     []
   );
@@ -975,23 +1021,157 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // (not this call) is what actually marks them paid once Stripe confirms it.
   const payCommission = useCallback(async (): Promise<{ error?: string }> => {
     const { data, error } = await supabase.functions.invoke<{ url: string }>('create-commission-checkout');
-    if (error) {
-      let message = 'Could not start checkout.';
-      const context = (error as { context?: Response }).context;
-      if (context) {
-        try {
-          const body = await context.json();
-          if (body?.error) message = body.error;
-        } catch {
-          // context wasn't JSON — fall back to the generic message
-        }
-      }
-      return { error: message };
-    }
+    if (error) return { error: await edgeFunctionError(error, 'Could not start checkout.') };
     if (!data?.url) return { error: 'Could not start checkout.' };
     await Linking.openURL(data.url);
     return {};
   }, []);
+
+  // --- In-app payment (Stripe Connect) --------------------------------------
+  // A business onboards once with Stripe, which collects the bank and identity
+  // details RockServ has no business holding. After that, customers pay in the
+  // app: Stripe takes the commission as an application fee and moves the rest
+  // straight to the business. Nothing is invoiced afterwards because nothing
+  // was ever owed.
+
+  const refreshPaymentAccount = useCallback(async () => {
+    if (!businessAccount) {
+      setPaymentAccount(NO_PAYMENT_ACCOUNT);
+      return;
+    }
+    const { data, error } = await supabase.functions.invoke<{
+      chargesEnabled: boolean;
+      payoutsEnabled: boolean;
+      detailsSubmitted: boolean;
+    }>('connect-status');
+    if (error || !data) return;
+    setPaymentAccount({
+      // detailsSubmitted is the only reliable sign an account exists at all —
+      // a brand new one reports false for everything else too.
+      connected: data.detailsSubmitted || data.chargesEnabled,
+      chargesEnabled: !!data.chargesEnabled,
+      payoutsEnabled: !!data.payoutsEnabled,
+      detailsSubmitted: !!data.detailsSubmitted,
+    });
+  }, [businessAccount]);
+
+  const startPaymentSetup = useCallback(async (): Promise<{ error?: string }> => {
+    const { data, error } = await supabase.functions.invoke<{ url: string }>('connect-onboard');
+    if (error) return { error: await edgeFunctionError(error, 'Could not start payment setup.') };
+    if (!data?.url) return { error: 'Could not start payment setup.' };
+    // Stripe's own hosted flow, in the system browser. An account link is
+    // single-use, so coming back here later mints a fresh one.
+    await Linking.openURL(data.url);
+    return {};
+  }, []);
+
+  const requestDeposit = useCallback(
+    async (requestId: string, amount: number): Promise<{ error?: string }> => {
+      const { error } = await supabase
+        .from('service_requests')
+        .update({ deposit_amount: amount, deposit_requested_at: new Date().toISOString() })
+        .eq('id', requestId);
+      // The database enforces the bounds — more than nothing, no more than the
+      // job, and frozen once paid — so its message is the useful one.
+      if (error) return { error: error.message };
+      setRequests((prev) =>
+        prev.map((r) =>
+          r.id === requestId ? { ...r, depositAmount: amount, depositRequestedAt: new Date().toISOString() } : r
+        )
+      );
+      void sendPushForEvent(requestId, 'deposit_requested');
+      return {};
+    },
+    []
+  );
+
+  const cancelDepositRequest = useCallback(async (requestId: string): Promise<{ error?: string }> => {
+    const { error } = await supabase
+      .from('service_requests')
+      .update({ deposit_amount: null, deposit_requested_at: null })
+      .eq('id', requestId);
+    if (error) return { error: error.message };
+    setRequests((prev) =>
+      prev.map((r) => (r.id === requestId ? { ...r, depositAmount: undefined, depositRequestedAt: undefined } : r))
+    );
+    return {};
+  }, []);
+
+  const fetchJobPayments = useCallback(async (requestId: string): Promise<JobPayment[]> => {
+    const { data, error } = await supabase
+      .from('job_payments')
+      .select('id, request_id, kind, amount, commission, status, created_at, paid_at, refunded_at')
+      .eq('request_id', requestId)
+      .order('created_at', { ascending: true });
+    if (error || !data) return [];
+    return data.map((row: any) => ({
+      id: row.id,
+      requestId: row.request_id,
+      kind: row.kind,
+      amount: Number(row.amount),
+      commission: Number(row.commission),
+      status: row.status,
+      createdAt: row.created_at,
+      paidAt: row.paid_at ?? undefined,
+      refundedAt: row.refunded_at ?? undefined,
+    }));
+  }, []);
+
+  const payForJob = useCallback(
+    async (requestId: string, kind: 'deposit' | 'final'): Promise<{ error?: string; cancelled?: boolean }> => {
+      const { data, error } = await supabase.functions.invoke<{
+        clientSecret: string;
+        amount: number;
+        businessName: string;
+      }>('create-job-payment', { body: { requestId, kind } });
+      if (error) return { error: await edgeFunctionError(error, 'Could not start the payment.') };
+      if (!data?.clientSecret) return { error: 'Could not start the payment.' };
+
+      const init = await initPaymentSheet({
+        merchantDisplayName: data.businessName || 'RockServ',
+        paymentIntentClientSecret: data.clientSecret,
+        // Cards only for now. Delayed methods settle days later, which would
+        // mean telling a business a job was paid before the money exists.
+        allowsDelayedPaymentMethods: false,
+        returnURL: createURL(''),
+      });
+      if (init.error) return { error: init.error.message };
+
+      const result = await presentPaymentSheet();
+      if (result.error) {
+        // Backing out of the sheet is not a failure worth an error message.
+        if (result.error.code === 'Canceled') return { cancelled: true };
+        return { error: result.error.message };
+      }
+
+      // The sheet succeeding means the card was accepted, not that the row is
+      // updated — the webhook does that. Refreshing here is what makes the
+      // screen catch up, and it is safe if the webhook has not landed yet
+      // because the job simply still reads as unpaid.
+      await refreshRequests();
+      void sendPushForEvent(requestId, kind === 'deposit' ? 'deposit_paid' : 'job_paid');
+      return {};
+    },
+    [initPaymentSheet, presentPaymentSheet, refreshRequests]
+  );
+
+  const refundJobPayment = useCallback(async (paymentId: string): Promise<{ error?: string }> => {
+    const { error } = await supabase.functions.invoke('refund-job-payment', { body: { paymentId } });
+    if (error) return { error: await edgeFunctionError(error, 'Could not refund that payment.') };
+    return {};
+  }, []);
+
+  // Signing in as a business asks Stripe where that account stands. Onboarding
+  // can be finished, abandoned halfway, or undone later by Stripe asking for
+  // more documents, and the answer decides whether the business can be paid at
+  // all — so it is read fresh rather than trusted from the last session.
+  useEffect(() => {
+    if (!businessAccount) {
+      setPaymentAccount(NO_PAYMENT_ACCOUNT);
+      return;
+    }
+    void refreshPaymentAccount();
+  }, [businessAccount, refreshPaymentAccount]);
 
 
   const addReview = useCallback(async (requestId: string, companyId: string, rating: number, comment: string) => {
@@ -2109,6 +2289,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       completeRequest,
       confirmCompletion,
       payCommission,
+      paymentAccount,
+      startPaymentSetup,
+      refreshPaymentAccount,
+      requestDeposit,
+      cancelDepositRequest,
+      fetchJobPayments,
+      payForJob,
+      refundJobPayment,
       myListings,
       refreshMyListings,
       createListing,
@@ -2216,6 +2404,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       completeRequest,
       confirmCompletion,
       payCommission,
+      paymentAccount,
+      startPaymentSetup,
+      refreshPaymentAccount,
+      requestDeposit,
+      cancelDepositRequest,
+      fetchJobPayments,
+      payForJob,
+      refundJobPayment,
       myListings,
       refreshMyListings,
       createListing,

@@ -133,6 +133,38 @@ export type ServiceRequest = {
   // confirmation and commission.
   employeeDone: boolean;
   employeeDoneAt?: string;
+  // What the business has asked for up front, if anything. Paying it is a
+  // separate thing — see JobPayment.
+  depositAmount?: number;
+  depositRequestedAt?: string;
+};
+
+// A customer's payment on a job. At most one of each kind: the deposit a
+// business asked for before starting, and the balance once the work is done.
+// Written only by the edge functions — the app reads these, never writes them,
+// because a client that could write one could mark a job paid without any
+// money moving.
+export type JobPayment = {
+  id: string;
+  requestId: string;
+  kind: 'deposit' | 'final';
+  amount: number;
+  // RockServ's cut, taken out of this payment as a Stripe application fee.
+  commission: number;
+  status: 'pending' | 'paid' | 'failed' | 'refunded';
+  createdAt: string;
+  paidAt?: string;
+  refundedAt?: string;
+};
+
+// Where a business is up to with Stripe. charges_enabled is the one that
+// matters: an account can exist, and have submitted everything, and still not
+// be cleared to take money.
+export type PaymentAccountStatus = {
+  connected: boolean;
+  chargesEnabled: boolean;
+  payoutsEnabled: boolean;
+  detailsSubmitted: boolean;
 };
 
 // What a customer fills in to raise a request. Separate from ServiceRequest

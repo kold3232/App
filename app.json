@@ -45,6 +45,13 @@
           "color": "#0F1E46",
           "defaultChannel": "default"
         }
+      ],
+      [
+        "@stripe/stripe-react-native",
+        {
+          "merchantIdentifier": "",
+          "enableGooglePay": false
+        }
       ]
     ],
     "extra": {

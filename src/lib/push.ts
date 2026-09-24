@@ -93,6 +93,9 @@ export type PushEvent =
   | 'time_confirmed'
   | 'job_assigned'
   | 'job_completed'
+  | 'deposit_requested'
+  | 'deposit_paid'
+  | 'job_paid'
   // No job attached — these land in the admin queue and only admins hear
   // about them.
   | 'business_applied'

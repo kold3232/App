@@ -23,7 +23,10 @@ type JobEvent =
   | 'request_declined'
   | 'time_confirmed'
   | 'job_assigned'
-  | 'job_completed';
+  | 'job_completed'
+  | 'deposit_requested'
+  | 'deposit_paid'
+  | 'job_paid';
 
 // Events with no job attached — things that land in the admin queue. Only
 // admins are told, and the text is derived from the caller's own record
@@ -161,7 +164,7 @@ Deno.serve(async (req) => {
     const { data: request } = await admin
       .from('service_requests')
       .select(
-        'id, case_number, customer_id, listing_id, company_name, category_name, customer_display_name, assigned_employee_id, quoted_amount, scheduled_for'
+        'id, case_number, customer_id, listing_id, company_name, category_name, customer_display_name, assigned_employee_id, quoted_amount, scheduled_for, deposit_amount'
       )
       .eq('id', requestId)
       .maybeSingle();
@@ -261,6 +264,25 @@ Deno.serve(async (req) => {
         recipientId = customerId;
         title = 'Job marked complete';
         body = `${listingName} marked ${caseLabel} as done. Confirm it in the app.`;
+        break;
+      case 'deposit_requested':
+        recipientId = customerId;
+        title = 'Deposit requested';
+        body = request.deposit_amount
+          ? `${listingName} asked for a £${Number(request.deposit_amount).toFixed(2)} deposit on ${caseLabel}. It comes off the total.`
+          : `${listingName} asked for a deposit on ${caseLabel}.`;
+        break;
+      case 'deposit_paid':
+        recipientId = businessId;
+        title = 'Deposit paid';
+        body = request.deposit_amount
+          ? `${customerLabel} paid the £${Number(request.deposit_amount).toFixed(2)} deposit on ${caseLabel}.`
+          : `${customerLabel} paid the deposit on ${caseLabel}.`;
+        break;
+      case 'job_paid':
+        recipientId = businessId;
+        title = 'Job paid';
+        body = `${customerLabel} paid for ${caseLabel}. Your share is on its way to your account.`;
         break;
       default:
         return ok({ ok: false, reason: 'unknown event' });

@@ -2,6 +2,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import React from 'react';
 import ListingEditorScreen from '../screens/company/ListingEditorScreen';
 import TeamScreen from '../screens/company/TeamScreen';
+import PaymentsScreen from '../screens/company/PaymentsScreen';
 import VerificationScreen from '../screens/company/VerificationScreen';
 import { colors } from '../theme';
 import CompanyNavigator from './CompanyNavigator';
@@ -36,6 +37,7 @@ export default function CompanyRootNavigator() {
       />
       <Stack.Screen name="Team" component={TeamScreen} options={{ title: 'Your team' }} />
       <Stack.Screen name="Verification" component={VerificationScreen} options={{ title: 'Verification' }} />
+      <Stack.Screen name="Payments" component={PaymentsScreen} options={{ title: 'Payments' }} />
     </Stack.Navigator>
   );
 }

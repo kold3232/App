@@ -31,6 +31,7 @@ export type CompanyStackParamList = {
   ListingEditor: { listingId?: string } | undefined;
   Team: undefined;
   Verification: undefined;
+  Payments: undefined;
 };
 
 export type AdminTabParamList = {

@@ -20,6 +20,7 @@ import { ChatMessageSender, ServiceRequest } from '../types';
 import { colors, radius, spacing } from '../theme';
 import { notify } from '../utils/alert';
 import { blockedMessageFor } from '../utils/contactFilter';
+import { JobPaymentBar } from './JobPaymentBar';
 import { Button } from './ui';
 
 export function ChatModal({
@@ -255,6 +256,8 @@ export function ChatModal({
                 <Text style={styles.quoteToggleText}>Send a quote</Text>
               </Pressable>
             ))}
+
+          <JobPaymentBar request={request} perspective={perspective} readOnly={readOnly} />
 
           {!readOnly && (
             <View style={styles.inputRow}>

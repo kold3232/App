@@ -12,7 +12,7 @@ import { colors, radius, spacing } from '../../theme';
 import { confirmAction } from '../../utils/alert';
 
 export default function SettingsScreen() {
-  const { setMode, businessAccount, signOutBusiness } = useApp();
+  const { setMode, businessAccount, signOutBusiness, paymentAccount } = useApp();
   const navigation = useNavigation<any>();
   const [showTerms, setShowTerms] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
@@ -70,6 +70,14 @@ export default function SettingsScreen() {
           <Pressable style={styles.legalRow} onPress={() => navigation.navigate('Verification')}>
             <Text style={styles.legalText}>Verification</Text>
             <Ionicons name="chevron-forward" size={16} color={colors.textFaint} />
+          </Pressable>
+          <View style={styles.legalDivider} />
+          <Pressable style={styles.legalRow} onPress={() => navigation.navigate('Payments')}>
+            <Text style={styles.legalText}>Payments</Text>
+            <View style={styles.rowRight}>
+              {!paymentAccount.chargesEnabled && <Text style={styles.rowBadge}>Set up</Text>}
+              <Ionicons name="chevron-forward" size={16} color={colors.textFaint} />
+            </View>
           </Pressable>
         </Card>
 
@@ -134,4 +142,15 @@ const styles = StyleSheet.create({
   legalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6 },
   legalText: { fontSize: 14, fontWeight: '600', color: colors.text },
   legalDivider: { height: 1, backgroundColor: colors.border, marginVertical: 4 },
+  rowRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  rowBadge: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.danger,
+    backgroundColor: colors.dangerBg,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+    overflow: 'hidden',
+  },
 });

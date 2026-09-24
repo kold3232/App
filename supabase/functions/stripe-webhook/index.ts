@@ -59,6 +59,83 @@ async function markPaymentStatus(session: Stripe.Checkout.Session, status: 'expi
     .eq('status', 'pending');
 }
 
+// --- In-app job payments (Stripe Connect) -----------------------------------
+// This, not the app, is what marks a job payment as taken. The client saying
+// "the sheet said it worked" is not evidence that money moved.
+
+async function markJobPaymentPaid(intent: Stripe.PaymentIntent) {
+  const admin = adminClient();
+
+  const { data: payment } = await admin
+    .from('job_payments')
+    .select('id, request_id, kind, status')
+    .eq('stripe_payment_intent_id', intent.id)
+    .maybeSingle();
+  if (!payment) {
+    console.error('No matching job_payments row for payment intent', intent.id);
+    return;
+  }
+  if (payment.status === 'paid') return; // Stripe retries — second time is a no-op.
+
+  await admin
+    .from('job_payments')
+    .update({ status: 'paid', paid_at: new Date().toISOString() })
+    .eq('id', payment.id);
+
+  // The balance being paid settles the platform's commission on that job too:
+  // it was taken as an application fee out of this very charge, so there is
+  // nothing left to invoice the business for.
+  if (payment.kind === 'final') {
+    await admin.from('service_requests').update({ commission_paid: true }).eq('id', payment.request_id);
+  }
+}
+
+async function markJobPaymentFailed(intent: Stripe.PaymentIntent) {
+  const admin = adminClient();
+  await admin
+    .from('job_payments')
+    .update({ status: 'failed' })
+    .eq('stripe_payment_intent_id', intent.id)
+    .eq('status', 'pending');
+}
+
+async function markJobPaymentRefunded(charge: Stripe.Charge) {
+  const intentId = typeof charge.payment_intent === 'string' ? charge.payment_intent : charge.payment_intent?.id;
+  if (!intentId) return;
+
+  const admin = adminClient();
+  const { data: payment } = await admin
+    .from('job_payments')
+    .select('id, request_id, kind, status')
+    .eq('stripe_payment_intent_id', intentId)
+    .maybeSingle();
+  if (!payment || payment.status === 'refunded') return;
+
+  await admin
+    .from('job_payments')
+    .update({ status: 'refunded', refunded_at: new Date().toISOString() })
+    .eq('id', payment.id);
+
+  // The commission went back with it, so the job owes it again.
+  if (payment.kind === 'final') {
+    await admin.from('service_requests').update({ commission_paid: false }).eq('id', payment.request_id);
+  }
+}
+
+// Stripe is the authority on whether a business is cleared to be paid, so the
+// flags on our side are only ever a copy of what it tells us here.
+async function syncConnectedAccount(account: Stripe.Account) {
+  const admin = adminClient();
+  await admin
+    .from('businesses')
+    .update({
+      stripe_charges_enabled: !!account.charges_enabled,
+      stripe_payouts_enabled: !!account.payouts_enabled,
+      stripe_details_submitted: !!account.details_submitted,
+    })
+    .eq('stripe_account_id', account.id);
+}
+
 Deno.serve(async (req) => {
   const signature = req.headers.get('stripe-signature');
   if (!signature) {
@@ -89,6 +166,25 @@ Deno.serve(async (req) => {
       break;
     case 'checkout.session.async_payment_failed':
       await markPaymentStatus(event.data.object as Stripe.Checkout.Session, 'failed');
+      break;
+
+    // In-app job payments. These carry rockserv_request_id in their metadata,
+    // but the payment intent id is what we match on — it was written to the
+    // row before the customer ever saw the card sheet.
+    case 'payment_intent.succeeded':
+      await markJobPaymentPaid(event.data.object as Stripe.PaymentIntent);
+      break;
+    case 'payment_intent.payment_failed':
+      await markJobPaymentFailed(event.data.object as Stripe.PaymentIntent);
+      break;
+    case 'charge.refunded':
+      await markJobPaymentRefunded(event.data.object as Stripe.Charge);
+      break;
+
+    // Onboarding progress, and any later suspension. A business can be cleared
+    // to take money one week and asked for more documents the next.
+    case 'account.updated':
+      await syncConnectedAccount(event.data.object as Stripe.Account);
       break;
   }
 

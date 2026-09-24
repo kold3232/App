@@ -1982,3 +1982,211 @@ begin
   end if;
   return new;
 end $$;
+
+-- RockServ — in-app payment via Stripe Connect
+-- The money model inverts here. Until now a business was paid directly by the
+-- customer and RockServ invoiced it afterwards for commission, which meant
+-- chasing money that had already left the building. Now the customer pays
+-- through the app: Stripe takes the platform's cut as an application fee and
+-- transfers the rest to the business's own connected account. Commission
+-- never reaches the business, so there is nothing to chase.
+--
+-- Each business gets a Stripe Express account. Stripe runs the identity and
+-- bank-details onboarding, which is the part RockServ has no business holding
+-- and no licence to hold.
+alter table public.businesses add column if not exists stripe_account_id text unique;
+-- Mirrors of Stripe's own flags, kept current by the account.updated webhook.
+-- charges_enabled is the one that gates taking money: an account can exist,
+-- and have submitted its details, and still not be cleared to be paid.
+alter table public.businesses add column if not exists stripe_charges_enabled boolean not null default false;
+alter table public.businesses add column if not exists stripe_payouts_enabled boolean not null default false;
+alter table public.businesses add column if not exists stripe_details_submitted boolean not null default false;
+
+-- A business may ask for a deposit before starting. The amount is its own
+-- choice, capped only by the job itself — see the trigger below.
+alter table public.service_requests add column if not exists deposit_amount numeric(10, 2);
+alter table public.service_requests add column if not exists deposit_requested_at timestamptz;
+
+-- One row per payment the customer makes on a job: at most one deposit and
+-- one final payment. commission is the application fee taken out of that
+-- payment, recorded at the time so a later rate change cannot rewrite history.
+--
+-- Written only by the edge functions (service role). Clients read their own
+-- rows and never write: a client that could insert here could mark a job paid
+-- without any money moving.
+create table if not exists public.job_payments (
+  id uuid primary key default gen_random_uuid(),
+  request_id uuid not null references public.service_requests (id) on delete cascade,
+  kind text not null check (kind in ('deposit', 'final')),
+  amount numeric(10, 2) not null check (amount > 0),
+  commission numeric(10, 2) not null default 0 check (commission >= 0),
+  stripe_payment_intent_id text unique,
+  status text not null default 'pending' check (status in ('pending', 'paid', 'failed', 'refunded')),
+  created_at timestamptz not null default now(),
+  paid_at timestamptz,
+  refunded_at timestamptz
+);
+
+-- One paid payment of each kind per job. A second attempt while the first is
+-- still pending is fine and expected — people abandon a card sheet and come
+-- back — but two successful charges for the same thing is not.
+create unique index if not exists job_payments_one_paid_per_kind
+  on public.job_payments (request_id, kind)
+  where status = 'paid';
+
+create index if not exists job_payments_request_idx on public.job_payments (request_id);
+
+alter table public.job_payments enable row level security;
+
+drop policy if exists "Job parties can view payments" on public.job_payments;
+create policy "Job parties can view payments"
+  on public.job_payments for select
+  using (
+    exists (
+      select 1 from public.service_requests r
+      join public.business_listings l on l.id = r.listing_id
+      where r.id = job_payments.request_id
+        and (r.customer_id = auth.uid() or l.business_id = auth.uid())
+    )
+  );
+
+drop policy if exists "Admins can view all job payments" on public.job_payments;
+create policy "Admins can view all job payments"
+  on public.job_payments for select
+  using (exists (select 1 from public.admins a where a.id = auth.uid()));
+
+-- The deposit is the business's to ask for and the customer's to refuse, so
+-- it goes on the business side of the ownership fence alongside job_value.
+-- A customer who could write it could ask themselves for a deposit of nothing
+-- and a business who could write the paid flags could mark itself paid.
+create or replace function public.enforce_service_request_field_ownership()
+returns trigger language plpgsql as $$
+declare
+  is_customer boolean;
+  is_business boolean;
+  is_employee boolean;
+  wants_done boolean;
+begin
+  if exists (select 1 from public.admins a where a.id = auth.uid()) then
+    return new;
+  end if;
+
+  is_customer := (auth.uid() = old.customer_id);
+  is_business := exists (
+    select 1 from public.business_listings l
+    where l.id = old.listing_id and l.business_id = auth.uid()
+  );
+  is_employee := exists (
+    select 1 from public.business_employees e
+    where e.id = old.assigned_employee_id and e.user_id = auth.uid() and e.status = 'active'
+  );
+
+  -- An employee may move exactly one flag on their own job and nothing else.
+  if is_employee and not is_business and not is_customer then
+    wants_done := new.employee_done;
+    new := old;
+    new.employee_done := wants_done;
+    new.employee_done_at := case
+      when wants_done and not old.employee_done then now()
+      when not wants_done then null
+      else old.employee_done_at
+    end;
+    return new;
+  end if;
+
+  -- Accepting a quote is what unlocks the contact details, so this is the
+  -- line that matters most. The area and display name are the customer's to
+  -- set too — a business must not be able to rewrite what it was shown.
+  if not is_customer then
+    new.customer_id := old.customer_id;
+    new.quoted_amount := old.quoted_amount;
+    new.quote_accepted := old.quote_accepted;
+    new.quote_accepted_at := old.quote_accepted_at;
+    new.customer_display_name := old.customer_display_name;
+    new.area := old.area;
+    new.is_business_customer := old.is_business_customer;
+    -- A business may clear a confirmation when it re-completes a job, but
+    -- must never be able to confirm on the customer's behalf.
+    if new.customer_confirmed and not old.customer_confirmed then
+      new.customer_confirmed := old.customer_confirmed;
+    end if;
+  end if;
+
+  -- The other direction: job value drives commission, so a customer must not
+  -- be able to zero it, mark it paid, or close the job off themselves. Nor
+  -- can they hand their own job to someone else's employee, or move it in the
+  -- business's diary, or waive the deposit they were asked for.
+  if not is_business then
+    new.status := old.status;
+    new.job_value := old.job_value;
+    new.commission := old.commission;
+    new.commission_paid := old.commission_paid;
+    new.scheduled_slot := old.scheduled_slot;
+    new.scheduled_for := old.scheduled_for;
+    new.assigned_employee_id := old.assigned_employee_id;
+    new.assignment_notes := old.assignment_notes;
+    new.assignment_map_url := old.assignment_map_url;
+    new.assigned_at := old.assigned_at;
+    new.employee_done := old.employee_done;
+    new.employee_done_at := old.employee_done_at;
+    new.deposit_amount := old.deposit_amount;
+    new.deposit_requested_at := old.deposit_requested_at;
+  end if;
+
+  -- Raising the deposit after it has been paid would mean asking for money
+  -- against a figure the customer never agreed to, so it is frozen once a
+  -- deposit payment has succeeded.
+  if new.deposit_amount is distinct from old.deposit_amount
+     and exists (
+       select 1 from public.job_payments p
+       where p.request_id = old.id and p.kind = 'deposit' and p.status = 'paid'
+     ) then
+    raise exception 'The deposit has already been paid and cannot be changed.'
+      using errcode = 'check_violation';
+  end if;
+
+  return new;
+end $$;
+
+-- A deposit is money taken before any work exists to show for it, so it is
+-- bounded by the job it belongs to. The quote is the only agreed figure at
+-- that point; without one there is nothing to take a deposit against.
+create or replace function public.check_deposit_amount()
+returns trigger language plpgsql as $$
+declare
+  ceiling numeric(10, 2);
+begin
+  if new.deposit_amount is null then
+    return new;
+  end if;
+  if new.deposit_amount <= 0 then
+    raise exception 'A deposit has to be more than nothing.'
+      using errcode = 'check_violation';
+  end if;
+
+  ceiling := coalesce(new.job_value, new.quoted_amount);
+  if ceiling is null then
+    raise exception 'Send the customer a quote before asking for a deposit.'
+      using errcode = 'check_violation';
+  end if;
+  if new.deposit_amount > ceiling then
+    raise exception 'A deposit cannot be more than the job itself (%).', ceiling
+      using errcode = 'check_violation';
+  end if;
+  return new;
+end $$;
+
+-- The name matters, and is not free to change. Postgres fires BEFORE triggers
+-- in alphabetical order, and this one has to run after
+-- service_requests_field_ownership. That trigger is what puts back the values
+-- a customer is not allowed to touch — including this one. Run the bounds
+-- check first and a customer trying to waive their own deposit is met with
+-- "a deposit has to be more than nothing" rather than being quietly ignored:
+-- the write is refused either way, but one of those explains nothing and
+-- reads like a bug. "validate" sorts after "field_ownership"; "deposit_bounds"
+-- did not.
+drop trigger if exists service_requests_deposit_bounds on public.service_requests;
+drop trigger if exists service_requests_validate_deposit on public.service_requests;
+create trigger service_requests_validate_deposit
+  before insert or update of deposit_amount on public.service_requests
+  for each row execute function public.check_deposit_amount();
