@@ -14,7 +14,34 @@ const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') ?? '', {
   httpClient: Stripe.createFetchHttpClient(),
 });
 
-const webhookSecret = Deno.env.get('STRIPE_WEBHOOK_SECRET') ?? '';
+// Stripe delivers our events through two separate destinations, and each one
+// signs with its own secret.
+//
+// Everything about a payment — the charge, the refund, the checkout session —
+// happens on the platform account, so it arrives through a "Your account"
+// destination. But account.updated for a connected business happens on THEIR
+// account, so it only arrives through a "Connected accounts" destination.
+// That event is what tells us a business has finished signing up and can be
+// paid, so we need both, and Stripe will not put both on one destination.
+//
+// Rather than run two functions, this one accepts either signature. A request
+// is genuine if it verifies against any secret we hold; it is rejected if it
+// verifies against none.
+const webhookSecrets = [
+  Deno.env.get('STRIPE_WEBHOOK_SECRET'),
+  Deno.env.get('STRIPE_WEBHOOK_SECRET_CONNECT'),
+].filter((s): s is string => !!s && s.length > 0);
+
+async function verifyEvent(body: string, signature: string): Promise<Stripe.Event | null> {
+  for (const secret of webhookSecrets) {
+    try {
+      return await stripe.webhooks.constructEventAsync(body, signature, secret);
+    } catch {
+      // Wrong secret for this destination — try the next one.
+    }
+  }
+  return null;
+}
 
 function adminClient() {
   return createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
@@ -144,11 +171,14 @@ Deno.serve(async (req) => {
 
   const body = await req.text();
 
-  let event: Stripe.Event;
-  try {
-    event = await stripe.webhooks.constructEventAsync(body, signature, webhookSecret);
-  } catch (err) {
-    console.error('Webhook signature verification failed', err);
+  if (webhookSecrets.length === 0) {
+    console.error('No webhook signing secret configured — refusing everything.');
+    return new Response('Not configured.', { status: 500 });
+  }
+
+  const event = await verifyEvent(body, signature);
+  if (!event) {
+    console.error('Webhook signature verification failed against all configured secrets.');
     return new Response('Invalid signature.', { status: 400 });
   }
 
