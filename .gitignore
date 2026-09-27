@@ -48,3 +48,9 @@ supabase/.temp/
 # git bundles used to hand commits over by hand — they hold this repo's own
 # history, so committing one back into it serves no purpose
 *.bundle
+
+# SQL blocks pulled out of schema.sql to paste into the Supabase editor.
+# schema.sql is the original; a committed copy would drift from it, and a
+# stale copy of a migration is worse than no copy at all. Regenerate with:
+#   sed -n '/in-app payment via Stripe Connect/,$p' supabase/schema.sql
+stripe-connect.sql
