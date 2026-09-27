@@ -1133,7 +1133,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         // Cards only for now. Delayed methods settle days later, which would
         // mean telling a business a job was paid before the money exists.
         allowsDelayedPaymentMethods: false,
-        returnURL: createURL(''),
+        // Needs a path. createURL('') yields a bare scheme with nothing after
+        // it, which Stripe rejects as "Not a valid URL" — shown inside the card
+        // sheet, above the pay button, with no way past it. Nothing handles
+        // this path; it exists so the URL is well formed and so the phone knows
+        // to reopen RockServ when a bank sends the payer back.
+        returnURL: createURL('stripe-redirect'),
       });
       if (init.error) return { error: init.error.message };
 
