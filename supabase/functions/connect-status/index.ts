@@ -77,6 +77,7 @@ Deno.serve(async (req) => {
     );
   } catch (err) {
     console.error('connect-status error', err);
-    return jsonResponse({ error: 'Could not check your payment account.' }, 500);
+    const reason = err instanceof Error && err.message ? err.message : 'Could not check your payment account.';
+    return jsonResponse({ error: reason }, 500);
   }
 });

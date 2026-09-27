@@ -110,6 +110,12 @@ Deno.serve(async (req) => {
     return jsonResponse({ url: link.url }, 200);
   } catch (err) {
     console.error('connect-onboard error', err);
-    return jsonResponse({ error: 'Could not start payment setup.' }, 500);
+    // Pass Stripe's own words through. Everything that fails here is a setup
+    // problem someone has to go and fix — Connect not enabled, a missing key,
+    // a country that is not allowed — and "could not start payment setup"
+    // sends them hunting with no idea where to look. Stripe redacts its own
+    // keys in these messages, so there is nothing secret to leak.
+    const reason = err instanceof Error && err.message ? err.message : 'Could not start payment setup.';
+    return jsonResponse({ error: reason }, 500);
   }
 });
