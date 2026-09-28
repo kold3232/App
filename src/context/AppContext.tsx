@@ -144,9 +144,8 @@ type AppContextValue = {
   requestDeposit: (requestId: string, amount: number) => Promise<{ error?: string }>;
   cancelDepositRequest: (requestId: string) => Promise<{ error?: string }>;
   fetchJobPayments: (requestId: string) => Promise<JobPayment[]>;
-  fetchCommissionState: (
-    requestIds: string[]
-  ) => Promise<Map<string, { collected: number; balancePaidInApp: boolean }>>;
+  fetchPaymentsFor: (requestIds: string[]) => Promise<Map<string, JobPayment[]>>;
+  openPayoutsDashboard: () => Promise<{ error?: string }>;
   payForJob: (requestId: string, kind: 'deposit' | 'final') => Promise<{ error?: string; cancelled?: boolean }>;
   refundJobPayment: (paymentId: string) => Promise<{ error?: string }>;
   myListings: CompanyProfile[];
@@ -1103,26 +1102,41 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
    * Chunked for the same reason as the contacts lookup: the id list travels in
    * the query string.
    */
-  const fetchCommissionState = useCallback(
-    async (requestIds: string[]): Promise<Map<string, { collected: number; balancePaidInApp: boolean }>> => {
-      const state = new Map<string, { collected: number; balancePaidInApp: boolean }>();
-      for (let i = 0; i < requestIds.length; i += 200) {
-        const { data } = await supabase
-          .from('job_payments')
-          .select('request_id, kind, commission')
-          .eq('status', 'paid')
-          .in('request_id', requestIds.slice(i, i + 200));
-        (data ?? []).forEach((row: any) => {
-          const current = state.get(row.request_id) ?? { collected: 0, balancePaidInApp: false };
-          current.collected += Number(row.commission ?? 0);
-          if (row.kind === 'final') current.balancePaidInApp = true;
-          state.set(row.request_id, current);
-        });
-      }
-      return state;
-    },
-    []
-  );
+  /**
+   * Every payment across a set of jobs, grouped by job.
+   *
+   * The earnings screen needs whole rows, not a summary: what the customer
+   * paid, what RockServ took, and therefore what the business actually
+   * received — which is the number they care about and the one no single
+   * column holds.
+   *
+   * Chunked for the same reason as the contacts lookup: the id list travels in
+   * the query string.
+   */
+  const fetchPaymentsFor = useCallback(async (requestIds: string[]): Promise<Map<string, JobPayment[]>> => {
+    const byRequest = new Map<string, JobPayment[]>();
+    for (let i = 0; i < requestIds.length; i += 200) {
+      const { data } = await supabase
+        .from('job_payments')
+        .select('id, request_id, kind, amount, commission, status, created_at, paid_at, refunded_at')
+        .in('request_id', requestIds.slice(i, i + 200));
+      (data ?? []).forEach((row: any) => {
+        const payment: JobPayment = {
+          id: row.id,
+          requestId: row.request_id,
+          kind: row.kind,
+          amount: Number(row.amount),
+          commission: Number(row.commission),
+          status: row.status,
+          createdAt: row.created_at,
+          paidAt: row.paid_at ?? undefined,
+          refundedAt: row.refunded_at ?? undefined,
+        };
+        byRequest.set(row.request_id, [...(byRequest.get(row.request_id) ?? []), payment]);
+      });
+    }
+    return byRequest;
+  }, []);
 
   const fetchJobPayments = useCallback(async (requestId: string): Promise<JobPayment[]> => {
     const { data, error } = await supabase
@@ -1186,6 +1200,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     },
     [initPaymentSheet, presentPaymentSheet, refreshRequests]
   );
+
+  // Stripe's own dashboard, for the things only Stripe knows: when a payout
+  // landed, what the schedule is, why one is held. The link is single-use, so
+  // it is minted on the tap rather than kept.
+  const openPayoutsDashboard = useCallback(async (): Promise<{ error?: string }> => {
+    const { data, error } = await supabase.functions.invoke<{ url: string }>('connect-dashboard-link');
+    if (error) return { error: await edgeFunctionError(error, 'Could not open your Stripe dashboard.') };
+    if (!data?.url) return { error: 'Could not open your Stripe dashboard.' };
+    await Linking.openURL(data.url);
+    return {};
+  }, []);
 
   const refundJobPayment = useCallback(async (paymentId: string): Promise<{ error?: string }> => {
     const { error } = await supabase.functions.invoke('refund-job-payment', { body: { paymentId } });
@@ -2326,7 +2351,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       requestDeposit,
       cancelDepositRequest,
       fetchJobPayments,
-      fetchCommissionState,
+      fetchPaymentsFor,
+      openPayoutsDashboard,
       payForJob,
       refundJobPayment,
       myListings,
@@ -2441,7 +2467,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       requestDeposit,
       cancelDepositRequest,
       fetchJobPayments,
-      fetchCommissionState,
+      fetchPaymentsFor,
+      openPayoutsDashboard,
       payForJob,
       refundJobPayment,
       myListings,
