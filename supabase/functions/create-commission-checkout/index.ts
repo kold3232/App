@@ -2,6 +2,11 @@
 // owed platform commission (10% on jobs <= £500, 5% above, tracked per
 // completed job in service_requests.commission).
 //
+// This is the fallback route, not the main one. A job the customer pays for in
+// the app has its commission taken out of that payment and never appears here.
+// What is left are jobs settled outside RockServ — cash, bank transfer — where
+// the only way to collect is still to invoice the business afterwards.
+//
 // The set of jobs a payment covers is snapshotted into commission_payments /
 // commission_payment_items *before* Stripe is called, so a job that
 // completes mid-checkout can never be swept into this payment by mistake.
@@ -82,8 +87,36 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: 'Could not load commission owed.' }, 500);
     }
 
-    const owed = owedRows ?? [];
-    const amount = owed.reduce((sum, r) => sum + Number(r.commission ?? 0), 0);
+    const candidates = owedRows ?? [];
+
+    // Some of these jobs have already handed over part of their commission
+    // through the app. A customer who pays the deposit in RockServ and then
+    // settles the balance in cash leaves the job unpaid overall — but the
+    // deposit's share of the commission was taken at the time, and billing the
+    // whole amount again would charge the business twice for it.
+    const collected = new Map<string, number>();
+    for (let i = 0; i < candidates.length; i += 200) {
+      const { data: paidRows } = await admin
+        .from('job_payments')
+        .select('request_id, commission')
+        .eq('status', 'paid')
+        .in(
+          'request_id',
+          candidates.slice(i, i + 200).map((r) => r.id)
+        );
+      (paidRows ?? []).forEach((row) => {
+        collected.set(row.request_id, (collected.get(row.request_id) ?? 0) + Number(row.commission ?? 0));
+      });
+    }
+
+    const owed = candidates
+      .map((r) => ({
+        id: r.id,
+        remaining: Math.max(0, Math.round((Number(r.commission ?? 0) - (collected.get(r.id) ?? 0)) * 100) / 100),
+      }))
+      .filter((r) => r.remaining > 0);
+
+    const amount = owed.reduce((sum, r) => sum + r.remaining, 0);
     if (owed.length === 0 || amount <= 0) {
       return jsonResponse({ error: 'No commission owed.' }, 400);
     }

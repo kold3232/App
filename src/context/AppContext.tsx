@@ -145,6 +145,9 @@ type AppContextValue = {
   requestDeposit: (requestId: string, amount: number) => Promise<{ error?: string }>;
   cancelDepositRequest: (requestId: string) => Promise<{ error?: string }>;
   fetchJobPayments: (requestId: string) => Promise<JobPayment[]>;
+  fetchCommissionState: (
+    requestIds: string[]
+  ) => Promise<Map<string, { collected: number; balancePaidInApp: boolean }>>;
   payForJob: (requestId: string, kind: 'deposit' | 'final') => Promise<{ error?: string; cancelled?: boolean }>;
   refundJobPayment: (paymentId: string) => Promise<{ error?: string }>;
   myListings: CompanyProfile[];
@@ -1096,6 +1099,41 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     );
     return {};
   }, []);
+
+  /**
+   * How much commission each of these jobs has already handed over through the
+   * app, and whether the balance itself was paid there.
+   *
+   * Two different questions, one query, because the invoices screen needs both.
+   * Whether the balance was paid in RockServ decides what the job is labelled.
+   * How much commission was collected decides what is still owed — and those
+   * come apart when a customer pays the deposit in the app and then settles the
+   * rest in cash. That job's commission is part paid, and billing the whole of
+   * it again would charge the business twice for the same deposit.
+   *
+   * Chunked for the same reason as the contacts lookup: the id list travels in
+   * the query string.
+   */
+  const fetchCommissionState = useCallback(
+    async (requestIds: string[]): Promise<Map<string, { collected: number; balancePaidInApp: boolean }>> => {
+      const state = new Map<string, { collected: number; balancePaidInApp: boolean }>();
+      for (let i = 0; i < requestIds.length; i += 200) {
+        const { data } = await supabase
+          .from('job_payments')
+          .select('request_id, kind, commission')
+          .eq('status', 'paid')
+          .in('request_id', requestIds.slice(i, i + 200));
+        (data ?? []).forEach((row: any) => {
+          const current = state.get(row.request_id) ?? { collected: 0, balancePaidInApp: false };
+          current.collected += Number(row.commission ?? 0);
+          if (row.kind === 'final') current.balancePaidInApp = true;
+          state.set(row.request_id, current);
+        });
+      }
+      return state;
+    },
+    []
+  );
 
   const fetchJobPayments = useCallback(async (requestId: string): Promise<JobPayment[]> => {
     const { data, error } = await supabase
@@ -2300,6 +2338,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       requestDeposit,
       cancelDepositRequest,
       fetchJobPayments,
+      fetchCommissionState,
       payForJob,
       refundJobPayment,
       myListings,
@@ -2415,6 +2454,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       requestDeposit,
       cancelDepositRequest,
       fetchJobPayments,
+      fetchCommissionState,
       payForJob,
       refundJobPayment,
       myListings,
