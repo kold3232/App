@@ -5,13 +5,24 @@ import { Button, Card, Chip, EmptyState, StatusBadge } from '../../components/ui
 import { Screen } from '../../components/Screen';
 import { Calendar } from '../../components/Calendar';
 import { ChatModal } from '../../components/ChatModal';
+import { LockedForPaymentSetup, PaymentSetupBanner } from '../../components/PaymentSetupGate';
 import { useApp } from '../../context/AppContext';
-import { RequestStatus } from '../../types';
+import { RequestStatus, ServiceRequest } from '../../types';
 import { colors, radius, spacing } from '../../theme';
 import { notify } from '../../utils/alert';
 import { callNumber, googleMapsUrl, openInMaps } from '../../utils/maps';
 
 const SCHEDULE_TIMES = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'];
+
+/**
+ * A deposit is money taken before the work starts, so until it lands the work
+ * does not start. Asking for one and then cracking on anyway would make it
+ * meaningless — and would leave the business exposed on exactly the jobs where
+ * they felt they needed protecting.
+ */
+function awaitingDeposit(r: ServiceRequest): boolean {
+  return !!r.depositAmount && r.depositAmount > 0 && !r.depositPaidAt && r.status !== 'completed';
+}
 
 const FILTERS: { id: RequestStatus | 'all'; label: string }[] = [
   { id: 'all', label: 'All' },
@@ -144,6 +155,7 @@ export default function DashboardScreen() {
                 <Chip key={f.id} label={f.label} selected={filter === f.id} onPress={() => setFilter(f.id)} />
               ))}
             </View>
+            <PaymentSetupBanner />
           </View>
         }
         ListEmptyComponent={
@@ -151,6 +163,7 @@ export default function DashboardScreen() {
         }
         ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
         renderItem={({ item }) => (
+          <LockedForPaymentSetup>
           <Card>
             <View style={styles.row}>
               <Text style={styles.customerName}>
@@ -198,6 +211,15 @@ export default function DashboardScreen() {
             )}
             <Text style={styles.date}>{new Date(item.createdAt).toLocaleString()}</Text>
 
+            {awaitingDeposit(item) && (
+              <View style={styles.awaitingDeposit}>
+                <Text style={styles.awaitingDepositText}>
+                  Waiting for the £{(item.depositAmount ?? 0).toFixed(2)} deposit. The job can't be booked in or
+                  started until the customer pays it — nudge them in the chat.
+                </Text>
+              </View>
+            )}
+
             {item.status === 'pending' && (
               <View style={styles.actions}>
                 <View style={{ flex: 1 }}>
@@ -209,7 +231,7 @@ export default function DashboardScreen() {
               </View>
             )}
             {/* Putting a date on the job is what lands it in the calendar. */}
-            {item.status === 'accepted' && (
+            {item.status === 'accepted' && !awaitingDeposit(item) && (
               <View style={styles.assignBox}>
                 {schedulingId === item.id ? (
                   <View>
@@ -406,7 +428,9 @@ export default function DashboardScreen() {
             {item.status === 'completed' && item.jobValue != null && (
               <View style={styles.completedSummary}>
                 <Text style={styles.completedText}>Job value £{item.jobValue.toFixed(2)}</Text>
-                <Text style={styles.completedText}>Commission £{(item.commission ?? 0).toFixed(2)}</Text>
+                <Text style={styles.completedText}>
+                  You receive £{(item.jobValue - (item.commission ?? 0)).toFixed(2)}
+                </Text>
               </View>
             )}
             {item.status === 'completed' && (
@@ -420,6 +444,7 @@ export default function DashboardScreen() {
               </View>
             )}
           </Card>
+          </LockedForPaymentSetup>
         )}
       />
       {chatRequest && (
@@ -435,6 +460,13 @@ export default function DashboardScreen() {
 }
 
 const styles = StyleSheet.create({
+  awaitingDeposit: {
+    backgroundColor: colors.pendingBg,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginTop: spacing.md,
+  },
+  awaitingDepositText: { fontSize: 12.5, color: colors.pending, lineHeight: 18, fontWeight: '600' },
   container: { flex: 1, backgroundColor: colors.surfaceAlt },
   list: { padding: spacing.lg, paddingBottom: spacing.xl * 2, flexGrow: 1 },
   title: { fontSize: 22, fontWeight: '800', color: colors.text, letterSpacing: 0.1 },

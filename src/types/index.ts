@@ -137,6 +137,9 @@ export type ServiceRequest = {
   // separate thing — see JobPayment.
   depositAmount?: number;
   depositRequestedAt?: string;
+  // Set by the payment webhook, never by either party. While a deposit has
+  // been asked for and this is empty, the job is waiting and cannot start.
+  depositPaidAt?: string;
 };
 
 // A customer's payment on a job. At most one of each kind: the deposit a

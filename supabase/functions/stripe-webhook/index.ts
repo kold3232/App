@@ -111,9 +111,17 @@ async function markJobPaymentPaid(intent: Stripe.PaymentIntent) {
 
   // The balance being paid settles the platform's commission on that job too:
   // it was taken as an application fee out of this very charge, so there is
-  // nothing left to invoice the business for.
+  // nothing left to collect.
   if (payment.kind === 'final') {
     await admin.from('service_requests').update({ commission_paid: true }).eq('id', payment.request_id);
+  }
+  // A paid deposit unblocks the work. Recorded on the job so every screen that
+  // has to decide whether it can proceed can read it without a second query.
+  if (payment.kind === 'deposit') {
+    await admin
+      .from('service_requests')
+      .update({ deposit_paid_at: new Date().toISOString() })
+      .eq('id', payment.request_id);
   }
 }
 
@@ -146,6 +154,10 @@ async function markJobPaymentRefunded(charge: Stripe.Charge) {
   // The commission went back with it, so the job owes it again.
   if (payment.kind === 'final') {
     await admin.from('service_requests').update({ commission_paid: false }).eq('id', payment.request_id);
+  }
+  // A refunded deposit is an unpaid deposit: the work is blocked again.
+  if (payment.kind === 'deposit') {
+    await admin.from('service_requests').update({ deposit_paid_at: null }).eq('id', payment.request_id);
   }
 }
 

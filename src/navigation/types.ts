@@ -17,7 +17,6 @@ export type CustomerTabParamList = {
 export type CompanyTabParamList = {
   Dashboard: undefined;
   Calendar: undefined;
-  Invoices: undefined;
   MyListing: undefined;
   Settings: undefined;
 };

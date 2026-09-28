@@ -135,7 +135,6 @@ type AppContextValue = {
   updateRequestStatus: (id: string, status: ServiceRequest['status']) => Promise<void>;
   completeRequest: (id: string, jobValue: number) => Promise<void>;
   confirmCompletion: (id: string) => Promise<void>;
-  payCommission: () => Promise<{ error?: string }>;
   // In-app payment (Stripe Connect). The business onboards once; after that
   // customers pay through the app and RockServ's commission comes out of the
   // payment rather than being invoiced afterwards.
@@ -638,6 +637,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       employeeDoneAt: row.employee_done_at ?? undefined,
       depositAmount: row.deposit_amount ?? undefined,
       depositRequestedAt: row.deposit_requested_at ?? undefined,
+      depositPaidAt: row.deposit_paid_at ?? undefined,
     }),
     []
   );
@@ -1017,17 +1017,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const confirmCompletion = useCallback(async (id: string) => {
     const { error } = await supabase.from('service_requests').update({ customer_confirmed: true }).eq('id', id);
     if (!error) setRequests((prev) => prev.map((r) => (r.id === id ? { ...r, customerConfirmed: true } : r)));
-  }, []);
-
-  // Opens a Stripe Checkout page for the business's currently-owed commission.
-  // The edge function snapshots which jobs the payment covers; the webhook
-  // (not this call) is what actually marks them paid once Stripe confirms it.
-  const payCommission = useCallback(async (): Promise<{ error?: string }> => {
-    const { data, error } = await supabase.functions.invoke<{ url: string }>('create-commission-checkout');
-    if (error) return { error: await edgeFunctionError(error, 'Could not start checkout.') };
-    if (!data?.url) return { error: 'Could not start checkout.' };
-    await Linking.openURL(data.url);
-    return {};
   }, []);
 
   // --- In-app payment (Stripe Connect) --------------------------------------
@@ -2331,7 +2320,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       updateRequestStatus,
       completeRequest,
       confirmCompletion,
-      payCommission,
       paymentAccount,
       startPaymentSetup,
       refreshPaymentAccount,
@@ -2447,7 +2435,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       updateRequestStatus,
       completeRequest,
       confirmCompletion,
-      payCommission,
       paymentAccount,
       startPaymentSetup,
       refreshPaymentAccount,

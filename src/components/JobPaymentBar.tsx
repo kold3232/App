@@ -135,8 +135,8 @@ export function JobPaymentBar({
             <Row
               icon="shield-outline"
               tone="info"
-              label={`${money(depositDue)} deposit requested`}
-              detail={`Secures the booking. It comes off the ${money(total)} total — you are not paying extra.`}
+              label={`${money(depositDue)} deposit required`}
+              detail={`The job can't be booked in until this is paid. It comes off the ${money(total)} total — you are not paying extra.`}
             />
             <Button
               title={busy ? 'Opening…' : `Pay ${money(depositDue)} deposit`}
@@ -155,7 +155,7 @@ export function JobPaymentBar({
               detail={
                 paidDeposit
                   ? `${money(total)} total, less the ${money(paidDeposit.amount)} deposit you have already paid.`
-                  : undefined
+                  : 'Payment is made here in RockServ.'
               }
             />
             <Button
@@ -216,8 +216,8 @@ export function JobPaymentBar({
           <Row
             icon="hourglass-outline"
             tone="info"
-            label={`${money(depositDue)} deposit requested`}
-            detail="Waiting for the customer to pay it."
+            label={`${money(depositDue)} deposit required`}
+            detail="The job is on hold until the customer pays it."
           />
           <Pressable onPress={() => cancelDepositRequest(request.id)} disabled={busy} hitSlop={8}>
             <Text style={styles.refundLink}>Cancel</Text>

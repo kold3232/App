@@ -2190,3 +2190,27 @@ drop trigger if exists service_requests_validate_deposit on public.service_reque
 create trigger service_requests_validate_deposit
   before insert or update of deposit_amount on public.service_requests
   for each row execute function public.check_deposit_amount();
+
+-- RockServ — in-app payment is the only payment
+-- A deposit exists to be paid before work starts, so every screen that decides
+-- whether a job can proceed needs to know whether it has been. Deriving that
+-- from job_payments meant a second query everywhere it was asked, so the job
+-- carries the answer itself. Written only by the webhook, which is the only
+-- thing that knows a payment actually succeeded.
+alter table public.service_requests add column if not exists deposit_paid_at timestamptz;
+
+-- Neither side may set it. A business that could would be marking itself paid;
+-- a customer that could would be skipping the deposit altogether.
+create or replace function public.enforce_deposit_paid_at()
+returns trigger language plpgsql as $$
+begin
+  if auth.uid() is not null and new.deposit_paid_at is distinct from old.deposit_paid_at then
+    new.deposit_paid_at := old.deposit_paid_at;
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists service_requests_deposit_paid_readonly on public.service_requests;
+create trigger service_requests_deposit_paid_readonly
+  before update on public.service_requests
+  for each row execute function public.enforce_deposit_paid_at();
