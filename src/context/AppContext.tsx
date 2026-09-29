@@ -1500,9 +1500,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         // Already logged in (e.g. as a business) — add a customer profile to the same account.
         const userId = existing.session.user.id;
         const sessionEmail = existing.session.user.email ?? email;
+        // Upsert, not insert. This screen is reachable when the account has a
+        // customer row that simply is not loaded — a half-finished signup, a
+        // confirmation email opened later — and inserting again failed with a
+        // duplicate key error that told the person nothing they could act on.
+        // The row is keyed by their own id and RLS confines them to it, so the
+        // worst an upsert can do is overwrite their own details with the ones
+        // they just typed.
         const { error: insertError } = await supabase
           .from('customers')
-          .insert({ id: userId, email: sessionEmail, ...profile });
+          .upsert({ id: userId, email: sessionEmail, ...profile });
         if (insertError) return { error: insertError.message };
         setCustomerProfile({ id: userId, email: sessionEmail, ...profile });
         return {};
@@ -1517,7 +1524,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
       const { error: insertError } = await supabase
         .from('customers')
-        .insert({ id: data.session.user.id, email, ...profile });
+        .upsert({ id: data.session.user.id, email, ...profile });
       if (insertError) return { error: insertError.message };
       setCustomerProfile({ id: data.session.user.id, email, ...profile });
       return {};
@@ -1571,9 +1578,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         userId = data.session.user.id;
         sessionEmail = email;
       }
+      // Upsert for the same reason as the customer side. Only these four
+      // columns are written, so a repeat leaves approval status and the Stripe
+      // account untouched.
       const { error: insertError } = await supabase
         .from('businesses')
-        .insert({ id: userId, email: sessionEmail, name: account.name, phone: account.phone });
+        .upsert({ id: userId, email: sessionEmail, name: account.name, phone: account.phone });
       if (insertError) return { error: insertError.message };
       sendPushForEvent(null, 'business_applied');
       await fetchBusinessAccount(userId);
