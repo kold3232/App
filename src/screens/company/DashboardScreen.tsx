@@ -44,6 +44,7 @@ export default function DashboardScreen() {
     refreshEmployees,
     assignRequestToEmployee,
     setRequestSchedule,
+    refreshPaymentAccount,
   } = useApp();
   const [filter, setFilter] = useState<RequestStatus | 'all'>('all');
   const [refreshing, setRefreshing] = useState(false);
@@ -52,7 +53,12 @@ export default function DashboardScreen() {
     useCallback(() => {
       refreshRequests();
       refreshEmployees();
-    }, [refreshRequests, refreshEmployees])
+      // The lock banner lives on this screen, but the answer it depends on was
+      // only ever refreshed by the Payments screen. A business finishing Stripe
+      // setup came back here and was still told it could not work, until
+      // something happened to remount the app. Ask again on the way in.
+      refreshPaymentAccount();
+    }, [refreshRequests, refreshEmployees, refreshPaymentAccount])
   );
   const [completingId, setCompletingId] = useState<string | null>(null);
   const [jobValueInput, setJobValueInput] = useState('');
