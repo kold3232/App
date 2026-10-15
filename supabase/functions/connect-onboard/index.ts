@@ -10,6 +10,10 @@
 // comes back to finish or to fix something Stripe has asked for. Both cases
 // are the same call: an account link is single-use and short-lived, so a
 // fresh one is minted every time.
+//
+// Accounts are created through the Accounts v2 API; everything after that —
+// the onboarding link, the status check, the charges — uses v1 endpoints,
+// which accept a v2 account id.
 import Stripe from 'https://esm.sh/stripe@17.7.0?target=deno';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
@@ -24,6 +28,68 @@ function jsonResponse(body: unknown, status: number) {
     status,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
+}
+
+// Stripe refuses to create Accounts v1 for platforms that did not already use
+// them, and the compatibility switch that lets you opt back in exists only in
+// test mode — so live accounts have to be made through /v2/core/accounts.
+//
+// Called directly rather than through the SDK: the pinned client predates this
+// endpoint, and the rest of this codebase talks to v1 endpoints that the SDK
+// handles well. A v2 account id works on those v1 endpoints — Stripe returns a
+// v1-shaped response and applies updates to the v2 object underneath — which is
+// why only account creation changes here and the account link, the status check
+// and the charges themselves are untouched.
+const ACCOUNTS_V2_API_VERSION = '2026-08-26.dahlia';
+
+async function createConnectedAccount(opts: {
+  businessId: string;
+  name?: string;
+  email?: string;
+}): Promise<string> {
+  const response = await fetch('https://api.stripe.com/v2/core/accounts', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${Deno.env.get('STRIPE_SECRET_KEY') ?? ''}`,
+      'Stripe-Version': ACCOUNTS_V2_API_VERSION,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      contact_email: opts.email,
+      display_name: opts.name,
+      // The Express dashboard is what a tradesperson uses to see their own
+      // payouts. Stripe requires that choosing it puts both the fees and the
+      // losses on the platform, which is the arrangement RockServ already
+      // operates under.
+      dashboard: 'express',
+      // Entity type is left out on purpose. A sole trader and a limited
+      // company need different details, and only the person signing up knows
+      // which they are — Stripe asks them during onboarding.
+      identity: { country: 'gi' },
+      configuration: {
+        // merchant lets the account be paid; recipient lets money be
+        // transferred to it, which is what a destination charge does.
+        merchant: { capabilities: { card_payments: { requested: true } } },
+        recipient: { capabilities: { stripe_balance: { stripe_transfers: { requested: true } } } },
+      },
+      defaults: {
+        currency: 'gbp',
+        responsibilities: { fees_collector: 'application', losses_collector: 'application' },
+      },
+      metadata: { rockserv_business_id: opts.businessId },
+    }),
+  });
+
+  const body = await response.json().catch(() => null);
+  if (!response.ok || !body?.id) {
+    // Stripe's message names the actual problem — an unsupported country, a
+    // configuration it will not allow, a platform not yet activated — and all
+    // of those need a person to go and fix something.
+    const message = body?.error?.message ?? `Stripe refused to create the account (${response.status}).`;
+    console.error('createConnectedAccount failed', response.status, body);
+    throw new Error(message);
+  }
+  return body.id as string;
 }
 
 Deno.serve(async (req) => {
@@ -65,23 +131,26 @@ Deno.serve(async (req) => {
 
     let accountId = business.stripe_account_id as string | null;
 
+    // A stored id is only worth reusing if Stripe still knows about it. Test
+    // and live mode hold entirely separate accounts, so every id saved while
+    // testing is meaningless once live keys are in use — and reusing one would
+    // fail on the account link with an error about a missing account rather
+    // than anything a business could act on. Treat an unknown id as no id.
+    if (accountId) {
+      try {
+        await stripe.accounts.retrieve(accountId);
+      } catch {
+        console.warn('Stored stripe_account_id not found on this key, creating a fresh account', accountId);
+        accountId = null;
+      }
+    }
+
     if (!accountId) {
-      const account = await stripe.accounts.create({
-        type: 'express',
-        country: 'GI',
+      accountId = await createConnectedAccount({
+        businessId,
+        name: business.name ?? undefined,
         email: business.email ?? undefined,
-        business_profile: {
-          name: business.name ?? undefined,
-          // Gibraltar trades, described the way Stripe's risk review expects.
-          product_description: 'Home and trade services booked through the RockServ marketplace.',
-        },
-        capabilities: {
-          card_payments: { requested: true },
-          transfers: { requested: true },
-        },
-        metadata: { rockserv_business_id: businessId },
       });
-      accountId = account.id;
 
       // Saved before the account link is minted. If this write fails we would
       // otherwise create a fresh Stripe account on every attempt and leave a
