@@ -7,6 +7,7 @@ import { useApp } from '../../context/AppContext';
 import { BrowseStackParamList } from '../../navigation/types';
 import { Company } from '../../types';
 import { colors, radius, shadow, spacing } from '../../theme';
+import { describeReplySpeed } from '../../utils/waiting';
 
 type Props = NativeStackScreenProps<BrowseStackParamList, 'CompanyList'>;
 
@@ -16,9 +17,16 @@ type PriceFilter = 'any' | Company['priceRange'];
 const PRICE_FILTERS: PriceFilter[] = ['any', '£', '££', '£££'];
 
 export default function CompanyListScreen({ route, navigation }: Props) {
-  const { categories, businessListings } = useApp();
+  const { categories, businessListings, requests } = useApp();
   const category = categories.find((c) => c.id === route.params.categoryId);
-  const allCompanies = businessListings.filter((c) => c.categoryIds.includes(route.params.categoryId));
+  const prefillFromRequestId = route.params.prefillFromRequestId;
+  // Arriving here from a request that went unanswered. The business that did
+  // not answer is left out of the list — offering them again would be a poor
+  // joke.
+  const unanswered = prefillFromRequestId ? requests.find((r) => r.id === prefillFromRequestId) : undefined;
+  const allCompanies = businessListings.filter(
+    (c) => c.categoryIds.includes(route.params.categoryId) && c.id !== unanswered?.companyId
+  );
 
   const [query, setQuery] = useState('');
   const [priceFilter, setPriceFilter] = useState<PriceFilter>('any');
@@ -54,6 +62,16 @@ export default function CompanyListScreen({ route, navigation }: Props) {
               <Text style={styles.title}>{category?.name}</Text>
             </View>
             <Text style={styles.subtitle}>{allCompanies.length} companies in Gibraltar</Text>
+
+            {unanswered && (
+              <View style={styles.resendNote}>
+                <Ionicons name="repeat-outline" size={15} color={colors.primary} />
+                <Text style={styles.resendNoteText}>
+                  Sending the same job to someone else. {unanswered.companyName} is left out, and your original
+                  request stays open.
+                </Text>
+              </View>
+            )}
 
             <TextInput
               style={styles.search}
@@ -96,7 +114,9 @@ export default function CompanyListScreen({ route, navigation }: Props) {
         }
         ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
         renderItem={({ item }) => (
-          <Pressable onPress={() => navigation.navigate('CompanyDetail', { companyId: item.id })}>
+          <Pressable
+            onPress={() => navigation.navigate('CompanyDetail', { companyId: item.id, prefillFromRequestId })}
+          >
             {({ pressed }) => (
               <Card style={pressed && styles.cardPressed}>
                 <View style={styles.row}>
@@ -119,6 +139,14 @@ export default function CompanyListScreen({ route, navigation }: Props) {
                       <Text style={styles.dot}>·</Text>
                       <Text style={styles.years}>{item.yearsActive > 0 ? `${item.yearsActive} yrs` : 'New'}</Text>
                     </View>
+                    {/* Only shown once there are enough replies behind it to
+                        be a habit rather than a coincidence. */}
+                    {item.medianReplyMinutes != null && (
+                      <View style={styles.replyRow}>
+                        <Ionicons name="flash-outline" size={12} color={colors.success} />
+                        <Text style={styles.replyText}>{describeReplySpeed(item.medianReplyMinutes)}</Text>
+                      </View>
+                    )}
                   </View>
                 </View>
               </Card>
@@ -137,6 +165,20 @@ const styles = StyleSheet.create({
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   title: { fontSize: 22, fontWeight: '800', color: colors.text },
   subtitle: { fontSize: 13, color: colors.textMuted, marginTop: 2 },
+  resendNote: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginTop: spacing.md,
+  },
+  resendNoteText: { flex: 1, fontSize: 12.5, color: colors.textMuted, lineHeight: 18 },
+  replyRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
+  replyText: { fontSize: 11.5, color: colors.success, fontWeight: '700' },
   search: {
     backgroundColor: colors.surface,
     borderWidth: 1.5,

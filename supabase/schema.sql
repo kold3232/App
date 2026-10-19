@@ -2268,3 +2268,135 @@ $$;
 
 revoke all on function public.access_code_required(text) from public;
 grant execute on function public.access_code_required(text) to anon, authenticated;
+
+-- RockServ — nothing goes silent
+-- A request sat at 'pending' forever if the business never opened the app, and
+-- the customer had no way to tell a busy tradesman from an abandoned account.
+-- Silence is the worst outcome in the app: a decline at least lets someone move
+-- on, and because the request went through RockServ, the silence reads as ours.
+--
+-- Two halves. The business gets nudged after a day. The customer gets told how
+-- long it has been and offered a way out — never an automatic one, because only
+-- they know whether this is a burst pipe or a conservatory quote.
+alter table public.service_requests
+  -- The first time the business said anything at all: accepted, declined,
+  -- quoted, or sent a chat message. The clock stops here and is never
+  -- restarted, so a long job is not penalised for being long.
+  add column if not exists first_business_reply_at timestamptz,
+  -- So the nudge goes out once rather than every time the job runs.
+  add column if not exists reply_nudged_at timestamptz;
+
+-- The nudge job asks exactly one question: which pending requests have had no
+-- reply. Worth an index, because it will ask every hour forever.
+create index if not exists service_requests_awaiting_reply_idx
+  on public.service_requests (created_at)
+  where status = 'pending' and first_business_reply_at is null;
+
+-- Neither party may write these. A business that could set its own reply time
+-- would be able to look responsive without replying, and the response figure
+-- customers see is built from this column.
+--
+-- Must sort after service_requests_field_ownership: that trigger reverts a
+-- status change the caller was not allowed to make, and stamping a reply from
+-- a change that is about to be thrown away would record a reply that never
+-- happened. BEFORE triggers fire in alphabetical order, and 'reply_tracking'
+-- follows 'field_ownership'.
+create or replace function public.enforce_reply_tracking()
+returns trigger language plpgsql as $$
+begin
+  -- pg_trigger_depth() is 1 for a direct update and 2 when this runs from
+  -- inside the chat_messages trigger below, which is the one path allowed to
+  -- stamp a reply on someone's behalf.
+  if auth.uid() is not null and pg_trigger_depth() <= 1 then
+    new.first_business_reply_at := old.first_business_reply_at;
+    new.reply_nudged_at := old.reply_nudged_at;
+  end if;
+
+  -- Accepting, declining or putting a number on it is a reply.
+  if new.first_business_reply_at is null
+     and (
+       (old.status = 'pending' and new.status is distinct from old.status)
+       or (new.quoted_amount is not null and old.quoted_amount is null)
+     ) then
+    new.first_business_reply_at := now();
+  end if;
+
+  return new;
+end $$;
+
+drop trigger if exists service_requests_reply_tracking on public.service_requests;
+create trigger service_requests_reply_tracking
+  before update on public.service_requests
+  for each row execute function public.enforce_reply_tracking();
+
+-- Saying something in the chat is a reply too — arguably the most useful kind,
+-- since "I'll come and look on Thursday" is what a customer actually wants.
+create or replace function public.stamp_reply_from_message()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.sender = 'business' then
+    update public.service_requests
+       set first_business_reply_at = now()
+     where id = new.request_id
+       and first_business_reply_at is null;
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists chat_messages_stamp_reply on public.chat_messages;
+create trigger chat_messages_stamp_reply
+  after insert on public.chat_messages
+  for each row execute function public.stamp_reply_from_message();
+
+-- A new request has not been replied to and has not been nudged, whatever the
+-- client sends. Replaces the version above with those two lines added.
+create or replace function public.reset_service_request_progress()
+returns trigger language plpgsql as $$
+begin
+  new.quoted_amount := null;
+  new.quote_accepted := false;
+  new.quote_accepted_at := null;
+  new.customer_confirmed := false;
+  new.job_value := null;
+  new.commission := null;
+  new.commission_paid := false;
+  new.first_business_reply_at := null;
+  new.reply_nudged_at := null;
+  return new;
+end $$;
+
+-- How quickly each listing answers, for the line customers see before they
+-- choose. Security definer because working it out means reading every
+-- business's requests, which no customer may do — only the aggregate comes
+-- back, never a row.
+--
+-- Three replies minimum: a median of one job is not a habit, and labelling a
+-- business off a sample of one is worse than saying nothing. Ninety days so a
+-- business that was quick last year cannot coast on it.
+create or replace function public.listing_response_times()
+returns table (listing_id uuid, median_reply_minutes numeric, sample_count bigint)
+language sql
+security definer
+set search_path = public
+as $$
+  select r.listing_id,
+         round(
+           (percentile_cont(0.5) within group (
+             order by extract(epoch from (r.first_business_reply_at - r.created_at)) / 60.0
+           ))::numeric,
+           0
+         ) as median_reply_minutes,
+         count(*) as sample_count
+    from public.service_requests r
+   where r.first_business_reply_at is not null
+     and r.created_at > now() - interval '90 days'
+   group by r.listing_id
+  having count(*) >= 3
+$$;
+
+revoke all on function public.listing_response_times() from public;
+grant execute on function public.listing_response_times() to anon, authenticated;

@@ -61,6 +61,11 @@ export type Company = {
   bookingStartMinute?: number;
   bookingEndMinute?: number;
   bookingSlotMinutes?: number;
+  // How long this listing usually takes to answer a request, in minutes, and
+  // how many jobs that median is drawn from. Both absent until there are
+  // enough replies to be worth showing — a median of one job is not a habit.
+  medianReplyMinutes?: number;
+  replySampleCount?: number;
   // Admin-curated position; higher sorts first, ties fall back to rating.
   displayPriority: number;
 };
@@ -123,6 +128,10 @@ export type ServiceRequest = {
   // preferredDate (what the customer asked for) and scheduledSlot (the label
   // an instant booking was made against).
   scheduledFor?: string;
+  // The first time the business said anything at all — accepted, declined,
+  // quoted, or just sent a message. Set by the database, never by the app.
+  // Absent on a pending request means nobody has answered yet.
+  firstBusinessReplyAt?: string;
   // Set by the manager when the job is handed to a member of staff.
   assignedEmployeeId?: string;
   assignmentNotes: string;

@@ -13,6 +13,7 @@ import { colors, radius, spacing } from '../../theme';
 import { notify } from '../../utils/alert';
 import { callNumber, googleMapsUrl, openInMaps } from '../../utils/maps';
 import { colorFromId } from '../../utils/color';
+import { hoursSince, timeAgo } from '../../utils/waiting';
 
 const SCHEDULE_TIMES = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'];
 
@@ -193,7 +194,17 @@ export default function DashboardScreen() {
         tone: colors.pending,
       };
     }
-    if (r.status === 'pending') return { icon: 'alert-circle-outline', text: 'Needs a reply', tone: colors.pending };
+    // How long it has been waiting, not just that it is waiting. A business
+    // scrolling past "needs a reply" for the fourth day running should be able
+    // to see that is what they are doing.
+    if (r.status === 'pending') {
+      const stale = hoursSince(r.createdAt) >= 24;
+      return {
+        icon: 'alert-circle-outline',
+        text: stale ? `Needs a reply · sent ${timeAgo(r.createdAt)}` : 'Needs a reply',
+        tone: stale ? colors.danger : colors.pending,
+      };
+    }
     if (r.scheduledFor) return { icon: 'calendar-outline', text: when(r.scheduledFor), tone: colors.success };
     if (r.preferredFor) return { icon: 'calendar-outline', text: `Asked for ${when(r.preferredFor)}`, tone: colors.info };
     return { icon: 'time-outline', text: 'No time set', tone: colors.pending };

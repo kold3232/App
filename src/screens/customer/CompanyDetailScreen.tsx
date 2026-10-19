@@ -8,6 +8,7 @@ import { useApp } from '../../context/AppContext';
 import { BrowseStackParamList } from '../../navigation/types';
 import { GalleryImage } from '../../types';
 import { colors, radius, shadow, spacing } from '../../theme';
+import { describeReplySpeed } from '../../utils/waiting';
 
 type Props = NativeStackScreenProps<BrowseStackParamList, 'CompanyDetail'>;
 
@@ -68,6 +69,16 @@ export default function CompanyDetailScreen({ route, navigation }: Props) {
         <Text style={styles.dot}>·</Text>
         <Text style={styles.meta}>{company.yearsActive > 0 ? `${company.yearsActive} years in Gibraltar` : 'New to RockServ'}</Text>
       </View>
+
+      {company.medianReplyMinutes != null && (
+        <View style={styles.replyRow}>
+          <Ionicons name="flash-outline" size={14} color={colors.success} />
+          <Text style={styles.replyText}>
+            {describeReplySpeed(company.medianReplyMinutes)}
+            {company.replySampleCount ? ` · across ${company.replySampleCount} jobs` : ''}
+          </Text>
+        </View>
+      )}
 
       <Card style={{ marginTop: spacing.lg }}>
         <SectionLabel>About</SectionLabel>
@@ -133,7 +144,12 @@ export default function CompanyDetailScreen({ route, navigation }: Props) {
       <Button
         title="Request a quote"
         variant={company.liveBookingEnabled ? 'outline' : 'primary'}
-        onPress={() => navigation.navigate('RequestQuote', { companyId: company.id })}
+        onPress={() =>
+          navigation.navigate('RequestQuote', {
+            companyId: company.id,
+            prefillFromRequestId: route.params.prefillFromRequestId,
+          })
+        }
       />
 
       <Modal visible={viewerIndex !== null} animationType="fade" onRequestClose={() => setViewerIndex(null)}>
@@ -192,6 +208,8 @@ const styles = StyleSheet.create({
   metaRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm, gap: 6 },
   dot: { color: colors.textFaint },
   meta: { fontSize: 13, color: colors.textMuted, fontWeight: '600' },
+  replyRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6 },
+  replyText: { fontSize: 12.5, color: colors.success, fontWeight: '700' },
   description: { fontSize: 14, color: colors.text, marginTop: spacing.sm, lineHeight: 20 },
   serviceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: spacing.sm },
   listItem: { fontSize: 14, color: colors.text, lineHeight: 20, flex: 1, marginRight: spacing.sm },

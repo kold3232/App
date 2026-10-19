@@ -11,6 +11,7 @@ import { CustomerTabParamList } from '../../navigation/types';
 import { JobPayment, ServiceRequest } from '../../types';
 import { colors, radius, spacing } from '../../theme';
 import { colorFromId } from '../../utils/color';
+import { timeAgo, waitedLongEnoughForAlternative } from '../../utils/waiting';
 
 type MyRequestsRouteProp = RouteProp<CustomerTabParamList, 'MyRequests'>;
 type Filter = 'all' | 'active' | 'completed';
@@ -48,6 +49,7 @@ export default function MyRequestsScreen() {
     customerProfile,
     refreshRequests,
     fetchPaymentsFor,
+    categories,
   } = useApp();
   const route = useRoute<MyRequestsRouteProp>();
   const navigation = useNavigation();
@@ -162,6 +164,27 @@ export default function MyRequestsScreen() {
     return null;
   }
 
+  /** Nobody has answered this yet, and the app should say so rather than imply it is normal. */
+  function awaitingReply(r: ServiceRequest): boolean {
+    return r.status === 'pending' && !r.firstBusinessReplyAt;
+  }
+
+  /**
+   * Sends the same job to somebody else.
+   *
+   * Nothing is cancelled on the way out — the original request stays open, in
+   * case the business does come back. Only the customer decides they have
+   * waited long enough, because only they know whether this is a burst pipe or
+   * a conservatory quote.
+   */
+  function tryAnotherBusiness(r: ServiceRequest) {
+    const categoryId = categories.find((c) => c.name === r.categoryName)?.id;
+    (navigation as any).navigate('Browse', {
+      screen: categoryId ? 'CompanyList' : 'CategoryList',
+      params: categoryId ? { categoryId, prefillFromRequestId: r.id } : undefined,
+    });
+  }
+
   /** The one line of status that sits under the business name. */
   function summaryLine(r: ServiceRequest): { icon: keyof typeof Ionicons.glyphMap; text: string; tone: string } {
     if (r.status === 'declined') {
@@ -170,8 +193,18 @@ export default function MyRequestsScreen() {
     if (r.scheduledFor) {
       return { icon: 'calendar-outline', text: shortDateTime(r.scheduledFor), tone: colors.success };
     }
+    // Saying how long it has been is the whole point: a customer cannot tell a
+    // busy tradesman from an abandoned account, and "waiting for a reply" on
+    // its own reads the same on day one as it does on day five.
+    if (awaitingReply(r)) {
+      return {
+        icon: 'hourglass-outline',
+        text: `No reply yet · sent ${timeAgo(r.createdAt)}`,
+        tone: waitedLongEnoughForAlternative(r.createdAt) ? colors.danger : colors.pending,
+      };
+    }
     if (r.status === 'pending') {
-      return { icon: 'hourglass-outline', text: 'Waiting for a reply', tone: colors.pending };
+      return { icon: 'chatbubble-ellipses-outline', text: 'They have replied in the chat', tone: colors.info };
     }
     return { icon: 'hourglass-outline', text: 'Waiting for a time', tone: colors.pending };
   }
@@ -316,6 +349,20 @@ export default function MyRequestsScreen() {
                       />
                     </View>
                   )}
+                </View>
+              )}
+
+              {/* The way out, once the silence has gone on long enough to be
+                  worth naming. A link rather than a button: taking it is the
+                  customer's call, not the app's suggestion. */}
+              {awaitingReply(item) && waitedLongEnoughForAlternative(item.createdAt) && !isReviewing && (
+                <View style={styles.noReplyBox}>
+                  <Text style={styles.noReplyText}>
+                    {item.companyName} hasn't answered. Your request stays open in case they do.
+                  </Text>
+                  <Pressable onPress={() => tryAnotherBusiness(item)} hitSlop={8}>
+                    <Text style={styles.noReplyLink}>Try another business →</Text>
+                  </Pressable>
                 </View>
               )}
 
@@ -489,6 +536,16 @@ const styles = StyleSheet.create({
     minHeight: 60,
     textAlignVertical: 'top',
   },
+  noReplyBox: {
+    gap: 6,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.md,
+    paddingVertical: 10,
+    paddingHorizontal: spacing.sm,
+  },
+  noReplyText: { fontSize: 12.5, color: colors.textMuted, lineHeight: 18 },
+  noReplyLink: { fontSize: 13, fontWeight: '800', color: colors.primary },
+
   yourReview: { gap: 4 },
   reviewComment: { fontSize: 13, color: colors.textMuted, lineHeight: 18 },
 

@@ -15,17 +15,24 @@ type Props = NativeStackScreenProps<BrowseStackParamList, 'RequestQuote'>;
 const TIME_OPTIONS = ['09:00', '11:30', '14:00', '16:30'];
 
 export default function RequestQuoteScreen({ route, navigation }: Props) {
-  const { addRequest, categories, customerProfile, businessListings } = useApp();
+  const { addRequest, categories, customerProfile, businessListings, requests } = useApp();
   const company = businessListings.find((c) => c.id === route.params.companyId);
+
+  // Sending a job that went unanswered to somebody else. Describing the same
+  // leak twice is the kind of thing that makes people give up, so the form
+  // starts from what they already wrote.
+  const reusing = route.params.prefillFromRequestId
+    ? requests.find((r) => r.id === route.params.prefillFromRequestId)
+    : undefined;
 
   const [customerName, setCustomerName] = useState(customerProfile?.name ?? '');
   const [phone, setPhone] = useState(customerProfile?.phone ?? '');
   const [useSavedAddress, setUseSavedAddress] = useState(!!customerProfile?.address);
   const [address, setAddress] = useState('');
-  const [area, setArea] = useState<string | null>(null);
-  const [isBusinessCustomer, setIsBusinessCustomer] = useState(false);
-  const [companyName, setCompanyName] = useState('');
-  const [jobDetails, setJobDetails] = useState('');
+  const [area, setArea] = useState<string | null>(reusing?.area || null);
+  const [isBusinessCustomer, setIsBusinessCustomer] = useState(!!reusing?.isBusinessCustomer);
+  const [companyName, setCompanyName] = useState(reusing?.contact?.companyName ?? '');
+  const [jobDetails, setJobDetails] = useState(reusing?.jobDetails ?? '');
   const [preferredIsoDate, setPreferredIsoDate] = useState<string | null>(null);
   const [preferredTime, setPreferredTime] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -113,6 +120,12 @@ export default function RequestQuoteScreen({ route, navigation }: Props) {
       >
         <Text style={styles.title}>Request a quote</Text>
         <Text style={styles.subtitle}>Sending to {company.name}</Text>
+
+        {reusing && (
+          <Text style={styles.reusingNote}>
+            Filled in from the job you sent {reusing.companyName}. Change anything that needs changing.
+          </Text>
+        )}
 
         <View style={styles.privacyNote}>
           <Text style={styles.privacyNoteText}>
@@ -265,6 +278,14 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.surfaceAlt },
   title: { fontSize: 22, fontWeight: '800', color: colors.text, letterSpacing: 0.1 },
   subtitle: { fontSize: 13, color: colors.textMuted, marginTop: 4, marginBottom: spacing.md },
+  reusingNote: {
+    fontSize: 12.5,
+    color: colors.primary,
+    fontWeight: '600',
+    lineHeight: 18,
+    marginTop: -spacing.xs,
+    marginBottom: spacing.md,
+  },
   field: { paddingVertical: spacing.sm },
   fieldBorder: { borderTopWidth: 1, borderTopColor: colors.border, marginTop: 2 },
   input: {

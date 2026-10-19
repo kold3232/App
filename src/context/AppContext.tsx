@@ -360,6 +360,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [proposedCategories, setProposedCategories] = useState<ProposedCategory[]>([]);
   const [adminBusinesses, setAdminBusinesses] = useState<AdminBusiness[]>([]);
   const [rawBusinessListings, setRawBusinessListings] = useState<BusinessListingRow[]>([]);
+  // Median minutes to a first reply, per listing. Only listings with enough
+  // finished jobs appear here at all — see listing_response_times.
+  const [responseTimes, setResponseTimes] = useState<Map<string, { minutes: number; samples: number }>>(new Map());
   const [categoryOverrides, setCategoryOverrides] = useState<Record<string, { groupId?: CategoryGroupId; status?: Category['status'] }>>({});
 
   // Built-in categories ship with the app; approved business proposals are
@@ -406,6 +409,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const listingReviews = reviews.filter((r) => r.companyId === l.id);
         const reviewCount = listingReviews.length;
         const rating = reviewCount > 0 ? listingReviews.reduce((sum, r) => sum + r.rating, 0) / reviewCount : 0;
+        const replies = responseTimes.get(l.id);
         return {
           id: l.id,
           businessId: l.business_id,
@@ -428,6 +432,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           bookingSlotMinutes: l.booking_slot_minutes ?? 60,
           coverPhotoUrl: l.cover_photo_url ?? undefined,
           displayPriority: l.display_priority ?? 0,
+          medianReplyMinutes: replies?.minutes,
+          replySampleCount: replies?.samples,
         };
       });
     // Real listings first, so a genuine business always outranks demo seed
@@ -436,7 +442,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     // Admin-set priority wins; everything else falls back to rating, so an
     // untouched marketplace still surfaces well-reviewed businesses first.
     return all.sort((a, b) => b.displayPriority - a.displayPriority || b.rating - a.rating);
-  }, [rawBusinessListings, reviews]);
+  }, [rawBusinessListings, reviews, responseTimes]);
 
   useEffect(() => {
     (async () => {
@@ -556,11 +562,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const refreshBusinessListings = useCallback(async () => {
-    const [{ data: listingRows, error: listingError }, { data: bizRows }] = await Promise.all([
+    const [{ data: listingRows, error: listingError }, { data: bizRows }, { data: replyRows }] = await Promise.all([
       supabase
         .from('business_listings')
         .select('id, business_id, name, phone, category_ids, tagline, description, price_range, services, available_now, live_booking_enabled, booking_days, booking_start_minute, booking_end_minute, booking_slot_minutes, cover_photo_url, display_priority'),
       supabase.from('businesses').select('id, is_approved, business_status'),
+      // Aggregates only, and only for listings with enough history to mean
+      // anything — the function decides that, not us. A customer cannot read
+      // anyone's requests, so this has to come back through the function.
+      supabase.rpc('listing_response_times'),
     ]);
     if (listingError || !listingRows || !bizRows) return;
     const bizById = new Map(bizRows.map((b) => [b.id, b]));
@@ -569,6 +579,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return !!biz && biz.is_approved && biz.business_status === 'active';
     });
     setRawBusinessListings(visible);
+    setResponseTimes(
+      new Map(
+        ((replyRows ?? []) as { listing_id: string; median_reply_minutes: number; sample_count: number }[]).map(
+          (row) => [row.listing_id, { minutes: Number(row.median_reply_minutes), samples: Number(row.sample_count) }]
+        )
+      )
+    );
   }, []);
 
   const refreshReviews = useCallback(async () => {
@@ -659,6 +676,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       depositAmount: row.deposit_amount ?? undefined,
       depositRequestedAt: row.deposit_requested_at ?? undefined,
       depositPaidAt: row.deposit_paid_at ?? undefined,
+      firstBusinessReplyAt: row.first_business_reply_at ?? undefined,
     }),
     []
   );
