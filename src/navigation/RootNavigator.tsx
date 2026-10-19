@@ -11,12 +11,13 @@ import ModeSelectScreen from '../screens/ModeSelectScreen';
 import LegalConsentScreen from '../screens/legal/LegalConsentScreen';
 import AdminLoginScreen from '../screens/admin/AdminLoginScreen';
 import ResetPasswordScreen from '../screens/auth/ResetPasswordScreen';
+import CustomerAccessGateScreen from '../screens/customer/CustomerAccessGateScreen';
 import CustomerSignUpScreen from '../screens/customer/CustomerSignUpScreen';
 import BusinessAuthScreen from '../screens/company/BusinessAuthScreen';
 import EmployeeAuthScreen from '../screens/employee/EmployeeAuthScreen';
 
 export default function RootNavigator() {
-  const { isReady, hasAcceptedLegal, mode, isAdminAuthenticated, customerProfile, businessAccount, myEmployment, passwordRecovery, authLoading } =
+  const { isReady, hasAcceptedLegal, mode, isAdminAuthenticated, customerProfile, businessAccount, myEmployment, passwordRecovery, authLoading, customerAccessGranted } =
     useApp();
 
   if (!isReady || ((mode === 'customer' || mode === 'company' || mode === 'admin' || mode === 'employee') && authLoading)) {
@@ -37,7 +38,16 @@ export default function RootNavigator() {
       ) : !hasAcceptedLegal ? (
         <LegalConsentScreen />
       ) : mode === 'customer' ? (
-        customerProfile ? <CustomerNavigator /> : <CustomerSignUpScreen />
+        // The code comes before the sign-up screen, but not before an account
+        // that already exists — someone already using RockServ as a customer
+        // should not be shut out when the gate goes up.
+        !customerAccessGranted && !customerProfile ? (
+          <CustomerAccessGateScreen />
+        ) : customerProfile ? (
+          <CustomerNavigator />
+        ) : (
+          <CustomerSignUpScreen />
+        )
       ) : mode === 'company' ? (
         businessAccount ? <CompanyRootNavigator /> : <BusinessAuthScreen />
       ) : mode === 'employee' ? (

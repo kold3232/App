@@ -2214,3 +2214,57 @@ drop trigger if exists service_requests_deposit_paid_readonly on public.service_
 create trigger service_requests_deposit_paid_readonly
   before update on public.service_requests
   for each row execute function public.enforce_deposit_paid_at();
+
+-- RockServ — access codes
+-- The app is on the App Store while only businesses are being tested, so the
+-- customer side is gated behind a code until there is something worth signing
+-- up for.
+--
+-- The code lives here rather than in the app for two reasons: it can be
+-- changed without shipping anything, and lifting the gate later is a delete
+-- rather than a release. No code row means that area is open to everyone,
+-- which is the end state.
+create table if not exists public.app_access_codes (
+  area text primary key,
+  code text not null,
+  updated_at timestamptz not null default now()
+);
+
+-- Nobody reads this table directly. The check below is security definer, so it
+-- can compare against the code without ever handing it out — a client that
+-- could select from here would simply read the answer.
+alter table public.app_access_codes enable row level security;
+
+create or replace function public.check_access_code(p_area text, p_code text)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  stored text;
+begin
+  select code into stored from public.app_access_codes where area = p_area;
+  -- No row means no gate. Deleting the row is how this is switched off.
+  if stored is null then
+    return true;
+  end if;
+  return stored = coalesce(p_code, '');
+end $$;
+
+revoke all on function public.check_access_code(text, text) from public;
+grant execute on function public.check_access_code(text, text) to anon, authenticated;
+
+-- Whether an area is gated at all, so the app can skip asking once the row is
+-- gone. Says nothing about the code itself.
+create or replace function public.access_code_required(p_area text)
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  select exists (select 1 from public.app_access_codes where area = p_area)
+$$;
+
+revoke all on function public.access_code_required(text) from public;
+grant execute on function public.access_code_required(text) to anon, authenticated;

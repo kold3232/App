@@ -49,6 +49,7 @@ const STORAGE_KEYS = {
   notifySignups: '@sortedforyou/notifySignups',
   categories: '@sortedforyou/categories',
   hasAcceptedLegal: '@sortedforyou/hasAcceptedLegal',
+  customerAccessGranted: '@sortedforyou/customerAccessGranted',
 };
 
 // Flat commission structure: 10% on jobs of £500 or less, 5% above £500.
@@ -118,6 +119,11 @@ type AppContextValue = {
   isReady: boolean;
   hasAcceptedLegal: boolean;
   acceptLegal: () => void;
+  // The customer side is gated by a code while only businesses are being
+  // tested. customerAccessGranted is true once this device has entered it, or
+  // when the gate has been lifted entirely.
+  customerAccessGranted: boolean;
+  submitCustomerAccessCode: (code: string) => Promise<{ error?: string }>;
   mode: UserMode | null;
   setMode: (mode: UserMode | null) => void;
   isAdminAuthenticated: boolean;
@@ -327,6 +333,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [paymentAccount, setPaymentAccount] = useState<PaymentAccountStatus>(NO_PAYMENT_ACCOUNT);
   const [isReady, setIsReady] = useState(false);
   const [hasAcceptedLegal, setHasAcceptedLegal] = useState(false);
+  const [customerAccessGranted, setCustomerAccessGranted] = useState(false);
   const [isAdminUser, setIsAdminUser] = useState(false);
   const isAdminAuthenticated = isAdminUser;
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -434,13 +441,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     (async () => {
       try {
-        const [storedMode, storedSignups, storedCategories, storedHasAcceptedLegal] =
+        const [storedMode, storedSignups, storedCategories, storedHasAcceptedLegal, storedAccess] =
           await Promise.all([
             AsyncStorage.getItem(STORAGE_KEYS.mode),
             AsyncStorage.getItem(STORAGE_KEYS.notifySignups),
             AsyncStorage.getItem(STORAGE_KEYS.categories),
             AsyncStorage.getItem(STORAGE_KEYS.hasAcceptedLegal),
+            AsyncStorage.getItem(STORAGE_KEYS.customerAccessGranted),
           ]);
+        if (storedAccess) setCustomerAccessGranted(JSON.parse(storedAccess));
         if (storedMode) {
           const parsedMode = JSON.parse(storedMode);
           setModeState(parsedMode === 'admin' ? null : parsedMode);
@@ -448,6 +457,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (storedSignups) setNotifySignups(JSON.parse(storedSignups));
         if (storedCategories) setBaseCategories(JSON.parse(storedCategories));
         if (storedHasAcceptedLegal) setHasAcceptedLegal(JSON.parse(storedHasAcceptedLegal));
+        // Asked every launch so that removing the code row opens the app for
+        // everyone without anyone having to update it. A failure here leaves
+        // whatever was stored, so a dropped connection does not lock out
+        // somebody who already has access.
+        try {
+          const { data: gated, error } = await supabase.rpc('access_code_required', { p_area: 'customer' });
+          if (!error && gated === false) {
+            setCustomerAccessGranted(true);
+            AsyncStorage.setItem(STORAGE_KEYS.customerAccessGranted, JSON.stringify(true));
+          }
+        } catch {
+          // Offline on launch. Keep the stored answer.
+        }
       } finally {
         setIsReady(true);
       }
@@ -900,6 +922,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (businessAccount) refreshMyListings();
     else setMyListings([]);
   }, [businessAccount, authLoading, refreshMyListings]);
+
+  const submitCustomerAccessCode = useCallback(async (code: string): Promise<{ error?: string }> => {
+    const entered = code.trim();
+    if (!entered) return { error: 'Enter the code you were given.' };
+    // Checked on the server. The code is never sent to the app, so it cannot
+    // be read out of the bundle — only asked about.
+    const { data, error } = await supabase.rpc('check_access_code', {
+      p_area: 'customer',
+      p_code: entered,
+    });
+    if (error) return { error: 'Could not check that code. Check your connection and try again.' };
+    if (data !== true) return { error: "That code isn't right. Check it and try again." };
+    setCustomerAccessGranted(true);
+    AsyncStorage.setItem(STORAGE_KEYS.customerAccessGranted, JSON.stringify(true));
+    return {};
+  }, []);
 
   const acceptLegal = useCallback(() => {
     setHasAcceptedLegal(true);
@@ -2338,6 +2376,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       isReady,
       hasAcceptedLegal,
       acceptLegal,
+      customerAccessGranted,
+      submitCustomerAccessCode,
       mode,
       setMode,
       isAdminAuthenticated,
@@ -2454,6 +2494,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       isReady,
       hasAcceptedLegal,
       acceptLegal,
+      customerAccessGranted,
+      submitCustomerAccessCode,
       mode,
       setMode,
       isAdminUser,
