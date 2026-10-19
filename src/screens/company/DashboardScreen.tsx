@@ -1,18 +1,45 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useMemo, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
-import { Button, Card, Chip, EmptyState, StatusBadge } from '../../components/ui';
+import { Button, Chip, EmptyState, StatusBadge } from '../../components/ui';
 import { Screen } from '../../components/Screen';
 import { Calendar } from '../../components/Calendar';
 import { ChatModal } from '../../components/ChatModal';
 import { LockedForPaymentSetup, PaymentSetupBanner } from '../../components/PaymentSetupGate';
 import { useApp } from '../../context/AppContext';
-import { RequestStatus, ServiceRequest } from '../../types';
+import { ServiceRequest } from '../../types';
 import { colors, radius, spacing } from '../../theme';
 import { notify } from '../../utils/alert';
 import { callNumber, googleMapsUrl, openInMaps } from '../../utils/maps';
+import { colorFromId } from '../../utils/color';
 
 const SCHEDULE_TIMES = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'];
+
+type Filter = 'all' | 'active' | 'completed';
+
+const money = (n: number) => `£${n.toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+
+function initials(name: string): string {
+  const words = name.replace(/[^a-zA-Z ]/g, ' ').trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return '?';
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return (words[0][0] + words[1][0]).toUpperCase();
+}
+
+function when(iso: string): string {
+  return new Date(iso).toLocaleString('en-GB', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function shortDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+}
 
 /**
  * A deposit is money taken before the work starts, so until it lands the work
@@ -23,14 +50,6 @@ const SCHEDULE_TIMES = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '1
 function awaitingDeposit(r: ServiceRequest): boolean {
   return !!r.depositAmount && r.depositAmount > 0 && !r.depositPaidAt && r.status !== 'completed';
 }
-
-const FILTERS: { id: RequestStatus | 'all'; label: string }[] = [
-  { id: 'all', label: 'All' },
-  { id: 'pending', label: 'Pending' },
-  { id: 'accepted', label: 'Accepted' },
-  { id: 'completed', label: 'Completed' },
-  { id: 'declined', label: 'Declined' },
-];
 
 export default function DashboardScreen() {
   const {
@@ -46,8 +65,9 @@ export default function DashboardScreen() {
     setRequestSchedule,
     refreshPaymentAccount,
   } = useApp();
-  const [filter, setFilter] = useState<RequestStatus | 'all'>('all');
+  const [filter, setFilter] = useState<Filter>('all');
   const [refreshing, setRefreshing] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -60,6 +80,7 @@ export default function DashboardScreen() {
       refreshPaymentAccount();
     }, [refreshRequests, refreshEmployees, refreshPaymentAccount])
   );
+
   const [completingId, setCompletingId] = useState<string | null>(null);
   const [jobValueInput, setJobValueInput] = useState('');
   const [chatRequestId, setChatRequestId] = useState<string | null>(null);
@@ -68,6 +89,7 @@ export default function DashboardScreen() {
   const [schedulingId, setSchedulingId] = useState<string | null>(null);
   const [scheduleDate, setScheduleDate] = useState<string | null>(null);
   const [scheduleTime, setScheduleTime] = useState('09:00');
+
   const activeEmployees = useMemo(() => employees.filter((e) => e.status === 'active'), [employees]);
   // A single account can hold both roles, and can now own several listings —
   // only show requests addressed to one of this business's own listings.
@@ -110,8 +132,8 @@ export default function DashboardScreen() {
     if (!scheduleDate) return;
     const [h, m] = scheduleTime.split(':').map(Number);
     const [y, mo, d] = scheduleDate.split('-').map(Number);
-    const when = new Date(y, mo - 1, d, h, m, 0, 0);
-    const { error } = await setRequestSchedule(requestId, when.toISOString());
+    const at = new Date(y, mo - 1, d, h, m, 0, 0);
+    const { error } = await setRequestSchedule(requestId, at.toISOString());
     if (error) {
       notify('Could not schedule', error);
       return;
@@ -136,15 +158,57 @@ export default function DashboardScreen() {
     if (error) notify('Could not unassign', error);
   }
 
-  const filtered = useMemo(
-    () => (filter === 'all' ? requests : requests.filter((r) => r.status === filter)),
-    [requests, filter]
+  const counts = useMemo(
+    () => ({
+      all: requests.length,
+      active: requests.filter((r) => r.status === 'pending' || r.status === 'accepted').length,
+      completed: requests.filter((r) => r.status === 'completed').length,
+    }),
+    [requests]
   );
+
+  const visible = useMemo(() => {
+    const base =
+      filter === 'active'
+        ? requests.filter((r) => r.status === 'pending' || r.status === 'accepted')
+        : filter === 'completed'
+          ? requests.filter((r) => r.status === 'completed')
+          : requests;
+    // A new request is the only thing on this screen with a clock on it, so it
+    // goes to the top wherever it appears.
+    return [...base].sort((a, b) => {
+      const rank = (r: ServiceRequest) => (r.status === 'pending' ? 0 : r.status === 'accepted' ? 1 : 2);
+      return rank(a) - rank(b) || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+  }, [requests, filter]);
+
+  /** The one line under the customer's name: what this job is waiting on. */
+  function summaryLine(r: ServiceRequest): { icon: keyof typeof Ionicons.glyphMap; text: string; tone: string } {
+    if (r.status === 'declined') return { icon: 'close-circle-outline', text: 'Declined', tone: colors.danger };
+    if (r.status === 'completed') return { icon: 'checkmark-circle-outline', text: 'Finished', tone: colors.success };
+    if (awaitingDeposit(r)) {
+      return {
+        icon: 'hourglass-outline',
+        text: `Waiting for ${money(r.depositAmount ?? 0)} deposit`,
+        tone: colors.pending,
+      };
+    }
+    if (r.status === 'pending') return { icon: 'alert-circle-outline', text: 'Needs a reply', tone: colors.pending };
+    if (r.scheduledFor) return { icon: 'calendar-outline', text: when(r.scheduledFor), tone: colors.success };
+    if (r.preferredFor) return { icon: 'calendar-outline', text: `Asked for ${when(r.preferredFor)}`, tone: colors.info };
+    return { icon: 'time-outline', text: 'No time set', tone: colors.pending };
+  }
+
+  const FILTERS: { id: Filter; label: string; count: number }[] = [
+    { id: 'all', label: 'All', count: counts.all },
+    { id: 'active', label: 'Active', count: counts.active },
+    { id: 'completed', label: 'Completed', count: counts.completed },
+  ];
 
   return (
     <Screen style={styles.container}>
       <FlatList
-        data={filtered}
+        data={visible}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         refreshControl={
@@ -152,99 +216,93 @@ export default function DashboardScreen() {
         }
         ListHeaderComponent={
           <View>
-            <Text style={styles.title}>Incoming requests</Text>
-            <Text style={styles.subtitle}>
-              Requests customers send in to {businessAccount?.name || 'your business'}
-            </Text>
-            <View style={styles.filterRow}>
-              {FILTERS.map((f) => (
-                <Chip key={f.id} label={f.label} selected={filter === f.id} onPress={() => setFilter(f.id)} />
-              ))}
+            <Text style={styles.title}>Requests</Text>
+            <Text style={styles.subtitle}>Sent in to {businessAccount?.name || 'your business'}</Text>
+            <View style={styles.segment}>
+              {FILTERS.map((f) => {
+                const on = filter === f.id;
+                return (
+                  <Pressable
+                    key={f.id}
+                    onPress={() => setFilter(f.id)}
+                    style={[styles.segmentItem, on && styles.segmentItemOn]}
+                  >
+                    <Text style={[styles.segmentText, on && styles.segmentTextOn]}>
+                      {f.label}
+                      {f.count > 0 ? ` · ${f.count}` : ''}
+                    </Text>
+                  </Pressable>
+                );
+              })}
             </View>
             <PaymentSetupBanner />
           </View>
         }
         ListEmptyComponent={
-          <EmptyState icon="file-tray-outline" title="Nothing here yet" subtitle="New customer requests will show up in this list." />
+          <EmptyState
+            icon="file-tray-outline"
+            title={filter === 'all' ? 'Nothing here yet' : `Nothing ${filter}`}
+            subtitle={
+              filter === 'all'
+                ? 'New customer requests will show up in this list.'
+                : 'Switch to All to see your other jobs.'
+            }
+          />
         }
         ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
-        renderItem={({ item }) => (
-          <LockedForPaymentSetup>
-          <Card>
-            <View style={styles.row}>
-              <Text style={styles.customerName}>
-                {item.contact?.companyName ?? item.customerName}
-              </Text>
-              <StatusBadge status={item.status} />
-            </View>
-            {item.isBusinessCustomer && !item.contact && (
-              <Text style={styles.businessTag}>🏢 Business customer</Text>
-            )}
-            <Text style={styles.category}>
-              Case #{item.caseNumber} · {item.categoryName} · {item.type === 'instant' ? 'Instant booking' : 'Quote request'}
-            </Text>
-            {myListings.length > 1 && <Text style={styles.forListing}>For {item.companyName}</Text>}
-            {item.jobDetails ? <Text style={styles.detail}>{item.jobDetails}</Text> : null}
-            {/* Once the address is unlocked it becomes a link into the Maps
-                app, which is where a tradesman actually wants it. Before that
-                there is only an area, and nothing to route to. */}
-            {item.contact ? (
-              <Pressable onPress={() => openInMaps(item.contact!.address)} hitSlop={6}>
-                <Text style={styles.metaLink} numberOfLines={2}>
-                  📍 {item.contact.address}
-                  <Text style={styles.linkHint}>  ·  Open in Maps</Text>
-                </Text>
-              </Pressable>
-            ) : (
-              <Text style={styles.meta} numberOfLines={1}>
-                📍 {item.area || 'Area not given'}
-              </Text>
-            )}
-            {(item.scheduledSlot || item.preferredDate) && (
-              <Text style={styles.meta} numberOfLines={1}>
-                🗓️ {item.type === 'instant' ? item.scheduledSlot : item.preferredDate}
-              </Text>
-            )}
-            {item.contact ? (
-              <Pressable onPress={() => callNumber(item.contact!.phone)} hitSlop={6}>
-                <Text style={styles.metaLink}>📞 {item.contact.phone}</Text>
-              </Pressable>
-            ) : (
-              <Text style={styles.locked}>
-                🔒 {item.customerName}'s full name, phone number and exact address unlock as soon as they accept
-                your quote. Use the chat to ask anything you need to price the job.
-              </Text>
-            )}
-            <Text style={styles.date}>{new Date(item.createdAt).toLocaleString()}</Text>
+        renderItem={({ item }) => {
+          const expanded = expandedId === item.id;
+          const summary = summaryLine(item);
+          const name = item.contact?.companyName ?? item.customerName;
+          const amount = item.jobValue ?? item.quotedAmount;
+          const scheduling = schedulingId === item.id;
+          const completing = completingId === item.id;
+          const assigning = assigningId === item.id;
+          const assignee = employees.find((e) => e.id === item.assignedEmployeeId);
 
-            {awaitingDeposit(item) && (
-              <View style={styles.awaitingDeposit}>
-                <Text style={styles.awaitingDepositText}>
-                  Waiting for the £{(item.depositAmount ?? 0).toFixed(2)} deposit. The job can't be booked in or
-                  started until the customer pays it — nudge them in the chat.
-                </Text>
-              </View>
-            )}
+          return (
+            <LockedForPaymentSetup>
+              <View style={styles.card}>
+                <View style={styles.head}>
+                  <View style={[styles.avatar, { backgroundColor: colorFromId(item.customerId) }]}>
+                    <Text style={styles.avatarText}>{initials(name)}</Text>
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={styles.customer} numberOfLines={1}>
+                      {name}
+                    </Text>
+                    <Text style={styles.category} numberOfLines={1}>
+                      {item.categoryName}
+                      {myListings.length > 1 ? ` · ${item.companyName}` : ''}
+                    </Text>
+                  </View>
+                  <StatusBadge status={item.status} />
+                  <Pressable
+                    onPress={() => setExpandedId(expanded ? null : item.id)}
+                    hitSlop={8}
+                    style={({ pressed }) => [styles.expandButton, pressed && styles.expandButtonPressed]}
+                    accessibilityLabel={expanded ? 'Hide full details' : 'Show full details'}
+                  >
+                    <Ionicons name={expanded ? 'remove' : 'add'} size={18} color={colors.primary} />
+                  </Pressable>
+                </View>
 
-            {item.status === 'pending' && (
-              <View style={styles.actions}>
-                <View style={{ flex: 1 }}>
-                  <Button title="Accept" onPress={() => updateRequestStatus(item.id, 'accepted')} />
+                <View style={styles.summary}>
+                  <View style={styles.summaryLeft}>
+                    <Ionicons name={summary.icon} size={14} color={summary.tone} />
+                    <Text style={[styles.summaryText, { color: summary.tone }]} numberOfLines={1}>
+                      {summary.text}
+                    </Text>
+                  </View>
+                  {amount != null && <Text style={styles.amount}>{money(amount)}</Text>}
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Button title="Decline" onPress={() => updateRequestStatus(item.id, 'declined')} variant="danger" />
-                </View>
-              </View>
-            )}
-            {/* Putting a date on the job is what lands it in the calendar. */}
-            {item.status === 'accepted' && !awaitingDeposit(item) && (
-              <View style={styles.assignBox}>
-                {schedulingId === item.id ? (
-                  <View>
-                    <Text style={styles.assignLabel}>When is this happening?</Text>
-                    <View style={{ marginTop: spacing.sm }}>
-                      <Calendar selectedDate={scheduleDate} onSelectDate={setScheduleDate} />
-                    </View>
+
+                {/* A form takes over the card while it is open, so the actions
+                    below never argue with it. */}
+                {scheduling ? (
+                  <View style={styles.form}>
+                    <Text style={styles.formLabel}>When is this happening?</Text>
+                    <Calendar selectedDate={scheduleDate} onSelectDate={setScheduleDate} />
                     {scheduleDate && (
                       <View style={styles.chipWrap}>
                         {SCHEDULE_TIMES.map((t) => (
@@ -254,113 +312,39 @@ export default function DashboardScreen() {
                     )}
                     <View style={styles.actions}>
                       <View style={{ flex: 1 }}>
-                        <Button title="Save to calendar" onPress={() => handleSchedule(item.id)} disabled={!scheduleDate} />
-                      </View>
-                      <View style={{ flex: 1 }}>
                         <Button title="Cancel" variant="outline" onPress={() => setSchedulingId(null)} />
                       </View>
+                      <View style={{ flex: 1 }}>
+                        <Button title="Save" onPress={() => handleSchedule(item.id)} disabled={!scheduleDate} />
+                      </View>
                     </View>
                   </View>
-                ) : !item.scheduledFor && item.preferredFor ? (
-                  // The default flow: the customer asked for a time, so
-                  // confirming it is one tap. Anything else is a conversation.
-                  <View>
-                    <Text style={styles.assignedTo}>
-                      Customer asked for{' '}
-                      {new Date(item.preferredFor).toLocaleString('en-GB', {
-                        weekday: 'short',
-                        day: 'numeric',
-                        month: 'short',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </Text>
+                ) : completing ? (
+                  <View style={styles.form}>
+                    <Text style={styles.formLabel}>What did the job come to?</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={jobValueInput}
+                      onChangeText={setJobValueInput}
+                      placeholder="e.g. 120"
+                      placeholderTextColor={colors.textFaint}
+                      selectionColor={colors.primary}
+                      keyboardType="decimal-pad"
+                    />
                     <View style={styles.actions}>
                       <View style={{ flex: 1 }}>
-                        <Button
-                          title="Confirm that time"
-                          onPress={() => handleConfirmPreferred(item.id, item.preferredFor!)}
-                        />
+                        <Button title="Cancel" variant="outline" onPress={() => setCompletingId(null)} />
                       </View>
                       <View style={{ flex: 1 }}>
-                        <Button
-                          title="Suggest another"
-                          variant="outline"
-                          onPress={() => {
-                            setScheduleDate(null);
-                            setSchedulingId(item.id);
-                          }}
-                        />
+                        <Button title="Finish job" onPress={() => confirmCompleting(item.id)} />
                       </View>
                     </View>
-                    <Text style={styles.assignedStatus}>
-                      Or talk it through in the chat — nothing is fixed until you set a time here.
-                    </Text>
                   </View>
-                ) : item.scheduledFor ? (
-                  <View style={styles.assignedRow}>
-                    <Text style={styles.assignedTo}>
-                      🗓️ In the diary for{' '}
-                      {new Date(item.scheduledFor).toLocaleString('en-GB', {
-                        weekday: 'short',
-                        day: 'numeric',
-                        month: 'short',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </Text>
-                    <Text
-                      style={styles.assignLink}
-                      onPress={() => {
-                        setScheduleDate(null);
-                        setSchedulingId(item.id);
-                      }}
-                    >
-                      Change
-                    </Text>
-                  </View>
-                ) : (
-                  <Text
-                    style={styles.assignLink}
-                    onPress={() => {
-                      setScheduleDate(null);
-                      setSchedulingId(item.id);
-                    }}
-                  >
-                    + Put this in the calendar
-                  </Text>
-                )}
-              </View>
-            )}
-
-            {/* Assignment only makes sense once the job is on. Marking the job
-                complete stays here on the manager's side either way — an
-                employee's "done" is just a nudge that it is ready to close. */}
-            {activeEmployees.length > 0 && (item.status === 'accepted' || item.status === 'pending') && (
-              <View style={styles.assignBox}>
-                {item.assignedEmployeeId ? (
-                  <View style={styles.assignedRow}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.assignedTo}>
-                        Assigned to{' '}
-                        {employees.find((e) => e.id === item.assignedEmployeeId)?.name ?? 'a former employee'}
-                      </Text>
-                      <Text style={styles.assignedStatus}>
-                        {item.employeeDone
-                          ? `✓ Marked done${item.employeeDoneAt ? ` ${new Date(item.employeeDoneAt).toLocaleDateString()}` : ''} — ready for you to complete`
-                          : 'Not finished yet'}
-                      </Text>
-                      {item.assignmentNotes ? <Text style={styles.assignedNotes}>{item.assignmentNotes}</Text> : null}
-                    </View>
-                    <Text style={styles.unassignLink} onPress={() => handleUnassign(item.id)}>
-                      Unassign
-                    </Text>
-                  </View>
-                ) : assigningId === item.id ? (
-                  <View>
-                    <Text style={styles.assignLabel}>Assign to</Text>
+                ) : assigning ? (
+                  <View style={styles.form}>
+                    <Text style={styles.formLabel}>Who is doing it?</Text>
                     <TextInput
-                      style={styles.assignInput}
+                      style={styles.input}
                       value={assignNotes}
                       onChangeText={setAssignNotes}
                       placeholder="Anything they need to know (optional)"
@@ -377,165 +361,287 @@ export default function DashboardScreen() {
                         />
                       ))}
                     </View>
-                    <View style={{ marginTop: spacing.sm }}>
-                      <Button title="Cancel" variant="outline" onPress={() => setAssigningId(null)} />
-                    </View>
+                    <Button title="Cancel" variant="outline" onPress={() => setAssigningId(null)} />
                   </View>
                 ) : (
-                  <Text
-                    style={styles.assignLink}
-                    onPress={() => {
-                      setAssignNotes('');
-                      setAssigningId(item.id);
-                    }}
-                  >
-                    + Assign to an employee
-                  </Text>
+                  <>
+                    <View style={styles.actions}>
+                      {item.status !== 'declined' && (
+                        <View style={{ flex: 1 }}>
+                          <Button title="Chat" variant="outline" onPress={() => setChatRequestId(item.id)} />
+                        </View>
+                      )}
+
+                      {item.status === 'pending' && (
+                        <View style={{ flex: 1 }}>
+                          <Button title="Accept" onPress={() => updateRequestStatus(item.id, 'accepted')} />
+                        </View>
+                      )}
+
+                      {item.status === 'accepted' && !awaitingDeposit(item) && (
+                        <View style={{ flex: 1 }}>
+                          {!item.scheduledFor && item.preferredFor ? (
+                            <Button
+                              title="Confirm time"
+                              onPress={() => handleConfirmPreferred(item.id, item.preferredFor!)}
+                            />
+                          ) : !item.scheduledFor ? (
+                            <Button
+                              title="Set a time"
+                              onPress={() => {
+                                setScheduleDate(null);
+                                setSchedulingId(item.id);
+                              }}
+                            />
+                          ) : (
+                            <Button title="Finish job" onPress={() => startCompleting(item.id, item.quotedAmount)} />
+                          )}
+                        </View>
+                      )}
+                    </View>
+
+                    {/* Declining is deliberate, so it is a link rather than a
+                        button sitting next to Accept. */}
+                    {item.status === 'pending' && (
+                      <Pressable onPress={() => updateRequestStatus(item.id, 'declined')} hitSlop={8}>
+                        <Text style={styles.decline}>Can't take this one</Text>
+                      </Pressable>
+                    )}
+
+                    {awaitingDeposit(item) && (
+                      <Text style={styles.waiting}>
+                        Nothing can be booked in until the {money(item.depositAmount ?? 0)} deposit is paid. Nudge them
+                        in the chat.
+                      </Text>
+                    )}
+
+                    {item.status === 'completed' && item.jobValue != null && (
+                      <Text style={styles.youGet}>
+                        You receive {money(item.jobValue - (item.commission ?? 0))} of {money(item.jobValue)}
+                      </Text>
+                    )}
+                  </>
+                )}
+
+                {expanded && (
+                  <View style={styles.details}>
+                    <Text style={styles.detailLabel}>What they asked for</Text>
+                    {item.jobDetails ? (
+                      <Text style={styles.detailBody}>{item.jobDetails}</Text>
+                    ) : (
+                      <Text style={styles.detailMeta}>No description was given.</Text>
+                    )}
+
+                    {item.isBusinessCustomer && (
+                      <View style={styles.detailRow}>
+                        <Ionicons name="business-outline" size={13} color={colors.textFaint} />
+                        <Text style={styles.detailMeta}>Booking for a company</Text>
+                      </View>
+                    )}
+
+                    {/* Once the address is unlocked it becomes a link into the
+                        Maps app, which is where a tradesman actually wants it.
+                        Before that there is only an area, and nothing to route
+                        to. */}
+                    {item.contact ? (
+                      <>
+                        <Pressable onPress={() => openInMaps(item.contact!.address)} hitSlop={6} style={styles.detailRow}>
+                          <Ionicons name="location-outline" size={13} color={colors.primary} />
+                          <Text style={[styles.detailMeta, styles.link]} numberOfLines={2}>
+                            {item.contact.address} · Open in Maps
+                          </Text>
+                        </Pressable>
+                        <Pressable onPress={() => callNumber(item.contact!.phone)} hitSlop={6} style={styles.detailRow}>
+                          <Ionicons name="call-outline" size={13} color={colors.primary} />
+                          <Text style={[styles.detailMeta, styles.link]}>{item.contact.phone}</Text>
+                        </Pressable>
+                      </>
+                    ) : (
+                      <>
+                        <View style={styles.detailRow}>
+                          <Ionicons name="location-outline" size={13} color={colors.textFaint} />
+                          <Text style={styles.detailMeta}>{item.area || 'Area not given'}</Text>
+                        </View>
+                        <View style={styles.detailRow}>
+                          <Ionicons name="lock-closed-outline" size={13} color={colors.textFaint} />
+                          <Text style={styles.detailMeta}>
+                            Full name, phone and exact address unlock when they accept your quote. Use the chat until
+                            then.
+                          </Text>
+                        </View>
+                      </>
+                    )}
+
+                    {item.preferredDate ? (
+                      <View style={styles.detailRow}>
+                        <Ionicons name="calendar-outline" size={13} color={colors.textFaint} />
+                        <Text style={styles.detailMeta}>They asked for {item.preferredDate}</Text>
+                      </View>
+                    ) : null}
+
+                    <View style={styles.detailRow}>
+                      <Ionicons name="pricetag-outline" size={13} color={colors.textFaint} />
+                      <Text style={styles.detailMeta}>
+                        Case #{item.caseNumber} · {item.type === 'instant' ? 'Instant booking' : 'Quote request'} ·{' '}
+                        {shortDate(item.createdAt)}
+                      </Text>
+                    </View>
+
+                    {item.depositAmount ? (
+                      <View style={styles.detailRow}>
+                        <Ionicons
+                          name={item.depositPaidAt ? 'checkmark-circle-outline' : 'hourglass-outline'}
+                          size={13}
+                          color={item.depositPaidAt ? colors.success : colors.pending}
+                        />
+                        <Text style={styles.detailMeta}>
+                          Deposit {money(item.depositAmount)} · {item.depositPaidAt ? 'paid' : 'not paid yet'}
+                        </Text>
+                      </View>
+                    ) : null}
+
+                    {/* Staff live down here: useful, but not what the card is
+                        for. */}
+                    {activeEmployees.length > 0 && (item.status === 'accepted' || item.status === 'pending') && (
+                      <View style={styles.assignBlock}>
+                        {assignee ? (
+                          <View style={styles.assignedRow}>
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.assignedTo}>{assignee.name}</Text>
+                              <Text style={styles.assignedStatus}>
+                                {item.employeeDone ? '✓ Says it is done' : 'Not finished yet'}
+                              </Text>
+                              {item.assignmentNotes ? (
+                                <Text style={styles.assignedNotes}>{item.assignmentNotes}</Text>
+                              ) : null}
+                            </View>
+                            <Text style={styles.assignLink} onPress={() => handleUnassign(item.id)}>
+                              Unassign
+                            </Text>
+                          </View>
+                        ) : (
+                          <Text
+                            style={styles.assignLink}
+                            onPress={() => {
+                              setAssignNotes('');
+                              setAssigningId(item.id);
+                            }}
+                          >
+                            + Assign to someone
+                          </Text>
+                        )}
+                      </View>
+                    )}
+
+                    {item.scheduledFor && item.status === 'accepted' && (
+                      <Text
+                        style={styles.assignLink}
+                        onPress={() => {
+                          setScheduleDate(null);
+                          setSchedulingId(item.id);
+                        }}
+                      >
+                        Change the time
+                      </Text>
+                    )}
+                  </View>
                 )}
               </View>
-            )}
-
-            {item.status === 'accepted' &&
-              (completingId === item.id ? (
-                <View style={styles.completeForm}>
-                  <Text style={styles.completeLabel}>Job value (£)</Text>
-                  <TextInput
-                    style={styles.jobValueInput}
-                    value={jobValueInput}
-                    onChangeText={setJobValueInput}
-                    placeholder="e.g. 120"
-                    placeholderTextColor={colors.textFaint}
-                    selectionColor={colors.primary}
-                    keyboardType="decimal-pad"
-                  />
-                  <View style={styles.actions}>
-                    <View style={{ flex: 1 }}>
-                      <Button title="Confirm completion" onPress={() => confirmCompleting(item.id)} variant="secondary" />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Button title="Cancel" variant="outline" onPress={() => setCompletingId(null)} />
-                    </View>
-                  </View>
-                </View>
-              ) : (
-                <View style={styles.actions}>
-                  <Button
-                    title="Mark as completed"
-                    onPress={() => startCompleting(item.id, item.quotedAmount)}
-                    variant="secondary"
-                  />
-                </View>
-              ))}
-            {item.type === 'quote' && (item.status === 'pending' || item.status === 'accepted') && (
-              <View style={styles.actions}>
-                <Button title="Chat with customer" variant="outline" onPress={() => setChatRequestId(item.id)} />
-              </View>
-            )}
-            {item.status === 'completed' && item.jobValue != null && (
-              <View style={styles.completedSummary}>
-                <Text style={styles.completedText}>Job value £{item.jobValue.toFixed(2)}</Text>
-                <Text style={styles.completedText}>
-                  You receive £{(item.jobValue - (item.commission ?? 0)).toFixed(2)}
-                </Text>
-              </View>
-            )}
-            {item.status === 'completed' && (
-              <Text style={styles.confirmStatus}>
-                {item.customerConfirmed ? '✓ Confirmed by customer' : 'Awaiting customer confirmation'}
-              </Text>
-            )}
-            {item.type === 'quote' && item.status === 'completed' && (
-              <View style={{ marginTop: spacing.sm }}>
-                <Button title="View chat" variant="outline" onPress={() => setChatRequestId(item.id)} />
-              </View>
-            )}
-          </Card>
-          </LockedForPaymentSetup>
-        )}
+            </LockedForPaymentSetup>
+          );
+        }}
       />
+
       {chatRequest && (
-        <ChatModal
-          visible={!!chatRequest}
-          onClose={() => setChatRequestId(null)}
-          request={chatRequest}
-          perspective="business"
-        />
+        <ChatModal visible request={chatRequest} perspective="business" onClose={() => setChatRequestId(null)} />
       )}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  awaitingDeposit: {
-    backgroundColor: colors.pendingBg,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    marginTop: spacing.md,
-  },
-  awaitingDepositText: { fontSize: 12.5, color: colors.pending, lineHeight: 18, fontWeight: '600' },
   container: { flex: 1, backgroundColor: colors.surfaceAlt },
   list: { padding: spacing.lg, paddingBottom: spacing.xl * 2, flexGrow: 1 },
-  title: { fontSize: 22, fontWeight: '800', color: colors.text, letterSpacing: 0.1 },
-  subtitle: { fontSize: 12, color: colors.textMuted, marginTop: 4 },
-  filterRow: { flexDirection: 'row', flexWrap: 'wrap', marginTop: spacing.md, marginBottom: spacing.xs },
-  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', marginTop: spacing.xs },
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  customerName: { fontSize: 16, fontWeight: '700', color: colors.text, flex: 1, marginRight: spacing.sm },
-  category: { fontSize: 12, color: colors.primary, fontWeight: '700', marginTop: 2 },
-  detail: { fontSize: 13, color: colors.text, marginTop: spacing.sm },
-  meta: { fontSize: 12, color: colors.textMuted, marginTop: 6 },
-  metaLink: { fontSize: 12, color: colors.primary, fontWeight: '600', marginTop: 6 },
-  linkHint: { fontSize: 11, color: colors.textMuted, fontWeight: '600' },
-  forListing: { fontSize: 11.5, color: colors.textMuted, fontWeight: '600', marginTop: 3 },
-  businessTag: { fontSize: 11.5, color: colors.primary, fontWeight: '700', marginTop: 3 },
-  locked: { fontSize: 11.5, color: colors.textMuted, marginTop: 8, lineHeight: 17, fontStyle: 'italic' },
-  date: { fontSize: 11, color: colors.textMuted, marginTop: 6 },
-  actions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
-  completeForm: { marginTop: spacing.md, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.border },
-  completeLabel: { fontSize: 12, fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 6 },
-  jobValueInput: {
-    backgroundColor: colors.surface,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: spacing.sm,
-    fontSize: 14,
-    color: colors.text,
-  },
-  completedSummary: {
+  title: { fontSize: 25, fontWeight: '800', color: colors.text, letterSpacing: 0.1 },
+  subtitle: { fontSize: 12.5, color: colors.textMuted, marginTop: 3 },
+
+  segment: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    gap: 4,
+    backgroundColor: colors.surface,
+    borderRadius: radius.pill,
+    padding: 4,
     marginTop: spacing.md,
-    paddingTop: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
+    marginBottom: spacing.md,
   },
-  completedText: { fontSize: 12.5, fontWeight: '700', color: colors.primary },
-  confirmStatus: { fontSize: 11.5, color: colors.textMuted, marginTop: 6 },
-  assignBox: { marginTop: spacing.md, paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: colors.border },
-  assignLink: { fontSize: 12.5, fontWeight: '700', color: colors.primary },
-  assignLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-  },
-  assignInput: {
+  segmentItem: { flex: 1, paddingVertical: 8, borderRadius: radius.pill, alignItems: 'center' },
+  segmentItemOn: { backgroundColor: colors.primary },
+  segmentText: { fontSize: 13, fontWeight: '700', color: colors.textMuted },
+  segmentTextOn: { color: colors.textInverse },
+
+  card: { backgroundColor: colors.surface, borderRadius: radius.xl, padding: spacing.md, gap: spacing.sm },
+  head: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  avatar: { width: 38, height: 38, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { color: colors.textInverse, fontWeight: '800', fontSize: 13, letterSpacing: 0.3 },
+  customer: { fontSize: 16, fontWeight: '800', color: colors.text },
+  category: { fontSize: 12, color: colors.textMuted, marginTop: 1 },
+  expandButton: {
+    width: 30,
+    height: 30,
+    borderRadius: radius.md,
     backgroundColor: colors.surfaceAlt,
-    borderWidth: 1.5,
-    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  expandButtonPressed: { opacity: 0.6 },
+
+  summary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.md,
+    paddingVertical: 10,
+    paddingHorizontal: spacing.sm,
+  },
+  summaryLeft: { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 },
+  summaryText: { fontSize: 13, fontWeight: '700', flexShrink: 1 },
+  amount: { fontSize: 15, fontWeight: '800', color: colors.text },
+
+  actions: { flexDirection: 'row', gap: spacing.sm },
+  decline: { fontSize: 12.5, fontWeight: '600', color: colors.textFaint, textAlign: 'center', paddingVertical: 4 },
+  waiting: { fontSize: 12.5, color: colors.pending, lineHeight: 18, fontWeight: '600' },
+  youGet: { fontSize: 13, color: colors.success, fontWeight: '700' },
+
+  form: { gap: spacing.sm },
+  formLabel: { fontSize: 13, fontWeight: '700', color: colors.text },
+  input: {
+    fontSize: 15,
+    color: colors.text,
+    backgroundColor: colors.surfaceAlt,
     borderRadius: radius.md,
     padding: spacing.sm,
-    fontSize: 13,
-    color: colors.text,
-    marginTop: 6,
-    minHeight: 46,
-    textAlignVertical: 'top',
+    minHeight: 44,
   },
+  chipWrap: { flexDirection: 'row', flexWrap: 'wrap' },
+
+  details: { gap: 6, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.sm },
+  detailLabel: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: colors.textFaint,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+  },
+  detailBody: { fontSize: 13.5, color: colors.text, lineHeight: 19 },
+  detailRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  detailMeta: { fontSize: 12.5, color: colors.textMuted, flex: 1, lineHeight: 17 },
+  link: { color: colors.primary, fontWeight: '600' },
+
+  assignBlock: { marginTop: 4 },
   assignedRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   assignedTo: { fontSize: 13, fontWeight: '700', color: colors.text },
-  assignedStatus: { fontSize: 11.5, color: colors.textMuted, marginTop: 3 },
-  assignedNotes: { fontSize: 11.5, color: colors.textMuted, marginTop: 4, fontStyle: 'italic' },
-  unassignLink: { fontSize: 12, fontWeight: '700', color: colors.danger },
+  assignedStatus: { fontSize: 12, color: colors.textMuted, marginTop: 1 },
+  assignedNotes: { fontSize: 12, color: colors.textMuted, marginTop: 2, fontStyle: 'italic' },
+  assignLink: { fontSize: 12.5, fontWeight: '700', color: colors.primary, paddingVertical: 4 },
 });
