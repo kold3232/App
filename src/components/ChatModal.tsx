@@ -20,6 +20,7 @@ import { ChatMessageSender, ServiceRequest } from '../types';
 import { colors, radius, spacing } from '../theme';
 import { notify } from '../utils/alert';
 import { blockedMessageFor } from '../utils/contactFilter';
+import { MIN_CARD_PAYMENT, tooSmallToCharge } from '../utils/money';
 import { JobPaymentBar } from './JobPaymentBar';
 import { Button } from './ui';
 
@@ -100,6 +101,12 @@ export function ChatModal({
     const value = parseFloat(quoteAmount);
     if (!value || value <= 0) {
       notify('Enter an amount', 'Please enter a quote amount to send.');
+      return;
+    }
+    // Caught here rather than when the customer tries to pay it, which is too
+    // late to be anybody's fault but ours.
+    if (value < MIN_CARD_PAYMENT) {
+      notify('Too small to charge', tooSmallToCharge('a quote'));
       return;
     }
     sendQuote(request.id, value);

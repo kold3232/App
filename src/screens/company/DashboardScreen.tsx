@@ -14,6 +14,7 @@ import { notify } from '../../utils/alert';
 import { callNumber, googleMapsUrl, openInMaps } from '../../utils/maps';
 import { colorFromId } from '../../utils/color';
 import { hoursSince, timeAgo } from '../../utils/waiting';
+import { MIN_CARD_PAYMENT, tooSmallToCharge } from '../../utils/money';
 
 const SCHEDULE_TIMES = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'];
 
@@ -110,6 +111,12 @@ export default function DashboardScreen() {
     const value = parseFloat(jobValueInput);
     if (!value || value <= 0) {
       notify('Enter a job value', 'Please enter the final job value to complete this booking.');
+      return;
+    }
+    // The customer pays this on a card, so a figure below Stripe's floor would
+    // close the job and then refuse to be paid.
+    if (value < MIN_CARD_PAYMENT) {
+      notify('Too small to charge', tooSmallToCharge('a job'));
       return;
     }
     completeRequest(id, value);

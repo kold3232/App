@@ -5,6 +5,7 @@ import { useApp } from '../context/AppContext';
 import { ChatMessageSender, JobPayment, ServiceRequest } from '../types';
 import { colors, radius, spacing } from '../theme';
 import { confirmAction, notify } from '../utils/alert';
+import { MIN_CARD_PAYMENT, tooSmallToCharge } from '../utils/money';
 import { Button } from './ui';
 
 const money = (n: number) => `£${n.toFixed(2)}`;
@@ -80,6 +81,10 @@ export function JobPaymentBar({
     const amount = parseFloat(depositInput);
     if (!amount || amount <= 0) {
       notify('Enter an amount', 'Type how much deposit you need before the job starts.');
+      return;
+    }
+    if (amount < MIN_CARD_PAYMENT) {
+      notify('Too small to charge', tooSmallToCharge('a deposit'));
       return;
     }
     setBusy(true);

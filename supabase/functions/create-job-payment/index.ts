@@ -36,6 +36,12 @@ const MIN_COMMISSION_RATE = 0.05;
 const round2 = (n: number) => Math.round(n * 100) / 100;
 const toPence = (n: number) => Math.round(n * 100);
 
+// Stripe will not process a card charge below this, and the error it raises
+// when you try reads like a stack trace. Caught here instead, so the person
+// holding the phone is told something they can act on.
+const MIN_CHARGE_PENCE = 30;
+const money = (n: number) => `£${n.toFixed(2)}`;
+
 function jsonResponse(body: unknown, status: number) {
   return new Response(JSON.stringify(body), {
     status,
@@ -166,6 +172,18 @@ Deno.serve(async (req) => {
       description = `${listing.name ?? business.name ?? 'RockServ job'} — balance`;
     }
 
+    if (toPence(amount) < MIN_CHARGE_PENCE) {
+      return jsonResponse(
+        {
+          error:
+            kind === 'deposit'
+              ? `A card payment has to be at least ${money(MIN_CHARGE_PENCE / 100)}, and this deposit is ${money(amount)}. Ask ${business.name ?? 'the business'} to request a larger one.`
+              : `A card payment has to be at least ${money(MIN_CHARGE_PENCE / 100)}, and this balance is ${money(amount)}. Ask ${business.name ?? 'the business'} to settle it another way.`,
+        },
+        409
+      );
+    }
+
     // Never take more in fees than the payment itself — a guard against an
     // arithmetic slip somewhere above ever producing a negative transfer.
     if (commission > amount) {
@@ -224,6 +242,13 @@ Deno.serve(async (req) => {
     );
   } catch (err) {
     console.error('create-job-payment error', err);
-    return jsonResponse({ error: 'Could not start the payment.' }, 500);
+    // Stripe's own wording can name account ids and internals, so it is logged
+    // rather than shown. The code is safe and is the one thing that makes a
+    // report like "it just says it failed" diagnosable.
+    const code = (err as { code?: string; raw?: { code?: string } })?.code ?? (err as { raw?: { code?: string } })?.raw?.code;
+    return jsonResponse(
+      { error: code ? `Could not start the payment (${code}).` : 'Could not start the payment.' },
+      500
+    );
   }
 });

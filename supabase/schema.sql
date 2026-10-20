@@ -2400,3 +2400,40 @@ $$;
 
 revoke all on function public.listing_response_times() from public;
 grant execute on function public.listing_response_times() to anon, authenticated;
+
+-- RockServ — nothing unpayable
+-- Stripe will not process a card charge below 30p in sterling, and a deposit
+-- under that could be requested, accepted, and then simply refuse to be paid:
+-- the customer got "Could not start the payment" with no way to act on it.
+--
+-- The screens check this too, so the business is told while they are typing.
+-- This is the backstop, and the reason the number lives in two places is that
+-- a screen can be bypassed and this cannot.
+create or replace function public.check_deposit_amount()
+returns trigger language plpgsql as $$
+declare
+  ceiling numeric(10, 2);
+begin
+  if new.deposit_amount is null then
+    return new;
+  end if;
+  if new.deposit_amount <= 0 then
+    raise exception 'A deposit has to be more than nothing.'
+      using errcode = 'check_violation';
+  end if;
+  if new.deposit_amount < 0.30 then
+    raise exception 'Card payments have to be at least £0.30, so a deposit cannot be less than that.'
+      using errcode = 'check_violation';
+  end if;
+
+  ceiling := coalesce(new.job_value, new.quoted_amount);
+  if ceiling is null then
+    raise exception 'Send the customer a quote before asking for a deposit.'
+      using errcode = 'check_violation';
+  end if;
+  if new.deposit_amount > ceiling then
+    raise exception 'A deposit cannot be more than the job itself (%).', ceiling
+      using errcode = 'check_violation';
+  end if;
+  return new;
+end $$;
